@@ -77,7 +77,7 @@ jobs:
         GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o navigator-darwin-arm64 ./cmd/navigator
     
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: navigator-binaries
         path: navigator-*
