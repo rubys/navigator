@@ -41,7 +41,13 @@ jobs:
       run: go build -o navigator cmd/navigator/main.go
     
     - name: Test binary
-      run: ./navigator -rails-root /tmp -listen :0 &
+      run: |
+        # Create minimal test environment
+        mkdir -p /tmp/test-rails/config/tenant
+        echo '"2025": {}' > /tmp/test-rails/config/tenant/showcases.yml
+        
+        # Test that binary starts and exits cleanly
+        timeout 5s ./navigator -rails-root /tmp/test-rails -listen :0 || [ $? -eq 124 ]
       
   build:
     runs-on: ubuntu-latest
