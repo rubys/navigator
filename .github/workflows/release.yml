@@ -1,0 +1,166 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags (v1.0.0, v0.2.1, etc.)
+
+permissions:
+  contents: write  # Required to create releases and upload assets
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for changelog generation
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Verify dependencies
+      run: go mod verify
+    
+    - name: Run tests
+      run: go test -race -cover ./...
+    
+    - name: Extract version from tag
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+    
+    - name: Build binaries
+      run: |
+        mkdir -p dist
+        
+        # Build flags with version info
+        BUILD_FLAGS="-s -w -X main.version=${{ env.VERSION }} -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.gitCommit=$(git rev-parse --short HEAD)"
+        
+        # Linux AMD64
+        echo "Building for Linux AMD64..."
+        GOOS=linux GOARCH=amd64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-linux-amd64 ./cmd/navigator
+        
+        # Linux ARM64
+        echo "Building for Linux ARM64..."
+        GOOS=linux GOARCH=arm64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-linux-arm64 ./cmd/navigator
+        
+        # macOS AMD64
+        echo "Building for macOS AMD64..."
+        GOOS=darwin GOARCH=amd64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-darwin-amd64 ./cmd/navigator
+        
+        # macOS ARM64 (Apple Silicon)
+        echo "Building for macOS ARM64..."
+        GOOS=darwin GOARCH=arm64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-darwin-arm64 ./cmd/navigator
+        
+        # Windows AMD64
+        echo "Building for Windows AMD64..."
+        GOOS=windows GOARCH=amd64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-windows-amd64.exe ./cmd/navigator
+        
+        # Windows ARM64
+        echo "Building for Windows ARM64..."
+        GOOS=windows GOARCH=arm64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-windows-arm64.exe ./cmd/navigator
+    
+    - name: Create compressed archives
+      run: |
+        cd dist
+        
+        # Create tar.gz for Unix systems
+        for binary in navigator-linux-* navigator-darwin-*; do
+          if [[ -f "$binary" ]]; then
+            echo "Creating archive for $binary..."
+            tar -czf "${binary}.tar.gz" "$binary"
+            rm "$binary"  # Remove uncompressed binary
+          fi
+        done
+        
+        # Create zip for Windows
+        for binary in navigator-windows-*.exe; do
+          if [[ -f "$binary" ]]; then
+            echo "Creating archive for $binary..."
+            zip "${binary%.exe}.zip" "$binary"
+            rm "$binary"  # Remove uncompressed binary
+          fi
+        done
+        
+        # List all created files
+        ls -la
+    
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        # Extract release notes from tag annotation if available
+        if git tag -l --format='%(contents)' ${{ env.VERSION }} | head -1 | grep -q .; then
+          echo "Using tag annotation for release notes"
+          git tag -l --format='%(contents)' ${{ env.VERSION }} > release_notes.md
+        else
+          echo "Generating automatic release notes"
+          echo "# Release ${{ env.VERSION }}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "## Changes" >> release_notes.md
+          echo "" >> release_notes.md
+          
+          # Get previous tag
+          PREV_TAG=$(git tag --sort=-version:refname | grep -A1 ${{ env.VERSION }} | tail -1)
+          if [[ -n "$PREV_TAG" && "$PREV_TAG" != "${{ env.VERSION }}" ]]; then
+            echo "Changes since $PREV_TAG:" >> release_notes.md
+            echo "" >> release_notes.md
+            git log --pretty=format:"- %s (%h)" $PREV_TAG..${{ env.VERSION }} >> release_notes.md
+          else
+            git log --pretty=format:"- %s (%h)" --max-count=10 >> release_notes.md
+          fi
+          
+          echo "" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Installation" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "Download the appropriate binary for your system from the assets below:" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "- **Linux AMD64**: \`navigator-linux-amd64.tar.gz\`" >> release_notes.md
+          echo "- **Linux ARM64**: \`navigator-linux-arm64.tar.gz\`" >> release_notes.md
+          echo "- **macOS AMD64**: \`navigator-darwin-amd64.tar.gz\`" >> release_notes.md
+          echo "- **macOS ARM64**: \`navigator-darwin-arm64.tar.gz\`" >> release_notes.md
+          echo "- **Windows AMD64**: \`navigator-windows-amd64.zip\`" >> release_notes.md
+          echo "- **Windows ARM64**: \`navigator-windows-arm64.zip\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "Extract the binary and run:" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "./navigator serve --rails-root /path/to/your/rails/app" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+        fi
+        
+        echo "release_notes_file=release_notes.md" >> $GITHUB_OUTPUT
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.VERSION }}
+        name: "Navigator ${{ env.VERSION }}"
+        body_path: ${{ steps.release_notes.outputs.release_notes_file }}
+        draft: false
+        prerelease: ${{ contains(env.VERSION, '-') }}  # Mark as prerelease if version contains hyphen (v1.0.0-beta)
+        files: |
+          dist/*
+        generate_release_notes: true  # Generate additional automatic release notes
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: navigator-release-${{ env.VERSION }}
+        path: dist/
+        retention-days: 90

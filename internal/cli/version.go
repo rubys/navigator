@@ -31,3 +31,16 @@ var versionCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(versionCmd)
 }
+
+// SetVersionInfo sets the version information (called from main)
+func SetVersionInfo(version, buildDate, gitCommit string) {
+	if version != "" {
+		Version = version
+	}
+	if buildDate != "" {
+		BuildDate = buildDate
+	}
+	if gitCommit != "" {
+		GitCommit = gitCommit
+	}
+}
