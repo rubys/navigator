@@ -50,7 +50,7 @@ type LoggingConfig struct {
 
 // LoadConfig loads configuration from file, environment variables, and command line flags
 func LoadConfig(configFile string) (*Config, error) {
-	v := viper.New()
+	v := viper.GetViper() // Use global viper instance instead of creating new one
 
 	// Set configuration defaults
 	setDefaults(v)

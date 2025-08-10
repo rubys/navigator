@@ -26,7 +26,12 @@ Examples:
   navigator config validate --config /etc/navigator/navigator.yaml
   navigator config validate --rails-root /path/to/rails/app`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg := GetConfig()
+		// Load configuration - flag binding should work with global Viper instance
+		cfg, err := LoadConfig(cfgFile)
+		if err != nil {
+			fmt.Printf("Error loading configuration: %v\n", err)
+			os.Exit(1)
+		}
 		validateConfig(cfg)
 	},
 }

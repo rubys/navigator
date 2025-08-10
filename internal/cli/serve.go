@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -33,7 +34,12 @@ Examples:
   navigator serve --config /etc/navigator/navigator.yaml
   navigator serve --rails-root /app --listen :8080 --log-level debug`,
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg := GetConfig()
+		// Load configuration - flag binding should work with global Viper instance
+		cfg, err := LoadConfig(cfgFile)
+		if err != nil {
+			fmt.Printf("Error loading configuration: %v\n", err)
+			os.Exit(1)
+		}
 		runServer(cfg)
 	},
 }
