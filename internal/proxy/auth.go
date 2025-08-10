@@ -83,11 +83,11 @@ func (h *HtpasswdAuth) CheckPassword(username, password string) bool {
 	defer h.mu.RUnlock()
 
 	log.Printf("Checking password for user: %s", username)
-	
+
 	// Use go-htpasswd library for verification
 	match := h.htpasswd.Match(username, password)
 	log.Printf("Password verification result for user %s: %v", username, match)
-	
+
 	return match
 }
 
@@ -104,7 +104,7 @@ func (h *HtpasswdAuth) SetRealm(realm string) {
 	h.realm = realm
 }
 
-// ListUsers returns all usernames  
+// ListUsers returns all usernames
 func (h *HtpasswdAuth) ListUsers() []string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -114,4 +114,3 @@ func (h *HtpasswdAuth) ListUsers() []string {
 	// The main functionality (authentication) works without this
 	return []string{}
 }
-

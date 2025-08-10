@@ -23,7 +23,7 @@ type ChiServer struct {
 func NewChiServer(router *chi.Mux, listenAddr string) *ChiServer {
 	// Setup HTTP/2 support
 	h2s := &http2.Server{}
-	
+
 	// Create the HTTP server
 	httpServer := &http.Server{
 		Addr:         listenAddr,
@@ -43,11 +43,11 @@ func NewChiServer(router *chi.Mux, listenAddr string) *ChiServer {
 // Start starts the HTTP server
 func (s *ChiServer) Start() error {
 	logger.WithField("address", s.listenAddr).Info("Starting HTTP server with HTTP/2 support")
-	
+
 	if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server failed: %w", err)
 	}
-	
+
 	return nil
 }
 

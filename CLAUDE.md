@@ -11,8 +11,8 @@ Navigator is a modern Go-based web server that replaces nginx/Passenger for mult
 ✅ **Chi Router Integration**: Replaced custom routing with github.com/go-chi/chi/v5
 ✅ **Structured Logging**: Implemented JSON logging with github.com/sirupsen/logrus  
 ✅ **HTTP Caching**: Added memory caching with github.com/victorspringer/http-cache
-🔲 **Viper Configuration**: Command-line flags only (no YAML/ENV support yet)
-🔲 **Cobra CLI**: Simple flag parsing (no subcommands yet)
+✅ **Viper Configuration**: YAML/ENV/CLI support with github.com/spf13/viper
+✅ **Cobra CLI**: Full CLI with subcommands using github.com/spf13/cobra
 
 ## Architecture
 
@@ -65,13 +65,23 @@ Navigator is a modern Go-based web server that replaces nginx/Passenger for mult
 go build -o navigator cmd/navigator/main.go
 
 # Run with command-line arguments
-./navigator -rails-root /path/to/rails/app -listen :3000
+./navigator serve --rails-root /path/to/rails/app --listen :3000
 
 # Run with configuration file
-./navigator -config configs/navigator.yml
+./navigator serve --config configs/navigator.yaml
+
+# Run with environment variables
+NAVIGATOR_RAILS_ROOT=/path/to/app ./navigator serve
 
 # Build and run in one command
-go build -o navigator cmd/navigator/main.go && ./navigator -rails-root /Users/rubys/git/showcase
+go build -o navigator cmd/navigator/main.go && ./navigator serve --rails-root /Users/rubys/git/showcase
+
+# View help and available commands
+./navigator --help
+./navigator serve --help
+
+# Validate configuration
+./navigator config validate --rails-root /path/to/app
 ```
 
 ### Development Workflow
@@ -134,32 +144,54 @@ When a Puma process dies, Navigator automatically:
 
 ## Configuration
 
-### Command-Line Arguments
+### Configuration Methods
 
-All configuration can be provided via command-line arguments:
+Navigator supports three configuration methods (in order of precedence):
 
+1. **Command-line flags** (highest priority):
 ```bash
-./navigator \
-  -rails-root /path/to/rails/app \
-  -listen :3000 \
-  -url-prefix /showcase \
-  -max-puma 20 \
-  -idle-timeout 10m
+./navigator serve \
+  --rails-root /path/to/rails/app \
+  --listen :3000 \
+  --url-prefix /showcase \
+  --max-puma 20 \
+  --idle-timeout 10m \
+  --htpasswd /path/to/htpasswd
 ```
 
-### Configuration
-
-Navigator uses command-line flags for configuration:
-
+2. **Environment variables**:
 ```bash
-./navigator \
-  -rails-root /path/to/rails/app \
-  -listen :3000 \
-  -url-prefix /showcase \
-  -max-puma 20 \
-  -idle-timeout 10m \
-  -htpasswd /path/to/htpasswd
+export NAVIGATOR_RAILS_ROOT="/path/to/rails/app"
+export NAVIGATOR_SERVER_LISTEN=":3000"
+export NAVIGATOR_SERVER_URL_PREFIX="/showcase"
+export NAVIGATOR_MANAGER_MAX_PUMA=20
+export NAVIGATOR_MANAGER_IDLE_TIMEOUT="10m"
+export NAVIGATOR_AUTH_HTPASSWD_FILE="/path/to/htpasswd"
+./navigator serve
 ```
+
+3. **YAML configuration file** (lowest priority):
+```yaml
+# config/navigator.yaml
+server:
+  listen: ":3000"
+  url_prefix: "/showcase"
+
+rails:
+  root: "/path/to/rails/app"
+
+manager:
+  max_puma: 20
+  idle_timeout: "10m"
+
+auth:
+  htpasswd_file: "/path/to/htpasswd"
+
+logging:
+  level: "info"
+```
+
+Then run: `./navigator serve --config config/navigator.yaml`
 
 ### Rails Integration
 
@@ -302,9 +334,14 @@ WantedBy=multi-user.target
 
 ## Dependencies
 
-- **Go 1.19+**: Modern Go features and performance
+- **Go 1.22+**: Modern Go features and performance
 - **gopkg.in/yaml.v3**: YAML parsing with Ruby symbol support
 - **github.com/tg123/go-htpasswd**: APR1 password hash support
+- **github.com/spf13/cobra**: CLI framework with subcommands
+- **github.com/spf13/viper**: Configuration management with YAML/ENV support
+- **github.com/go-chi/chi/v5**: HTTP router and middleware
+- **github.com/sirupsen/logrus**: Structured JSON logging
+- **github.com/victorspringer/http-cache**: HTTP caching middleware
 
 ## Security Considerations
 

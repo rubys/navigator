@@ -41,7 +41,7 @@ type Config struct {
 
 // PumaManager manages Puma processes for different tenants
 type PumaManager struct {
-	Config    Config // Exported for access by proxy
+	Config    Config                  // Exported for access by proxy
 	processes map[string]*PumaProcess // key is tenant label
 	portPool  *PortPool
 	mu        sync.RWMutex
@@ -65,12 +65,12 @@ func NewPortPool(basePort, maxPorts int) *PortPool {
 		maxPorts: maxPorts,
 		inUse:    make(map[int]bool),
 	}
-	
+
 	// Initialize available ports
 	for i := 0; i < maxPorts; i++ {
 		pool.available = append(pool.available, basePort+i)
 	}
-	
+
 	return pool
 }
 
@@ -78,15 +78,15 @@ func NewPortPool(basePort, maxPorts int) *PortPool {
 func (p *PortPool) Get() (int, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	if len(p.available) == 0 {
 		return 0, fmt.Errorf("no available ports")
 	}
-	
+
 	port := p.available[0]
 	p.available = p.available[1:]
 	p.inUse[port] = true
-	
+
 	return port, nil
 }
 
@@ -94,7 +94,7 @@ func (p *PortPool) Get() (int, error) {
 func (p *PortPool) Release(port int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	if p.inUse[port] {
 		delete(p.inUse, port)
 		p.available = append(p.available, port)
@@ -104,7 +104,7 @@ func (p *PortPool) Release(port int) {
 // NewPumaManager creates a new Puma process manager
 func NewPumaManager(cfg Config) *PumaManager {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	manager := &PumaManager{
 		Config:    cfg,
 		processes: make(map[string]*PumaProcess),
@@ -112,10 +112,10 @@ func NewPumaManager(cfg Config) *PumaManager {
 		ctx:       ctx,
 		cancel:    cancel,
 	}
-	
+
 	// Start idle process cleanup routine
 	go manager.cleanupIdleProcesses()
-	
+
 	return manager
 }
 
@@ -124,26 +124,26 @@ func (m *PumaManager) GetOrStart(tenant *config.Tenant) (*PumaProcess, error) {
 	m.mu.RLock()
 	process, exists := m.processes[tenant.Label]
 	m.mu.RUnlock()
-	
+
 	if exists {
 		process.mu.Lock()
 		process.LastUsed = time.Now()
 		process.mu.Unlock()
-		
+
 		// Check if process is still alive
 		if process.Cmd != nil && process.Cmd.Process != nil {
 			if err := process.Cmd.Process.Signal(syscall.Signal(0)); err == nil {
 				return process, nil
 			}
 		}
-		
+
 		// Process died, remove it
 		m.mu.Lock()
 		delete(m.processes, tenant.Label)
 		m.mu.Unlock()
 		m.portPool.Release(process.Port)
 	}
-	
+
 	// Start new process
 	return m.Start(tenant)
 }
@@ -152,21 +152,21 @@ func (m *PumaManager) GetOrStart(tenant *config.Tenant) (*PumaProcess, error) {
 func (m *PumaManager) Start(tenant *config.Tenant) (*PumaProcess, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	// Check if already running
 	if process, exists := m.processes[tenant.Label]; exists {
 		return process, nil
 	}
-	
+
 	// Allocate port
 	port, err := m.portPool.Get()
 	if err != nil {
 		return nil, fmt.Errorf("failed to allocate port: %w", err)
 	}
-	
+
 	// Set port on tenant
 	tenant.PumaPort = port
-	
+
 	// Create process
 	process := &PumaProcess{
 		Tenant:    tenant,
@@ -175,23 +175,23 @@ func (m *PumaManager) Start(tenant *config.Tenant) (*PumaProcess, error) {
 		LastUsed:  time.Now(),
 		stopChan:  make(chan struct{}),
 	}
-	
+
 	// Build Puma command
 	cmd := exec.Command(
 		"bundle", "exec", "puma",
 		"-p", fmt.Sprintf("%d", port),
 		"-e", "production",
-		"-t", "5:5",  // 5 threads
-		"-w", "2",    // 2 workers
+		"-t", "5:5", // 5 threads
+		"-w", "2", // 2 workers
 		"--pidfile", filepath.Join(m.Config.RailsRoot, "tmp/pids", fmt.Sprintf("%s.pid", tenant.Label)),
 	)
-	
+
 	// Set working directory
 	cmd.Dir = m.Config.RailsRoot
-	
+
 	// Set environment
 	cmd.Env = append(os.Environ(), tenant.GetEnvironment(m.Config.RailsRoot, m.Config.DbPath, m.Config.StoragePath)...)
-	
+
 	// Set up logging
 	logPath := m.Config.LogPath
 	if logPath == "" {
@@ -202,33 +202,33 @@ func (m *PumaManager) Start(tenant *config.Tenant) (*PumaProcess, error) {
 		cmd.Stdout = file
 		cmd.Stderr = file
 	}
-	
+
 	// Start the process
 	if err := cmd.Start(); err != nil {
 		m.portPool.Release(port)
 		return nil, fmt.Errorf("failed to start Puma: %w", err)
 	}
-	
+
 	process.Cmd = cmd
-	
+
 	// Wait for Puma to be ready
 	if err := m.waitForPuma(port, 30*time.Second); err != nil {
 		cmd.Process.Kill()
 		m.portPool.Release(port)
 		return nil, fmt.Errorf("Puma failed to start: %w", err)
 	}
-	
+
 	// Store process
 	m.processes[tenant.Label] = process
-	
+
 	logger.WithFields(map[string]interface{}{
 		"tenant": tenant.Label,
 		"port":   port,
 	}).Info("Started Puma process")
-	
+
 	// Monitor process
 	go m.monitorProcess(process)
-	
+
 	return process, nil
 }
 
@@ -236,26 +236,26 @@ func (m *PumaManager) Start(tenant *config.Tenant) (*PumaProcess, error) {
 func (m *PumaManager) Stop(label string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	process, exists := m.processes[label]
 	if !exists {
 		return nil
 	}
-	
+
 	// Signal stop
 	close(process.stopChan)
-	
+
 	// Try graceful shutdown first
 	if process.Cmd != nil && process.Cmd.Process != nil {
 		process.Cmd.Process.Signal(syscall.SIGTERM)
-		
+
 		// Wait up to 10 seconds for graceful shutdown
 		done := make(chan struct{})
 		go func() {
 			process.Cmd.Wait()
 			close(done)
 		}()
-		
+
 		select {
 		case <-done:
 			// Graceful shutdown succeeded
@@ -264,29 +264,29 @@ func (m *PumaManager) Stop(label string) error {
 			process.Cmd.Process.Kill()
 		}
 	}
-	
+
 	// Release port
 	m.portPool.Release(process.Port)
-	
+
 	// Remove from map
 	delete(m.processes, label)
-	
+
 	logger.WithField("tenant", label).Info("Stopped Puma process")
-	
+
 	return nil
 }
 
 // StopAll stops all Puma processes
 func (m *PumaManager) StopAll() {
 	m.cancel() // Cancel context to stop cleanup routine
-	
+
 	m.mu.RLock()
 	labels := make([]string, 0, len(m.processes))
 	for label := range m.processes {
 		labels = append(labels, label)
 	}
 	m.mu.RUnlock()
-	
+
 	for _, label := range labels {
 		m.Stop(label)
 	}
@@ -303,7 +303,7 @@ func (m *PumaManager) GetProcess(label string) *PumaProcess {
 func (m *PumaManager) ListProcesses() []*PumaProcess {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	list := make([]*PumaProcess, 0, len(m.processes))
 	for _, p := range m.processes {
 		list = append(list, p)
@@ -314,7 +314,7 @@ func (m *PumaManager) ListProcesses() []*PumaProcess {
 // waitForPuma waits for Puma to start accepting connections
 func (m *PumaManager) waitForPuma(port int, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
-	
+
 	for time.Now().Before(deadline) {
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), time.Second)
 		if err == nil {
@@ -323,7 +323,7 @@ func (m *PumaManager) waitForPuma(port int, timeout time.Duration) error {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	
+
 	return fmt.Errorf("timeout waiting for Puma to start on port %d", port)
 }
 
@@ -337,7 +337,7 @@ func (m *PumaManager) monitorProcess(process *PumaProcess) {
 		// Wait for process to exit
 		if process.Cmd != nil {
 			process.Cmd.Wait()
-			
+
 			// Process crashed, clean up
 			m.mu.Lock()
 			if current, exists := m.processes[process.Tenant.Label]; exists && current == process {
@@ -354,7 +354,7 @@ func (m *PumaManager) monitorProcess(process *PumaProcess) {
 func (m *PumaManager) cleanupIdleProcesses() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-m.ctx.Done():
@@ -363,18 +363,18 @@ func (m *PumaManager) cleanupIdleProcesses() {
 			m.mu.RLock()
 			now := time.Now()
 			toStop := []string{}
-			
+
 			for label, process := range m.processes {
 				process.mu.RLock()
 				idle := now.Sub(process.LastUsed)
 				process.mu.RUnlock()
-				
+
 				if idle > m.Config.IdleTimeout {
 					toStop = append(toStop, label)
 				}
 			}
 			m.mu.RUnlock()
-			
+
 			for _, label := range toStop {
 				logger.WithField("tenant", label).Info("Stopping idle Puma process")
 				m.Stop(label)
@@ -395,18 +395,18 @@ func (p *PumaProcess) IsHealthy() bool {
 	if p.Cmd == nil || p.Cmd.Process == nil {
 		return false
 	}
-	
+
 	// Check if process is still running
 	if err := p.Cmd.Process.Signal(syscall.Signal(0)); err != nil {
 		return false
 	}
-	
+
 	// Check if port is listening
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", p.Port), time.Second)
 	if err != nil {
 		return false
 	}
 	conn.Close()
-	
+
 	return true
 }

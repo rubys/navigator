@@ -13,7 +13,7 @@ var log *logrus.Logger
 // Init initializes the logger with the specified level
 func Init(level string) {
 	log = logrus.New()
-	
+
 	// Set output format
 	log.SetFormatter(&logrus.JSONFormatter{
 		TimestampFormat: "2006-01-02T15:04:05.000Z07:00",
@@ -23,10 +23,10 @@ func Init(level string) {
 			logrus.FieldKeyMsg:   "message",
 		},
 	})
-	
+
 	// Set output destination
 	log.SetOutput(os.Stdout)
-	
+
 	// Parse and set log level
 	logLevel, err := logrus.ParseLevel(level)
 	if err != nil {
@@ -34,7 +34,7 @@ func Init(level string) {
 		logLevel = logrus.InfoLevel
 	}
 	log.SetLevel(logLevel)
-	
+
 	log.WithField("level", level).Info("Logger initialized")
 }
 
@@ -64,12 +64,12 @@ func WithTenant(tenant string) *logrus.Entry {
 // WithRequest creates a new entry with request information from context
 func WithRequest(ctx context.Context) *logrus.Entry {
 	fields := logrus.Fields{}
-	
+
 	// Extract request ID if available
 	if requestID := middleware.GetReqID(ctx); requestID != "" {
 		fields["request_id"] = requestID
 	}
-	
+
 	return WithFields(fields)
 }
 

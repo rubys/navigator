@@ -84,11 +84,11 @@ func LoadShowcases(path string) (*Showcases, error) {
 
 	// Process all showcases
 	studiosMap := make(map[string]bool)
-	
+
 	for year, yearData := range raw {
 		for studioKey, info := range yearData {
 			studiosMap[studioKey] = true
-			
+
 			if info.Region != "" {
 				s.Regions[info.Region] = true
 			}
@@ -173,7 +173,7 @@ func (s *Showcases) GetTenant(label string) *Tenant {
 func (s *Showcases) GetTenantByPath(path string) *Tenant {
 	// Remove leading/trailing slashes
 	path = strings.Trim(path, "/")
-	
+
 	// Special case for index
 	if path == "" || path == "index" {
 		return s.GetTenant("index")
@@ -181,14 +181,14 @@ func (s *Showcases) GetTenantByPath(path string) *Tenant {
 
 	// Debug: log tenant lookup for troubleshooting
 	logger.WithFields(map[string]interface{}{
-		"path":        path,
+		"path":         path,
 		"tenant_count": len(s.Tenants),
 	}).Debug("Looking up tenant by path")
 
 	// Find the tenant with the longest matching scope (most specific match)
 	var bestMatch *Tenant
 	var bestMatchLength int
-	
+
 	for _, t := range s.Tenants {
 		if t.Scope != "" && strings.HasPrefix(path, t.Scope) {
 			logger.WithFields(map[string]interface{}{
@@ -247,13 +247,13 @@ func (s *Showcases) Reload() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Copy over the new data
 	s.Years = newConfig.Years
 	s.Tenants = newConfig.Tenants
 	s.Studios = newConfig.Studios
 	s.Regions = newConfig.Regions
-	
+
 	return nil
 }
 
@@ -272,11 +272,11 @@ func (t *Tenant) GetDatabasePath(dbRoot string) string {
 	if t.DbPath != "" {
 		return t.DbPath
 	}
-	
+
 	if t.Owner == "Demo" {
 		return filepath.Join("/demo/db", fmt.Sprintf("%s.sqlite3", t.Label))
 	}
-	
+
 	return filepath.Join(dbRoot, fmt.Sprintf("%s.sqlite3", t.Label))
 }
 
@@ -297,7 +297,7 @@ func (t *Tenant) GetEnvironment(railsRoot, dbPath, storagePath string) []string 
 		fmt.Sprintf("RAILS_STORAGE=%s", t.GetStoragePath(storagePath)),
 		fmt.Sprintf("RAILS_APP_SCOPE=%s", t.Scope),
 		"RAILS_ENV=production",
-		"RAILS_PROXY_HOST=localhost:3000", // Set proxy host for Rails templates
+		"RAILS_PROXY_HOST=localhost:3000",     // Set proxy host for Rails templates
 		"RAILS_APP_REDIS=showcase_production", // Redis configuration
 	}
 
@@ -309,7 +309,7 @@ func (t *Tenant) GetEnvironment(railsRoot, dbPath, storagePath string) []string 
 			logo = "arthur-murray-logo.gif"
 		}
 		env = append(env, fmt.Sprintf("SHOWCASE_LOGO=%s", logo))
-		
+
 		locale := t.Locale
 		if locale == "" {
 			locale = "en_US"

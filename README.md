@@ -1,6 +1,6 @@
 # Navigator
 
-Navigator is a modern Go-based web server that replaces nginx/Passenger for multi-tenant Rails applications. It provides intelligent request routing, dynamic process management, authentication, and high-performance caching.
+Navigator is a modern Go-based web server that replaces nginx/Passenger for multi-tenant Rails applications. It provides intelligent request routing, dynamic process management, authentication, HTTP/2 support, and high-performance caching with flexible configuration options.
 
 ## Features
 
@@ -13,6 +13,8 @@ Navigator is a modern Go-based web server that replaces nginx/Passenger for mult
 - **Authentication**: HTTP Basic authentication support via htpasswd files
 - **Smart Asset Serving**: Different cache TTLs for fingerprinted vs regular assets
 - **Compression**: Gzip compression for text-based content
+- **Flexible Configuration**: YAML files, environment variables, and command-line flags
+- **Modern CLI**: Cobra-powered CLI with subcommands and comprehensive help
 
 ## Architecture
 
@@ -20,6 +22,8 @@ Built with modern Go libraries:
 - **[Chi Router](https://github.com/go-chi/chi)**: Fast HTTP router with middleware support
 - **[Logrus](https://github.com/sirupsen/logrus)**: Structured logging with JSON output
 - **[HTTP Cache](https://github.com/victorspringer/http-cache)**: Memory-based caching with LRU eviction
+- **[Cobra](https://github.com/spf13/cobra)**: Modern CLI framework with subcommands
+- **[Viper](https://github.com/spf13/viper)**: Configuration management with YAML/ENV support
 
 ## Installation
 
@@ -38,58 +42,95 @@ go build -o navigator cmd/navigator/main.go
 ## Quick Start
 
 ```bash
-./navigator -rails-root /path/to/rails/app -listen :3000
+# Start Navigator with command-line flags
+./navigator serve --rails-root /path/to/rails/app --listen :3000
+
+# Or use environment variables
+NAVIGATOR_RAILS_ROOT=/path/to/rails/app ./navigator serve
+
+# Or use a configuration file
+./navigator serve --config /path/to/navigator.yaml
+
+# Get help and see all available commands
+./navigator --help
+./navigator serve --help
 ```
 
 ## Configuration
 
-Navigator uses command-line flags for configuration:
+Navigator supports three configuration methods (in order of precedence):
 
-### Required Arguments
-
-```bash
--rails-root string
-    Rails application root directory (required)
-```
-
-### Optional Arguments
+### 1. Command-Line Flags (Highest Priority)
 
 ```bash
--listen string
-    Address to listen on (default ":3000")
--showcases string
-    Path to showcases.yml relative to rails-root (default "config/tenant/showcases.yml")
--db-path string
-    Database directory path (default "db")
--storage string
-    Storage directory path (default "storage")
--htpasswd string
-    Path to htpasswd file
--url-prefix string
-    URL prefix to strip from requests (default "/showcase")
--max-puma int
-    Maximum number of concurrent Puma processes (default 10)
--idle-timeout duration
-    Idle timeout before stopping Puma process (default 5m0s)
--log-level string
-    Log level: debug, info, warn, error (default "info")
+./navigator serve \
+  --rails-root /path/to/rails/app \
+  --listen :3000 \
+  --url-prefix /showcase \
+  --max-puma 20 \
+  --idle-timeout 10m \
+  --log-level debug \
+  --htpasswd /path/to/htpasswd
 ```
 
-### Example Usage
+### 2. Environment Variables
+
+All configuration can be set via environment variables with the `NAVIGATOR_` prefix:
 
 ```bash
-# Basic usage
-./navigator -rails-root /opt/rails/showcase
+export NAVIGATOR_RAILS_ROOT="/path/to/rails/app"
+export NAVIGATOR_SERVER_LISTEN=":3000"
+export NAVIGATOR_SERVER_URL_PREFIX="/showcase"
+export NAVIGATOR_MANAGER_MAX_PUMA=20
+export NAVIGATOR_MANAGER_IDLE_TIMEOUT="10m"
+export NAVIGATOR_AUTH_HTPASSWD_FILE="/path/to/htpasswd"
+export NAVIGATOR_LOGGING_LEVEL="debug"
 
-# With custom settings
-./navigator \
-  -rails-root /opt/rails/showcase \
-  -listen :8080 \
-  -max-puma 20 \
-  -idle-timeout 10m \
-  -log-level debug \
-  -htpasswd /etc/navigator/htpasswd
+./navigator serve
 ```
+
+### 3. YAML Configuration File (Lowest Priority)
+
+Create a `navigator.yaml` file:
+
+```yaml
+server:
+  listen: ":3000"
+  url_prefix: "/showcase"
+
+rails:
+  root: "/path/to/rails/app"
+  showcases: "config/tenant/showcases.yml"
+  db_path: "db"
+  storage: "storage"
+
+manager:
+  max_puma: 20
+  idle_timeout: "10m"
+
+auth:
+  htpasswd_file: "/path/to/htpasswd"
+
+logging:
+  level: "debug"
+```
+
+Then run:
+```bash
+./navigator serve --config navigator.yaml
+```
+
+### Configuration Options
+
+| Option | CLI Flag | Environment Variable | Default | Description |
+|--------|----------|---------------------|---------|-------------|
+| Rails Root | `--rails-root` | `NAVIGATOR_RAILS_ROOT` | *required* | Rails application directory |
+| Listen Address | `--listen` | `NAVIGATOR_SERVER_LISTEN` | `:3000` | HTTP server bind address |
+| URL Prefix | `--url-prefix` | `NAVIGATOR_SERVER_URL_PREFIX` | `/showcase` | URL prefix to strip |
+| Max Puma | `--max-puma` | `NAVIGATOR_MANAGER_MAX_PUMA` | `10` | Max concurrent Puma processes |
+| Idle Timeout | `--idle-timeout` | `NAVIGATOR_MANAGER_IDLE_TIMEOUT` | `5m` | Process idle timeout |
+| Htpasswd File | `--htpasswd` | `NAVIGATOR_AUTH_HTPASSWD_FILE` | `` | Authentication file path |
+| Log Level | `--log-level` | `NAVIGATOR_LOGGING_LEVEL` | `info` | Log level (debug/info/warn/error) |
 
 ## Performance
 
@@ -122,7 +163,44 @@ All logs are output in JSON format for easy parsing:
 
 Enable debug logging for detailed tenant routing:
 ```bash
-./navigator -rails-root /path/to/app -log-level debug
+./navigator serve --rails-root /path/to/app --log-level debug
+```
+
+## CLI Commands
+
+Navigator provides several commands for different operations:
+
+### `navigator serve`
+Start the Navigator server (main command):
+```bash
+./navigator serve --rails-root /path/to/rails/app
+```
+
+### `navigator config validate`
+Validate configuration and display resolved settings:
+```bash
+./navigator config validate --rails-root /path/to/app
+./navigator config validate --config navigator.yaml
+```
+
+This command will:
+- Load and validate configuration from all sources
+- Check that required files exist (Rails root, showcases.yml)
+- Display the final resolved configuration
+- Show configured tenants
+
+### `navigator version`
+Display version information:
+```bash
+./navigator version
+```
+
+### `navigator --help`
+Show comprehensive help:
+```bash
+./navigator --help           # Show all commands
+./navigator serve --help     # Show serve command options
+./navigator config --help    # Show config subcommands
 ```
 
 ## Rails Integration
@@ -199,11 +277,13 @@ Supports APR1, Bcrypt, SHA, and Crypt hash formats.
 navigator/
 ├── cmd/navigator/          # Main application entry point
 ├── internal/
+│   ├── cli/               # Cobra CLI commands and Viper configuration
 │   ├── config/            # Configuration and YAML parsing  
 │   ├── logger/            # Structured logging wrapper
 │   ├── manager/           # Puma process management
 │   ├── proxy/             # HTTP routing, caching, auth
 │   └── server/            # HTTP/2 server implementation
+├── config/                # Example configuration files
 ├── go.mod                 # Go module definition
 ├── README.md              # This file
 └── LICENSE               # MIT license
@@ -254,7 +334,7 @@ After=network.target
 Type=simple
 User=rails
 WorkingDirectory=/opt/rails/app
-ExecStart=/usr/local/bin/navigator -rails-root /opt/rails/app -listen :3000
+ExecStart=/usr/local/bin/navigator serve --rails-root /opt/rails/app --listen :3000
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -284,7 +364,7 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app
 COPY --from=builder /app/navigator .
 EXPOSE 3000
-CMD ["./navigator", "-rails-root", "/app"]
+CMD ["./navigator", "serve", "--rails-root", "/app"]
 ```
 
 ## Monitoring
@@ -306,12 +386,12 @@ All operations are logged with structured JSON including:
 
 **Port conflicts**: Navigator manages ports 4000+ automatically
 ```bash
-./navigator -max-puma 50  # Increase port range
+./navigator serve --max-puma 50  # Increase port range
 ```
 
 **Authentication failures**: Check htpasswd format
 ```bash
-./navigator -log-level debug  # See auth details
+./navigator serve --log-level debug  # See auth details
 ```
 
 **Tenant not found**: Verify showcases.yml symbols
@@ -334,12 +414,14 @@ memory.AdapterWithCapacity(50000000)  // 50MB instead of 100MB
 
 ## Dependencies
 
-- **Go 1.19+**: Modern Go features
-- **Chi v5**: HTTP router with middleware
-- **Logrus**: Structured logging
-- **HTTP-Cache**: Memory caching with LRU
-- **htpasswd**: Password file support
-- **YAML v3**: Configuration parsing
+- **Go 1.22+**: Modern Go features and performance
+- **Chi v5**: HTTP router with middleware support
+- **Logrus**: Structured JSON logging
+- **HTTP-Cache**: Memory caching with LRU eviction
+- **Cobra**: Modern CLI framework with subcommands
+- **Viper**: Configuration management (YAML/ENV/flags)
+- **htpasswd**: Multi-format password file support
+- **YAML v3**: Configuration file parsing
 
 ## Contributing
 

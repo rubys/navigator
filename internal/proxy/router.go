@@ -43,7 +43,7 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 	if err != nil {
 		logger.WithField("error", err).Warn("Failed to initialize cache, proceeding without caching")
 	}
-	
+
 	var cacheClient *cache.Client
 	if memcached != nil {
 		cacheClient, err = cache.NewClient(
@@ -89,7 +89,7 @@ func NewRouter(cfg RouterConfig) *chi.Mux {
 	r.Use(h.structuredLogRequest)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5, "text/html", "text/css", "text/javascript", "application/json"))
-	
+
 	// Add cache middleware for static assets
 	if h.cacheClient != nil {
 		r.Use(h.cacheMiddleware)
@@ -114,11 +114,11 @@ func (h *Router) structuredLogRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-		
+
 		next.ServeHTTP(ww, r)
-		
+
 		duration := time.Since(start)
-		
+
 		logger.WithFields(map[string]interface{}{
 			"method":      r.Method,
 			"path":        r.URL.Path,
@@ -139,7 +139,7 @@ func (h *Router) cacheMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		
+
 		// Use the http-cache middleware for static assets
 		cacheHandler := h.cacheClient.Middleware(next)
 		cacheHandler.ServeHTTP(w, r)
@@ -148,8 +148,8 @@ func (h *Router) cacheMiddleware(next http.Handler) http.Handler {
 
 // isCacheableAsset checks if the path is for a cacheable static asset
 func (h *Router) isCacheableAsset(path string) bool {
-	return h.isAssetPath(path) || strings.HasSuffix(path, ".ico") || strings.HasSuffix(path, ".png") || 
-		   strings.HasSuffix(path, ".jpg") || strings.HasSuffix(path, ".gif") || strings.HasSuffix(path, ".svg")
+	return h.isAssetPath(path) || strings.HasSuffix(path, ".ico") || strings.HasSuffix(path, ".png") ||
+		strings.HasSuffix(path, ".jpg") || strings.HasSuffix(path, ".gif") || strings.HasSuffix(path, ".svg")
 }
 
 // isLongTermAsset checks if the asset should be cached for a longer period
@@ -198,7 +198,7 @@ func (h *Router) handleRequest(w http.ResponseWriter, r *http.Request) {
 		if h.serveStaticFile(w, r) {
 			return
 		}
-		
+
 		// Look up tenant
 		tenant = h.Showcases.GetTenantByPath(cleanPath)
 		if tenant != nil {
@@ -257,16 +257,16 @@ func (h *Router) proxyToTenant(w http.ResponseWriter, r *http.Request, tenant *c
 			"tenant": tenant.Label,
 			"error":  err,
 		}).Error("Proxy error occurred")
-		
+
 		// Check if this is a connection refused error (process died)
 		if strings.Contains(err.Error(), "connection refused") || strings.Contains(err.Error(), "dial tcp") {
 			logger.WithField("tenant", tenant.Label).Warn("Connection refused, attempting to restart process")
-			
+
 			// Clear the cached proxy
 			h.mu.Lock()
 			delete(h.proxies, tenant.Label)
 			h.mu.Unlock()
-			
+
 			// Attempt to restart the process
 			if newProcess, restartErr := h.Manager.GetOrStart(tenant); restartErr == nil {
 				// Process restarted successfully, create new proxy and retry
@@ -278,10 +278,10 @@ func (h *Router) proxyToTenant(w http.ResponseWriter, r *http.Request, tenant *c
 				newProxy.ServeHTTP(w, r)
 				return
 			}
-			
+
 			logger.WithField("tenant", tenant.Label).Error("Failed to restart process")
 		}
-		
+
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 	}
 
@@ -317,7 +317,7 @@ func (h *Router) getOrCreateProxy(label string, port int) *httputil.ReverseProxy
 	}
 
 	proxy = httputil.NewSingleHostReverseProxy(target)
-	
+
 	// Configure transport for better performance
 	proxy.Transport = &http.Transport{
 		MaxIdleConns:        100,
@@ -341,7 +341,7 @@ func (h *Router) getOrCreateProxy(label string, port int) *httputil.ReverseProxy
 // serveStaticFile attempts to serve a static file with try_files logic
 func (h *Router) serveStaticFile(w http.ResponseWriter, r *http.Request) bool {
 	path := r.URL.Path
-	
+
 	// Security: prevent directory traversal
 	if strings.Contains(path, "..") {
 		return false
@@ -349,7 +349,7 @@ func (h *Router) serveStaticFile(w http.ResponseWriter, r *http.Request) bool {
 
 	// Try files in order (nginx-style try_files behavior)
 	tryPaths := []string{path}
-	
+
 	// If path doesn't have an extension, try with .html
 	if filepath.Ext(path) == "" {
 		tryPaths = append(tryPaths, path+".html")
@@ -375,7 +375,7 @@ func (h *Router) tryServeFile(w http.ResponseWriter, r *http.Request, path strin
 	// Use http.ServeFile for proper ETag, Content-Type, and range support
 	if info, err := http.Dir(filepath.Dir(path)).Open(filepath.Base(path)); err == nil {
 		defer info.Close()
-		
+
 		if stat, err := info.Stat(); err == nil && !stat.IsDir() {
 			// Cache headers are now handled by the cache middleware
 			http.ServeFile(w, r, path)
