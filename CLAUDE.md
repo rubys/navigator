@@ -350,6 +350,82 @@ WantedBy=multi-user.target
 3. **Process Isolation**: Each tenant runs in separate Puma process
 4. **Header Security**: Adds security headers to responses
 
+## Release Process
+
+### Automatic Release Builds
+
+Navigator uses GitHub Actions to automatically build and release binaries when version tags are pushed:
+
+```bash
+# Create a new release
+git tag -a v0.3.0 -m "Release v0.3.0: Your release notes here"
+git push origin v0.3.0
+```
+
+The release workflow will:
+1. **Run all tests** to ensure code quality
+2. **Build binaries** for multiple platforms:
+   - Linux: AMD64, ARM64 (tar.gz)
+   - macOS: AMD64, ARM64 (tar.gz)  
+   - Windows: AMD64, ARM64 (zip)
+3. **Inject version information** into binaries
+4. **Create compressed archives** for distribution
+5. **Generate release notes** from tag annotations
+6. **Create GitHub release** with all assets
+7. **Mark pre-releases** for versions with hyphens (e.g., v1.0.0-beta)
+
+### Version Information
+
+Binaries include build metadata:
+
+```bash
+./navigator version
+# Navigator v0.3.0
+# Git Commit: abc1234
+# Build Date: 2025-08-10T14:52:00Z  
+# Go Version: go1.22.0
+# Platform: linux/amd64
+```
+
+### Release Notes
+
+Use annotated tags for detailed release notes:
+
+```bash
+git tag -a v0.3.0 -m "Navigator v0.3.0: Feature Release
+
+🚀 New Features:
+- Added metrics endpoint with Prometheus support
+- Implemented rate limiting per tenant
+- Added TLS termination with automatic certificates
+
+🐛 Bug Fixes:
+- Fixed memory leak in process manager
+- Improved error handling in proxy recovery
+
+📈 Performance:
+- 25% faster request routing
+- Reduced memory usage by 15%"
+```
+
+### Manual Release Steps
+
+For maintainers creating releases:
+
+1. **Update version** in relevant files if needed
+2. **Run tests** locally: `go test ./...`
+3. **Create annotated tag** with release notes
+4. **Push tag** to trigger automatic build
+5. **Monitor workflow** for any issues
+6. **Verify release** on GitHub with all assets
+
+### Release Workflow Files
+
+- `.github/workflows/release.yml` - Automatic release builds
+- `.github/workflows/ci.yml` - Continuous integration tests
+- `cmd/navigator/main.go` - Version information injection
+- `internal/cli/version.go` - Version display command
+
 ## Future Enhancements
 
 1. **Metrics**: Prometheus/OpenTelemetry integration
