@@ -154,7 +154,7 @@ jobs:
         prerelease: ${{ contains(env.VERSION, '-') }}  # Mark as prerelease if version contains hyphen (v1.0.0-beta)
         files: |
           dist/*
-        generate_release_notes: true  # Generate additional automatic release notes
+        generate_release_notes: false  # Use custom release notes from tag annotation
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     

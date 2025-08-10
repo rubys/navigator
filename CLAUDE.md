@@ -387,6 +387,32 @@ Binaries include build metadata:
 # Platform: linux/amd64
 ```
 
+### Important Notes
+
+⚠️ **Tag Annotation Usage**: The release workflow is configured to use **tag annotations** as release notes. If you use `generate_release_notes: true` in the GitHub Actions workflow, it will override your custom tag annotations and generate automatic commit-based release notes instead.
+
+**Correct workflow configuration**:
+```yaml
+generate_release_notes: false  # Use custom release notes from tag annotation
+```
+
+**Always use annotated tags** for releases to provide meaningful release notes:
+```bash
+# Good: Creates annotated tag with custom release notes
+git tag -a v0.3.0 -m "Release v0.3.0
+
+## New Features
+- Added authentication middleware
+- Improved process recovery logic
+
+## Bug Fixes  
+- Fixed configuration flag binding issue
+- Resolved process cleanup race condition"
+
+# Bad: Creates lightweight tag with no custom message
+git tag v0.3.0
+```
+
 ### Release Notes
 
 Use annotated tags for detailed release notes:
