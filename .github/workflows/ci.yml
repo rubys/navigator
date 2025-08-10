@@ -38,7 +38,7 @@ jobs:
       run: go test -race -cover ./...
     
     - name: Build
-      run: go build -o navigator cmd/navigator/main.go
+      run: go build -o navigator ./cmd/navigator
     
     - name: Test binary
       run: |
@@ -65,16 +65,16 @@ jobs:
     - name: Build binaries
       run: |
         # Linux AMD64
-        GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o navigator-linux-amd64 cmd/navigator/main.go
+        GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o navigator-linux-amd64 ./cmd/navigator
         
         # Linux ARM64
-        GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o navigator-linux-arm64 cmd/navigator/main.go
+        GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o navigator-linux-arm64 ./cmd/navigator
         
         # macOS AMD64
-        GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o navigator-darwin-amd64 cmd/navigator/main.go
+        GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o navigator-darwin-amd64 ./cmd/navigator
         
         # macOS ARM64
-        GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o navigator-darwin-arm64 cmd/navigator/main.go
+        GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o navigator-darwin-arm64 ./cmd/navigator
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
