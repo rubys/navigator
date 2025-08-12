@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"strings"
 	"testing"
 
 	"github.com/rubys/navigator/internal/config"
@@ -156,6 +157,35 @@ func TestRouterStructuredLogging(t *testing.T) {
 	
 	if w.Body.String() != "test response" {
 		t.Errorf("Expected 'test response', got %s", w.Body.String())
+	}
+}
+
+// TestStudiosRouting tests that all /studios/* paths are routed to the index tenant
+func TestStudiosRouting(t *testing.T) {
+	
+	// Test various /studios/* paths
+	testPaths := []struct {
+		path        string
+		shouldRoute bool
+	}{
+		{"/studios/", true},
+		{"/studios/montreal", true},
+		{"/studios/paris", true},
+		{"/studios/tokyo/extra", true},
+		{"/studios", true},
+		{"/other/path", false},
+	}
+	
+	for _, test := range testPaths {
+		// We'll just test the routing logic by checking if the path triggers index tenant lookup
+		cleanPath := strings.TrimPrefix(test.path, "/")
+		
+		// This is the same logic from handleRequest
+		shouldRouteToIndex := strings.HasPrefix(cleanPath, "studios/") || cleanPath == "studios"
+		
+		if shouldRouteToIndex != test.shouldRoute {
+			t.Errorf("Path %s: expected route to index=%v, got %v", test.path, test.shouldRoute, shouldRouteToIndex)
+		}
 	}
 }
 

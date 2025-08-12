@@ -186,12 +186,15 @@ func (h *Router) handleRequest(w http.ResponseWriter, r *http.Request) {
 	// Clean path for tenant lookup
 	cleanPath := strings.TrimPrefix(path, "/")
 
-	// Special handling for /studios/
+	// Special handling for /studios/ paths - all should go to index tenant
 	var tenant *config.Tenant
-	if cleanPath == "studios/" || cleanPath == "studios" {
+	if strings.HasPrefix(cleanPath, "studios/") || cleanPath == "studios" {
 		tenant = h.Showcases.GetTenant("index")
 		if tenant != nil {
-			logger.WithField("tenant", "index").Debug("Routing /studios/ to index tenant")
+			logger.WithFields(map[string]interface{}{
+				"tenant": "index",
+				"path":   cleanPath,
+			}).Debug("Routing /studios/* to index tenant")
 		}
 	} else {
 		// Try to serve static files first
