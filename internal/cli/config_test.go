@@ -199,16 +199,22 @@ func TestValidateAndResolvePaths(t *testing.T) {
 	}
 }
 
-func TestValidateAndResolvePathsRequiredField(t *testing.T) {
+func TestValidateAndResolvePathsDefaultRoot(t *testing.T) {
 	config := &Config{
 		Rails: RailsConfig{
-			Root: "", // Missing required field
+			Root: "", // Empty root should default to "."
 		},
 	}
 
 	err := config.validateAndResolvePaths()
-	if err == nil {
-		t.Error("Expected error for missing rails.root, but got none")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Verify that empty root was replaced with "."
+	expectedRoot, _ := filepath.Abs(".")
+	if config.Rails.Root != expectedRoot {
+		t.Errorf("Expected root to be '%s', got '%s'", expectedRoot, config.Rails.Root)
 	}
 }
 

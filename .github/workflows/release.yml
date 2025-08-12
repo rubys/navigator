@@ -138,7 +138,7 @@ jobs:
           echo "" >> release_notes.md
           echo "Extract the binary and run:" >> release_notes.md
           echo "\`\`\`bash" >> release_notes.md
-          echo "./navigator serve --rails-root /path/to/your/rails/app" >> release_notes.md
+          echo "./navigator serve --root /path/to/your/rails/app" >> release_notes.md
           echo "\`\`\`" >> release_notes.md
         fi
         

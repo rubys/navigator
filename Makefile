@@ -13,7 +13,7 @@ build: ## Build the binary
 
 # Development targets
 dev: ## Build and run in development mode
-	go run cmd/navigator/main.go -rails-root $(PWD) -log-level debug
+	go run cmd/navigator/main.go serve --log-level debug
 
 clean: ## Clean build artifacts
 	rm -f ${BINARY_NAME}
@@ -70,7 +70,7 @@ watch: ## Watch files and rebuild on changes (requires entr)
 
 profile: ## Run with profiling enabled
 	go build ${LDFLAGS} -o ${BINARY_NAME} cmd/navigator/main.go
-	./${BINARY_NAME} -rails-root $(PWD) -log-level debug -cpuprofile cpu.prof -memprofile mem.prof
+	./${BINARY_NAME} serve --log-level debug -cpuprofile cpu.prof -memprofile mem.prof
 
 # Help
 help: ## Show this help message

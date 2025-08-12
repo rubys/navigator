@@ -24,7 +24,7 @@ This command will:
 Examples:
   navigator config validate
   navigator config validate --config /etc/navigator/navigator.yaml
-  navigator config validate --rails-root /path/to/rails/app`,
+  navigator config validate --root /path/to/rails/app`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Load configuration - flag binding should work with global Viper instance
 		cfg, err := LoadConfig(cfgFile)
@@ -47,8 +47,7 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	configCmd.AddCommand(configValidateCmd)
 
-	// Mark rails-root as required for config validate command
-	configValidateCmd.MarkPersistentFlagRequired("rails-root")
+	// No longer marking root as required since it has a default value
 }
 
 // validateConfig validates and displays the current configuration

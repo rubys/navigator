@@ -46,15 +46,15 @@ func init() {
 	// Let individual commands initialize config as needed
 
 	// Global flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is navigator.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: config/navigator.yml relative to root)")
 
 	// Server flags
 	rootCmd.PersistentFlags().String("listen", ":3000", "address to listen on")
 	rootCmd.PersistentFlags().String("url-prefix", "/showcase", "URL prefix to strip from requests")
 
 	// Rails flags
-	rootCmd.PersistentFlags().String("rails-root", "", "Rails application root directory (required)")
-	rootCmd.PersistentFlags().String("showcases", "config/tenant/showcases.yml", "path to showcases.yml relative to rails-root")
+	rootCmd.PersistentFlags().String("root", ".", "Application root directory (default: current directory)")
+	rootCmd.PersistentFlags().String("showcases", "config/tenant/showcases.yml", "path to showcases.yml relative to root")
 	rootCmd.PersistentFlags().String("db-path", "db", "database directory path")
 	rootCmd.PersistentFlags().String("storage", "storage", "storage directory path")
 
@@ -82,7 +82,7 @@ func bindFlags() {
 	viper.BindPFlag("server.url_prefix", rootCmd.PersistentFlags().Lookup("url-prefix"))
 
 	// Rails flags
-	viper.BindPFlag("rails.root", rootCmd.PersistentFlags().Lookup("rails-root"))
+	viper.BindPFlag("rails.root", rootCmd.PersistentFlags().Lookup("root"))
 	viper.BindPFlag("rails.showcases", rootCmd.PersistentFlags().Lookup("showcases"))
 	viper.BindPFlag("rails.db_path", rootCmd.PersistentFlags().Lookup("db-path"))
 	viper.BindPFlag("rails.storage", rootCmd.PersistentFlags().Lookup("storage"))

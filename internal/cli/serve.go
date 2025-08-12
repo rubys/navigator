@@ -29,10 +29,16 @@ The server will:
   • Handle authentication if htpasswd file is configured
   • Provide automatic process recovery on failures
 
+Configuration is loaded from (in order of precedence):
+  • Command-line flags
+  • Environment variables (NAVIGATOR_*)
+  • Config file (auto-loads config/navigator.yml if present)
+
 Examples:
-  navigator serve --rails-root /path/to/rails/app
-  navigator serve --config /etc/navigator/navigator.yaml
-  navigator serve --rails-root /app --listen :8080 --log-level debug`,
+  navigator serve                          # Uses current directory, auto-loads config/navigator.yml
+  navigator serve --root /path/to/app      # Specify different root directory
+  navigator serve --config custom.yaml     # Use custom config file
+  navigator serve --listen :8080 --log-level debug`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Load configuration - flag binding should work with global Viper instance
 		cfg, err := LoadConfig(cfgFile)
@@ -47,8 +53,7 @@ Examples:
 func init() {
 	rootCmd.AddCommand(serveCmd)
 
-	// Mark rails-root as required for serve command
-	serveCmd.MarkPersistentFlagRequired("rails-root")
+	// No longer marking root as required since it has a default value
 }
 
 // runServer starts the Navigator server with the given configuration

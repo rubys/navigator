@@ -65,23 +65,29 @@ Navigator is a modern Go-based web server that replaces nginx/Passenger for mult
 go build -o navigator cmd/navigator/main.go
 
 # Run with command-line arguments
-./navigator serve --rails-root /path/to/rails/app --listen :3000
+./navigator serve --root /path/to/rails/app --listen :3000
 
-# Run with configuration file
+# Run in current directory (uses '.' as default)
+./navigator serve
+
+# Run with configuration file (automatically looks for config/navigator.yml)
+./navigator serve
+
+# Run with custom configuration file
 ./navigator serve --config configs/navigator.yaml
 
 # Run with environment variables
 NAVIGATOR_RAILS_ROOT=/path/to/app ./navigator serve
 
 # Build and run in one command
-go build -o navigator cmd/navigator/main.go && ./navigator serve --rails-root /Users/rubys/git/showcase
+go build -o navigator cmd/navigator/main.go && ./navigator serve --root /Users/rubys/git/showcase
 
 # View help and available commands
 ./navigator --help
 ./navigator serve --help
 
 # Validate configuration
-./navigator config validate --rails-root /path/to/app
+./navigator config validate --root /path/to/app
 ```
 
 ### Development Workflow
@@ -146,12 +152,14 @@ When a Puma process dies, Navigator automatically:
 
 ### Configuration Methods
 
-Navigator supports three configuration methods (in order of precedence):
+Navigator supports three configuration methods (in order of precedence).
+
+**Note**: When no `--config` flag is provided, Navigator automatically looks for `config/navigator.yml` relative to the root directory.
 
 1. **Command-line flags** (highest priority):
 ```bash
 ./navigator serve \
-  --rails-root /path/to/rails/app \
+  --root /path/to/rails/app \
   --listen :3000 \
   --url-prefix /showcase \
   --max-puma 20 \
@@ -171,8 +179,11 @@ export NAVIGATOR_AUTH_HTPASSWD_FILE="/path/to/htpasswd"
 ```
 
 3. **YAML configuration file** (lowest priority):
+
+Navigator automatically checks for `config/navigator.yml` relative to the root directory. You can also create a custom configuration file:
+
 ```yaml
-# config/navigator.yaml
+# config/navigator.yml (or custom location)
 server:
   listen: ":3000"
   url_prefix: "/showcase"
@@ -276,7 +287,7 @@ ab -n 100 -c 5 -A username:password http://localhost:3000/2025/raleigh/disney/
 Navigator logs all requests and process management operations:
 
 ```bash
-./navigator -rails-root /path/to/app 2>&1 | tee navigator.log
+./navigator serve --root /path/to/app 2>&1 | tee navigator.log
 ```
 
 ### Common Issues

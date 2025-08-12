@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -55,7 +54,7 @@ func TestVersionCommand(t *testing.T) {
 func TestServeCommandFlags(t *testing.T) {
 	// Test that serve command has all expected flags
 	expectedFlags := []string{
-		"rails-root",
+		"root",
 		"listen", 
 		"url-prefix",
 		"max-puma",
@@ -88,7 +87,7 @@ func TestServeCommandFlags(t *testing.T) {
 func TestConfigValidateCommandFlags(t *testing.T) {
 	// Test that config validate command has required flags
 	expectedFlags := []string{
-		"rails-root",
+		"root",
 		"config",
 	}
 
@@ -176,9 +175,8 @@ func TestGetConfigInitialization(t *testing.T) {
 		config = originalConfig
 	}()
 
-	// Set minimal required environment for config loading
-	os.Setenv("NAVIGATOR_RAILS_ROOT", "/tmp")
-	defer os.Unsetenv("NAVIGATOR_RAILS_ROOT")
+	// No longer need to set NAVIGATOR_RAILS_ROOT since root has a default value
+	// The default '.' will be used
 
 	// GetConfig should initialize config without panicking
 	testConfig := GetConfig()

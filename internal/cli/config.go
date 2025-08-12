@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -76,18 +77,36 @@ func LoadConfig(configFile string) (*Config, error) {
 			return nil, fmt.Errorf("error reading config file: %w", err)
 		}
 	} else {
-		// Try to find config file in common locations
-		v.SetConfigName("navigator")
-		v.SetConfigType("yaml")
-		v.AddConfigPath("./config") // Only look in project config directory
-		v.AddConfigPath("/etc/navigator")
-
-		// Read config file if found (ignore if not found or corrupted)
-		if err := v.ReadInConfig(); err != nil {
-			// Only return error if explicitly set config file, otherwise just warn and continue
-			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		// First get the root directory from viper (could be from flag or env)
+		rootDir := v.GetString("rails.root")
+		if rootDir == "" || rootDir == "." {
+			rootDir, _ = filepath.Abs(".")
+		} else {
+			rootDir, _ = filepath.Abs(rootDir)
+		}
+		
+		// Check for config/navigator.yml relative to root directory
+		defaultConfigPath := filepath.Join(rootDir, "config", "navigator.yml")
+		if _, err := os.Stat(defaultConfigPath); err == nil {
+			v.SetConfigFile(defaultConfigPath)
+			if err := v.ReadInConfig(); err != nil {
 				// Config file found but has errors - warn but continue
-				fmt.Printf("Warning: found config file but couldn't parse it: %v\n", err)
+				fmt.Printf("Warning: found config file at %s but couldn't parse it: %v\n", defaultConfigPath, err)
+			}
+		} else {
+			// Try to find config file in common locations
+			v.SetConfigName("navigator")
+			v.SetConfigType("yaml")
+			v.AddConfigPath("./config") // Look in local config directory
+			v.AddConfigPath("/etc/navigator")
+
+			// Read config file if found (ignore if not found or corrupted)
+			if err := v.ReadInConfig(); err != nil {
+				// Only return error if explicitly set config file, otherwise just warn and continue
+				if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+					// Config file found but has errors - warn but continue
+					fmt.Printf("Warning: found config file but couldn't parse it: %v\n", err)
+				}
 			}
 		}
 	}
@@ -113,6 +132,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.url_prefix", "/showcase")
 
 	// Rails defaults
+	v.SetDefault("rails.root", ".")
 	v.SetDefault("rails.showcases", "config/tenant/showcases.yml")
 	v.SetDefault("rails.db_path", "db")
 	v.SetDefault("rails.storage", "storage")
@@ -127,9 +147,9 @@ func setDefaults(v *viper.Viper) {
 
 // validateAndResolvePaths validates required fields and resolves relative paths
 func (c *Config) validateAndResolvePaths() error {
-	// Validate required fields
+	// Use current directory if Rails.Root is empty
 	if c.Rails.Root == "" {
-		return fmt.Errorf("rails.root is required")
+		c.Rails.Root = "."
 	}
 
 	// Resolve Rails root to absolute path

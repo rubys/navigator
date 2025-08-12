@@ -47,7 +47,7 @@ jobs:
         echo '"2025": {}' > /tmp/test-rails/config/tenant/showcases.yml
         
         # Test that binary starts and exits cleanly with new CLI syntax
-        timeout 5s ./navigator serve --rails-root /tmp/test-rails --listen :0 || [ $? -eq 124 ]
+        timeout 5s ./navigator serve --root /tmp/test-rails --listen :0 || [ $? -eq 124 ]
       
   build:
     runs-on: ubuntu-latest

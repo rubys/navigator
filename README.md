@@ -43,12 +43,18 @@ go build -o navigator cmd/navigator/main.go
 
 ```bash
 # Start Navigator with command-line flags
-./navigator serve --rails-root /path/to/rails/app --listen :3000
+./navigator serve --root /path/to/rails/app --listen :3000
+
+# Or start in the current directory (uses '.' as default)
+./navigator serve
 
 # Or use environment variables
 NAVIGATOR_RAILS_ROOT=/path/to/rails/app ./navigator serve
 
-# Or use a configuration file
+# Or use a configuration file (automatically looks for config/navigator.yml)
+./navigator serve
+
+# Or specify a custom configuration file
 ./navigator serve --config /path/to/navigator.yaml
 
 # Get help and see all available commands
@@ -64,7 +70,7 @@ Navigator supports three configuration methods (in order of precedence):
 
 ```bash
 ./navigator serve \
-  --rails-root /path/to/rails/app \
+  --root /path/to/rails/app \
   --listen :3000 \
   --url-prefix /showcase \
   --max-puma 20 \
@@ -91,7 +97,7 @@ export NAVIGATOR_LOGGING_LEVEL="debug"
 
 ### 3. YAML Configuration File (Lowest Priority)
 
-Create a `navigator.yaml` file:
+Navigator automatically looks for `config/navigator.yml` relative to the root directory. You can also create a custom `navigator.yaml` file:
 
 ```yaml
 server:
@@ -117,6 +123,10 @@ logging:
 
 Then run:
 ```bash
+# Uses config/navigator.yml if present in root directory
+./navigator serve
+
+# Or specify a custom config file
 ./navigator serve --config navigator.yaml
 ```
 
@@ -124,7 +134,7 @@ Then run:
 
 | Option | CLI Flag | Environment Variable | Default | Description |
 |--------|----------|---------------------|---------|-------------|
-| Rails Root | `--rails-root` | `NAVIGATOR_RAILS_ROOT` | *required* | Rails application directory |
+| Rails Root | `--root` | `NAVIGATOR_RAILS_ROOT` | `.` | Application root directory |
 | Listen Address | `--listen` | `NAVIGATOR_SERVER_LISTEN` | `:3000` | HTTP server bind address |
 | URL Prefix | `--url-prefix` | `NAVIGATOR_SERVER_URL_PREFIX` | `/showcase` | URL prefix to strip |
 | Max Puma | `--max-puma` | `NAVIGATOR_MANAGER_MAX_PUMA` | `10` | Max concurrent Puma processes |
