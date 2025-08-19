@@ -190,6 +190,12 @@ func (h *Router) handleRequest(w http.ResponseWriter, r *http.Request) {
 	// Clean path for tenant lookup
 	cleanPath := strings.TrimPrefix(path, "/")
 
+	// Always try to serve static files first, regardless of path
+	// This ensures images and other assets don't require authentication
+	if h.serveStaticFile(w, r) {
+		return
+	}
+
 	// Special handling for /studios/ paths - all should go to index tenant
 	var tenant *config.Tenant
 	if strings.HasPrefix(cleanPath, "studios/") || cleanPath == "studios" {
@@ -201,11 +207,6 @@ func (h *Router) handleRequest(w http.ResponseWriter, r *http.Request) {
 			}).Debug("Routing /studios/* to index tenant")
 		}
 	} else {
-		// Try to serve static files first
-		if h.serveStaticFile(w, r) {
-			return
-		}
-
 		// Look up tenant
 		tenant = h.Showcases.GetTenantByPath(cleanPath)
 		if tenant != nil {
@@ -223,6 +224,7 @@ func (h *Router) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check authentication if required
+	// Static files have already been served above, so only dynamic requests reach here
 	if h.htpasswd != nil && !h.isPublicPath(path) {
 		if !h.htpasswd.Authenticate(r) {
 			h.htpasswd.RequireAuth(w, r)
