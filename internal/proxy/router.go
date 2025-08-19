@@ -1,10 +1,14 @@
 package proxy
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -329,11 +333,71 @@ func (h *Router) getOrCreateProxy(label string, port int) *httputil.ReverseProxy
 		DisableCompression:  true, // We handle compression ourselves
 	}
 
-	// Add response modifier for security headers
+	// Add response modifier for security headers and X-Accel-Redirect handling
 	proxy.ModifyResponse = func(resp *http.Response) error {
 		resp.Header.Set("X-Frame-Options", "SAMEORIGIN")
 		resp.Header.Set("X-Content-Type-Options", "nosniff")
 		resp.Header.Set("X-XSS-Protection", "1; mode=block")
+		
+		// Handle X-Accel-Redirect (nginx internal redirect)
+		if accelRedirect := resp.Header.Get("X-Accel-Redirect"); accelRedirect != "" {
+			// Remove the X-Accel-Redirect header from the response
+			resp.Header.Del("X-Accel-Redirect")
+			
+			// Parse the internal redirect path
+			// Format is typically /internal/path/to/file
+			if strings.HasPrefix(accelRedirect, "/internal/") {
+				filePath := strings.TrimPrefix(accelRedirect, "/internal/")
+				fullPath := filepath.Join(h.RailsRoot, "public", filePath)
+				
+				// Open and read the file
+				fileData, err := os.ReadFile(fullPath)
+				if err != nil {
+					logger.WithFields(map[string]interface{}{
+						"path":  fullPath,
+						"error": err,
+					}).Error("Failed to read X-Accel-Redirect file")
+					resp.StatusCode = http.StatusNotFound
+					resp.Body = io.NopCloser(strings.NewReader("Not Found"))
+					return nil
+				}
+				
+				// Get file info for headers
+				stat, err := os.Stat(fullPath)
+				if err != nil {
+					logger.WithFields(map[string]interface{}{
+						"path":  fullPath,
+						"error": err,
+					}).Error("Failed to stat X-Accel-Redirect file")
+					resp.StatusCode = http.StatusInternalServerError
+					resp.Body = io.NopCloser(strings.NewReader("Internal Server Error"))
+					return nil
+				}
+				
+				// Replace the response body with the file content
+				resp.Body = io.NopCloser(bytes.NewReader(fileData))
+				resp.ContentLength = int64(len(fileData))
+				resp.Header.Set("Content-Length", fmt.Sprintf("%d", len(fileData)))
+				
+				// Set proper content type if not already set
+				if resp.Header.Get("Content-Type") == "" || resp.Header.Get("Content-Type") == "text/html" {
+					contentType := mime.TypeByExtension(filepath.Ext(fullPath))
+					if contentType != "" {
+						resp.Header.Set("Content-Type", contentType)
+					}
+				}
+				
+				// Set Last-Modified header
+				resp.Header.Set("Last-Modified", stat.ModTime().UTC().Format(http.TimeFormat))
+				
+				logger.WithFields(map[string]interface{}{
+					"redirect_path": accelRedirect,
+					"file_path":     fullPath,
+					"size":          stat.Size(),
+				}).Debug("Serving X-Accel-Redirect file")
+			}
+		}
+		
 		return nil
 	}
 
