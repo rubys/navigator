@@ -35,10 +35,10 @@ type Router struct {
 
 // NewRouter creates a new chi router with all routes configured
 func NewRouter(cfg RouterConfig) *chi.Mux {
-	// Initialize memory cache for static assets (100MB, 1 hour TTL)
+	// Initialize memory cache for static assets (10MB max, LRU eviction)
 	memcached, err := memory.NewAdapter(
 		memory.AdapterWithAlgorithm(memory.LRU),
-		memory.AdapterWithCapacity(100000000), // 100MB
+		memory.AdapterWithStorageCapacity(10*1024*1024), // 10MB of memory
 	)
 	if err != nil {
 		logger.WithField("error", err).Warn("Failed to initialize cache, proceeding without caching")
