@@ -42,12 +42,39 @@ jobs:
     
     - name: Test binary
       run: |
-        # Create minimal test environment
-        mkdir -p /tmp/test-rails/config/tenant
-        echo '"2025": {}' > /tmp/test-rails/config/tenant/showcases.yml
+        # Create minimal test environment with YAML configuration
+        mkdir -p /tmp/test-rails/config
+        cat << 'EOF' > /tmp/test-rails/config/navigator.yml
+server:
+  listen: 0  # Use port 0 for testing
+  hostname: localhost
+  public_dir: /tmp/test-rails/public
+
+pools:
+  max_size: 1
+  idle_timeout: 300
+  start_port: 4000
+
+auth:
+  enabled: false
+
+static:
+  directories: []
+  extensions: [html, css, js]
+  try_files:
+    enabled: false
+
+applications:
+  global_env: {}
+  standard_vars: {}
+  tenants: []
+
+managed_processes: []
+EOF
+        mkdir -p /tmp/test-rails/public
         
-        # Test that binary starts and exits cleanly with new CLI syntax
-        timeout 5s ./navigator serve --root /tmp/test-rails --listen :0 || [ $? -eq 124 ]
+        # Test that binary starts and exits cleanly with YAML config
+        timeout 5s ./navigator /tmp/test-rails/config/navigator.yml || [ $? -eq 124 ]
       
   build:
     runs-on: ubuntu-latest

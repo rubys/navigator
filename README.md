@@ -1,452 +1,247 @@
-# Navigator
+# Navigator - Go Web Server
 
-Navigator is a modern Go-based web server that replaces nginx/Passenger for multi-tenant Rails applications. It provides intelligent request routing, dynamic process management, authentication, HTTP/2 support, and high-performance caching with flexible configuration options.
+Navigator is a Go-based replacement for nginx + Phusion Passenger that provides multi-tenant Rails application hosting with on-demand process management.
 
-## Features
+## Overview
 
-- **Multi-tenant Support**: Routes requests to appropriate Rails instances based on URL patterns
-- **Dynamic Process Management**: Starts and stops Puma processes on-demand with configurable idle timeout
-- **HTTP Caching**: 100MB memory cache with LRU eviction for static assets (70% performance improvement)
-- **Structured Logging**: JSON logs with contextual fields using logrus
-- **HTTP/2 Support**: Modern HTTP/2 protocol with h2c (cleartext) support
-- **Automatic Process Recovery**: Detects crashed processes and restarts them automatically
-- **Authentication**: HTTP Basic authentication support via htpasswd files
-- **Smart Asset Serving**: Different cache TTLs for fingerprinted vs regular assets
-- **Compression**: Gzip compression for text-based content
-- **Flexible Configuration**: YAML files, environment variables, and command-line flags
-- **Modern CLI**: Cobra-powered CLI with subcommands and comprehensive help
-
-## Architecture
-
-Built with modern Go libraries:
-- **[Chi Router](https://github.com/go-chi/chi)**: Fast HTTP router with middleware support
-- **[Logrus](https://github.com/sirupsen/logrus)**: Structured logging with JSON output
-- **[HTTP Cache](https://github.com/victorspringer/http-cache)**: Memory-based caching with LRU eviction
-- **[Cobra](https://github.com/spf13/cobra)**: Modern CLI framework with subcommands
-- **[Viper](https://github.com/spf13/viper)**: Configuration management with YAML/ENV support
+Navigator supports both nginx-style and modern YAML configuration formats:
+- **Multi-tenant hosting**: Manages multiple Rails applications with separate databases
+- **On-demand process management**: Starts Rails apps when needed, stops after idle timeout
+- **Managed processes**: Start and stop additional processes alongside Navigator (Redis, workers, etc.)
+- **Static file serving**: Serves assets, images, and static content directly from filesystem with configurable caching
+- **Authentication**: Full htpasswd support (APR1, bcrypt, SHA, etc.) with pattern-based exclusions
+- **URL rewriting**: Nginx-style rewrite rules with redirect and last flags
+- **Reverse proxy**: Forwards dynamic requests to Rails applications
+- **Dual configuration**: Supports both nginx config files (deprecated) and modern YAML format
 
 ## Installation
+
+Download the latest release from [GitHub Releases](https://github.com/rubys/navigator/releases) or build from source:
 
 ```bash
 # Clone the repository
 git clone https://github.com/rubys/navigator.git
 cd navigator
 
-# Install dependencies
-go mod download
-
-# Build the binary
-go build -o navigator cmd/navigator/main.go
+# Build the navigator
+make build
+# Or build directly with Go
+go build -mod=readonly -o bin/navigator cmd/navigator/main.go
 ```
 
 ## Quick Start
 
 ```bash
-# Start Navigator with command-line flags
-./navigator serve --root /path/to/rails/app --listen :3000
-
-# Or start in the current directory (uses '.' as default)
-./navigator serve
-
-# Or use environment variables
-NAVIGATOR_RAILS_ROOT=/path/to/rails/app ./navigator serve
-
-# Or use a configuration file (automatically looks for config/navigator.yml)
-./navigator serve
-
-# Or specify a custom configuration file
-./navigator serve --config /path/to/navigator.yaml
-
-# Get help and see all available commands
-./navigator --help
-./navigator serve --help
+# Run with YAML configuration (default looks for config/navigator.yml)
+./bin/navigator
+# Or specify a custom config file
+./bin/navigator /path/to/navigator.yml
 ```
+
+The navigator will:
+- Auto-detect configuration format (YAML vs nginx)
+- Start listening on the configured port (default: 9999 for local, 3000 for production)
+- Dynamically allocate ports for Rails applications (4000-4099)
+- Clean up stale PID files before starting apps
+- Handle graceful shutdown on interrupt signals
 
 ## Configuration
 
-Navigator supports three configuration methods (in order of precedence):
+### YAML Configuration (Recommended)
 
-### 1. Command-Line Flags (Highest Priority)
-
-```bash
-./navigator serve \
-  --root /path/to/rails/app \
-  --listen :3000 \
-  --url-prefix /showcase \
-  --max-puma 20 \
-  --idle-timeout 10m \
-  --log-level debug \
-  --htpasswd /path/to/htpasswd
-```
-
-### 2. Environment Variables
-
-All configuration can be set via environment variables with the `NAVIGATOR_` prefix:
-
-```bash
-export NAVIGATOR_RAILS_ROOT="/path/to/rails/app"
-export NAVIGATOR_SERVER_LISTEN=":3000"
-export NAVIGATOR_SERVER_URL_PREFIX="/showcase"
-export NAVIGATOR_MANAGER_MAX_PUMA=20
-export NAVIGATOR_MANAGER_IDLE_TIMEOUT="10m"
-export NAVIGATOR_AUTH_HTPASSWD_FILE="/path/to/htpasswd"
-export NAVIGATOR_LOGGING_LEVEL="debug"
-
-./navigator serve
-```
-
-### 3. YAML Configuration File (Lowest Priority)
-
-Navigator automatically looks for `config/navigator.yml` relative to the root directory. You can also create a custom `navigator.yaml` file:
+Create a YAML configuration file with your application settings:
 
 ```yaml
 server:
-  listen: ":3000"
-  url_prefix: "/showcase"
+  listen: 3000
+  hostname: localhost
+  root_path: /showcase
+  public_dir: /path/to/public
 
-rails:
-  root: "/path/to/rails/app"
-  showcases: "config/tenant/showcases.yml"
-  db_path: "db"
-  storage: "storage"
-
-manager:
-  max_puma: 20
-  idle_timeout: "10m"
+pools:
+  max_size: 22
+  idle_timeout: 300
+  start_port: 4000
 
 auth:
-  htpasswd_file: "/path/to/htpasswd"
+  enabled: true
+  realm: Showcase
+  htpasswd: /path/to/htpasswd
+  public_paths:
+    - /showcase/assets/
+    - /showcase/docs/
+    - "*.css"
+    - "*.js"
 
-logging:
-  level: "debug"
+static:
+  directories:
+    - path: /showcase/assets/
+      root: assets/
+      cache: 86400
+  extensions: [html, htm, css, js, png, jpg, gif]
+  try_files:
+    enabled: true
+    suffixes: ["index.html", ".html", ".htm", ".txt", ".xml", ".json"]
+    fallback: rails
+
+applications:
+  global_env:
+    RAILS_RELATIVE_URL_ROOT: /showcase
+  
+  # Standard environment variables applied to all tenants (except special ones)
+  standard_vars:
+    RAILS_APP_DB: "${tenant.database}"
+    RAILS_APP_OWNER: "${tenant.owner}"  # Studio name only
+    RAILS_STORAGE: "/path/to/storage"   # Root storage path (not tenant-specific)
+    RAILS_APP_SCOPE: "${tenant.scope}"
+    PIDFILE: "/path/to/pids/${tenant.database}.pid"
+  
+  tenants:
+    - name: 2025-boston
+      path: /showcase/2025/boston/
+      group: showcase-2025-boston
+      database: 2025-boston
+      owner: "Boston Dance Studio"
+      storage: "/path/to/storage/2025-boston"
+      scope: "2025/boston"
+      env:
+        SHOWCASE_LOGO: "boston-logo.png"
+    
+    # Special tenants that don't use standard_vars
+    - name: cable
+      path: /cable
+      group: showcase-cable
+      special: true
+      force_max_concurrent_requests: 0
+
+managed_processes:
+  - name: redis
+    command: redis-server
+    args: []
+    working_dir: /path/to/app
+    env:
+      REDIS_PORT: "6379"
+    auto_restart: true
+    start_delay: 0
+    
+  - name: sidekiq
+    command: bundle
+    args: [exec, sidekiq]
+    working_dir: /path/to/app
+    env:
+      RAILS_ENV: production
+    auto_restart: true
+    start_delay: 2
 ```
 
-Then run:
-```bash
-# Uses config/navigator.yml if present in root directory
-./navigator serve
+## Key Features
 
-# Or specify a custom config file
-./navigator serve --config navigator.yaml
-```
+### Managed Processes
 
-### Configuration Options
+Navigator can manage additional processes that should run alongside the web server. These processes are:
+- **Started automatically** when Navigator starts
+- **Stopped gracefully** when Navigator shuts down (after Rails apps to maintain dependencies)
+- **Monitored and restarted** if they crash (when auto_restart is enabled)
+- **Started with delays** to ensure proper initialization order
 
-| Option | CLI Flag | Environment Variable | Default | Description |
-|--------|----------|---------------------|---------|-------------|
-| Rails Root | `--root` | `NAVIGATOR_RAILS_ROOT` | `.` | Application root directory |
-| Listen Address | `--listen` | `NAVIGATOR_SERVER_LISTEN` | `:3000` | HTTP server bind address |
-| URL Prefix | `--url-prefix` | `NAVIGATOR_SERVER_URL_PREFIX` | `/showcase` | URL prefix to strip |
-| Max Puma | `--max-puma` | `NAVIGATOR_MANAGER_MAX_PUMA` | `10` | Max concurrent Puma processes |
-| Idle Timeout | `--idle-timeout` | `NAVIGATOR_MANAGER_IDLE_TIMEOUT` | `5m` | Process idle timeout |
-| Htpasswd File | `--htpasswd` | `NAVIGATOR_AUTH_HTPASSWD_FILE` | `` | Authentication file path |
-| Log Level | `--log-level` | `NAVIGATOR_LOGGING_LEVEL` | `info` | Log level (debug/info/warn/error) |
+Common use cases:
+- **Redis server**: Cache and session storage
+- **Sidekiq/Resque**: Background job processors
+- **WebSocket servers**: Additional real-time communication servers
+- **Monitoring scripts**: Health check and metrics collection
 
-## Performance
+### Performance Optimizations
+- **Static file serving**: Bypasses Rails for assets and static content
+- **Try files optimization**: Serves public content (studios, regions, docs) without Rails
+- **Process pooling**: Reuses Rails processes across requests
+- **Concurrent handling**: Multiple requests processed simultaneously
+- **Zero Rails overhead**: Public routes serve static files instantly
 
-Navigator provides significant performance improvements:
+### Process Management
+- **On-demand startup**: Rails apps start when first requested
+- **Idle timeout**: Apps automatically shut down after 5 minutes of inactivity (configurable)
+- **Dynamic port allocation**: Finds available ports in range 4000-4099 instead of sequential assignment
+- **PID file management**: Cleans up stale PID files before starting and after stopping apps
+- **Graceful shutdown**: Handles SIGINT/SIGTERM signals to cleanly stop all Rails apps
 
-- **Static Asset Caching**: 70% faster response times (1.49ms → 0.45ms)
-- **Memory Cache**: 100MB LRU cache with 1-hour TTL
-- **Smart TTL**: 24-hour cache for fingerprinted assets
-- **HTTP/2**: Modern protocol support with multiplexing
-- **Compression**: Automatic gzip compression
+### Authentication
+- **Multiple formats**: Full htpasswd support via go-htpasswd library (APR1, bcrypt, SHA, MD5-crypt, etc.)
+- **Pattern-based exclusions**: Simple glob patterns and regex patterns for public paths
+- **Basic Auth**: Standard HTTP Basic Authentication
 
-## Structured Logging
-
-All logs are output in JSON format for easy parsing:
-
-```json
-{
-  "level": "info",
-  "message": "HTTP request",
-  "method": "GET",
-  "path": "/studios/",
-  "status": 200,
-  "duration_ms": 45,
-  "remote_addr": "192.168.1.100",
-  "user_agent": "Mozilla/5.0...",
-  "request_id": "req-123",
-  "timestamp": "2025-08-10T12:00:00.000Z"
-}
-```
-
-Enable debug logging for detailed tenant routing:
-```bash
-./navigator serve --rails-root /path/to/app --log-level debug
-```
-
-## CLI Commands
-
-Navigator provides several commands for different operations:
-
-### `navigator serve`
-Start the Navigator server (main command):
-```bash
-./navigator serve --rails-root /path/to/rails/app
-```
-
-### `navigator config validate`
-Validate configuration and display resolved settings:
-```bash
-./navigator config validate --rails-root /path/to/app
-./navigator config validate --config navigator.yaml
-```
-
-This command will:
-- Load and validate configuration from all sources
-- Check that required files exist (Rails root, showcases.yml)
-- Display the final resolved configuration
-- Show configured tenants
-
-### `navigator version`
-Display version information:
-```bash
-./navigator version
-```
-
-### `navigator --help`
-Show comprehensive help:
-```bash
-./navigator --help           # Show all commands
-./navigator serve --help     # Show serve command options
-./navigator config --help    # Show config subcommands
-```
-
-## Rails Integration
-
-### showcases.yml Format
-
-Navigator expects a `showcases.yml` file with Ruby-style symbols:
-
-```yaml
-"2025":
-  raleigh:
-    :name: "Raleigh Studio"
-    :region: "us-east"
-    :events:
-      disney:
-        :name: "Disney Theme"
-        :date: "2025-03-15"
-      summer:
-        :name: "Summer Showcase"
-        :date: "2025-07-20"
-```
-
-### Environment Variables Set by Navigator
-
-For each Rails instance, Navigator sets:
-
-- `RAILS_APP_DB`: Tenant database identifier (e.g., "2025-raleigh-disney")
-- `RAILS_APP_OWNER`: Tenant owner name
-- `RAILS_APP_SCOPE`: URL scope (e.g., "2025/raleigh/disney")
-- `DATABASE_URL`: SQLite database URL
-- `RAILS_STORAGE`: Storage path for the tenant
-- `RAILS_ENV`: Always "production"
-- `RAILS_PROXY_HOST`: Proxy host for URL generation
-
-## Multi-Tenant Routing
-
-Navigator routes requests based on URL patterns:
-
-- `/` → Redirects to `/studios/`
-- `/studios/` → `index` tenant
-- `/2025/raleigh/disney/` → `2025-raleigh-disney` tenant
-- Static assets served directly with caching
-
-## Process Management
-
-- **On-Demand Startup**: Puma processes start on first request
-- **Idle Cleanup**: Processes stopped after configurable timeout (default: 5 minutes)
-- **Automatic Recovery**: Crashed processes detected and restarted automatically
-- **Port Management**: Dynamic port allocation starting from 4000
-- **Health Monitoring**: Continuous process health checks
-
-## Authentication
-
-HTTP Basic authentication via htpasswd files:
+## Testing
 
 ```bash
-# Create htpasswd file
-htpasswd -c /path/to/htpasswd username
+# Test static asset serving
+curl -I http://localhost:9999/showcase/assets/application.js
 
-# Add users
-htpasswd /path/to/htpasswd another_user
+# Test try_files behavior (non-authenticated routes)
+curl -I http://localhost:9999/showcase/studios/raleigh        # → raleigh.html
+curl -I http://localhost:9999/showcase/regions/dfw           # → dfw.html
 
-# Use with Navigator
-./navigator -rails-root /path/to/app -htpasswd /path/to/htpasswd
+# Test authentication
+curl -u username:password http://localhost:9999/protected/path
+
+# Test Rails proxy (authenticated routes)
+curl -u test:secret http://localhost:9999/showcase/2025/boston/
 ```
-
-Supports APR1, Bcrypt, SHA, and Crypt hash formats.
 
 ## Development
 
-### Project Structure
-
-```
-navigator/
-├── cmd/navigator/          # Main application entry point
-├── internal/
-│   ├── cli/               # Cobra CLI commands and Viper configuration
-│   ├── config/            # Configuration and YAML parsing  
-│   ├── logger/            # Structured logging wrapper
-│   ├── manager/           # Puma process management
-│   ├── proxy/             # HTTP routing, caching, auth
-│   └── server/            # HTTP/2 server implementation
-├── config/                # Example configuration files
-├── go.mod                 # Go module definition
-├── README.md              # This file
-└── LICENSE               # MIT license
-```
+### File Structure
+- `cmd/navigator/main.go` - Main application entry point
+- `Makefile` - Build configuration
+- `go.mod`, `go.sum` - Go module dependencies
 
 ### Building
-
 ```bash
 # Standard build
-go build -o navigator cmd/navigator/main.go
+make build
 
 # Cross-compile for Linux
 GOOS=linux GOARCH=amd64 go build -o navigator cmd/navigator/main.go
 
-# Build with version info
-go build -ldflags "-X main.version=1.0.0" -o navigator cmd/navigator/main.go
-```
-
-### Testing
-
-```bash
-# Run tests
-go test ./...
-
-# With coverage
-go test -cover ./...
-
-# With race detection  
-go test -race ./...
-
-# Manual testing
-curl http://localhost:3000/studios/
-curl http://localhost:3000/2025/raleigh/disney/
+# Install dependencies
+go mod download
 ```
 
 ## Deployment
 
-### Systemd Service
+Navigator is designed to replace nginx + Passenger in production environments:
+- **Single binary**: No external dependencies
+- **Configuration compatibility**: Uses existing nginx config files (deprecated) or modern YAML
+- **Resource efficiency**: Lower memory footprint than full nginx/Passenger stack
+- **Monitoring**: Built-in logging for requests, static files, and process management
 
-Create `/etc/systemd/system/navigator.service`:
+## Release Process
 
-```ini
-[Unit]
-Description=Navigator Rails Proxy
-After=network.target
+Navigator uses GitHub Actions for automated releases. To create a new release:
 
-[Service]
-Type=simple
-User=rails
-WorkingDirectory=/opt/rails/app
-ExecStart=/usr/local/bin/navigator serve --rails-root /opt/rails/app --listen :3000
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
 ```bash
-sudo systemctl enable navigator
-sudo systemctl start navigator
-sudo journalctl -u navigator -f  # View logs
+# Create a new release with release notes
+git tag -a v0.3.0 -m "Release v0.3.0
+
+## New Features
+- Added managed processes support
+- Improved PID file handling
+- Dynamic port allocation
+
+## Bug Fixes  
+- Fixed graceful shutdown
+- Resolved port conflicts"
+
+git push origin v0.3.0
 ```
 
-### Docker
-
-```dockerfile
-FROM golang:1.22-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN go build -o navigator cmd/navigator/main.go
-
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-WORKDIR /app
-COPY --from=builder /app/navigator .
-EXPOSE 3000
-CMD ["./navigator", "serve", "--rails-root", "/app"]
-```
-
-## Monitoring
-
-Navigator provides health check endpoints:
-
-- `GET /up` - Basic health check
-- `GET /health` - Detailed health check
-
-All operations are logged with structured JSON including:
-- Request details (method, path, status, duration)
-- Process management events
-- Cache hit/miss statistics  
-- Error conditions with context
-
-## Troubleshooting
-
-### Common Issues
-
-**Port conflicts**: Navigator manages ports 4000+ automatically
-```bash
-./navigator serve --max-puma 50  # Increase port range
-```
-
-**Authentication failures**: Check htpasswd format
-```bash
-./navigator serve --log-level debug  # See auth details
-```
-
-**Tenant not found**: Verify showcases.yml symbols
-```bash
-# Correct: :name
-# Incorrect: name
-```
-
-**High memory usage**: Adjust cache size by editing source:
-```go
-memory.AdapterWithCapacity(50000000)  // 50MB instead of 100MB
-```
-
-### Performance Tuning
-
-1. **Cache Size**: Adjust memory cache based on available RAM
-2. **Process Limits**: Set `max-puma` based on CPU cores
-3. **Idle Timeout**: Balance resource usage vs startup latency
-4. **Log Level**: Use "warn" or "error" in production for performance
-
-## Dependencies
-
-- **Go 1.22+**: Modern Go features and performance
-- **Chi v5**: HTTP router with middleware support
-- **Logrus**: Structured JSON logging
-- **HTTP-Cache**: Memory caching with LRU eviction
-- **Cobra**: Modern CLI framework with subcommands
-- **Viper**: Configuration management (YAML/ENV/flags)
-- **htpasswd**: Multi-format password file support
-- **YAML v3**: Configuration file parsing
-
-## Contributing
-
-Pull requests welcome! Please ensure:
-- Code follows Go conventions (`go fmt`, `go vet`)
-- Tests pass (`go test ./...`)
-- Documentation is updated
-- Commit messages are descriptive
+The release workflow will automatically:
+1. Run tests to ensure code quality
+2. Build binaries for multiple platforms (Linux, macOS, Windows on AMD64/ARM64)
+3. Create compressed archives for distribution
+4. Generate GitHub release with release notes from tag annotation
+5. Upload all release assets
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## Support
-
-- **Issues**: Use GitHub issue tracker
-- **Documentation**: See [CLAUDE.md](CLAUDE.md) for development details
-- **Performance**: All requests logged with timing information
+For more detailed information, see [NAVIGATOR.md](NAVIGATOR.md).
