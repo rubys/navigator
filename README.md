@@ -1,18 +1,20 @@
 # Navigator - Go Web Server
 
-Navigator is a Go-based replacement for nginx + Phusion Passenger that provides multi-tenant Rails application hosting with on-demand process management.
+Navigator is a Go-based web server that provides multi-tenant Rails application hosting with on-demand process management.
 
 ## Overview
 
-Navigator supports both nginx-style and modern YAML configuration formats:
+Navigator uses YAML configuration format for:
 - **Multi-tenant hosting**: Manages multiple Rails applications with separate databases
 - **On-demand process management**: Starts Rails apps when needed, stops after idle timeout
 - **Managed processes**: Start and stop additional processes alongside Navigator (Redis, workers, etc.)
 - **Static file serving**: Serves assets, images, and static content directly from filesystem with configurable caching
 - **Authentication**: Full htpasswd support (APR1, bcrypt, SHA, etc.) with pattern-based exclusions
-- **URL rewriting**: Nginx-style rewrite rules with redirect and last flags
-- **Reverse proxy**: Forwards dynamic requests to Rails applications
-- **Dual configuration**: Supports both nginx config files (deprecated) and modern YAML format
+- **URL rewriting**: Rewrite rules with redirect, last, and fly-replay flags for region-specific routing
+- **Reverse proxy**: Forwards dynamic requests to Rails applications with method-based exclusions and custom headers
+- **Machine suspension**: Auto-suspend Fly.io machines after idle timeout with automatic wake on requests
+- **Configuration reload**: Live configuration reload with SIGHUP signal (no restart needed)
+- **WebSocket support**: Full support for WebSocket connections and standalone servers
 
 ## Installation
 
@@ -32,14 +34,21 @@ go build -mod=readonly -o bin/navigator cmd/navigator/main.go
 ## Quick Start
 
 ```bash
+# Display help
+./bin/navigator --help
+
 # Run with YAML configuration (default looks for config/navigator.yml)
 ./bin/navigator
 # Or specify a custom config file
 ./bin/navigator /path/to/navigator.yml
+
+# Reload configuration without restart
+./bin/navigator -s reload
+# Or send SIGHUP signal directly
+kill -HUP $(cat /tmp/navigator.pid)
 ```
 
 The navigator will:
-- Auto-detect configuration format (YAML vs nginx)
 - Start listening on the configured port (default: 9999 for local, 3000 for production)
 - Dynamically allocate ports for Rails applications (4000-4099)
 - Clean up stale PID files before starting apps
@@ -47,7 +56,7 @@ The navigator will:
 
 ## Configuration
 
-### YAML Configuration (Recommended)
+### YAML Configuration
 
 Create a YAML configuration file with your application settings:
 
@@ -113,6 +122,18 @@ applications:
       group: showcase-cable
       special: true
       force_max_concurrent_requests: 0
+    
+    # Tenants with pattern matching for WebSocket support
+    - name: cable-pattern
+      path: /cable-specific
+      group: showcase-cable
+      match_pattern: "*/cable"  # Matches any path ending with /cable
+      special: true
+    
+    # Tenants with standalone servers (e.g., Action Cable)
+    - name: external-service
+      path: /external/
+      standalone_server: "localhost:28080"  # Proxy to standalone server instead of Rails
 
 managed_processes:
   - name: redis
@@ -132,9 +153,59 @@ managed_processes:
       RAILS_ENV: production
     auto_restart: true
     start_delay: 2
+
+# Machine suspension (Fly.io specific)
+suspend:
+  enabled: false
+  idle_timeout: 600  # Seconds of inactivity before suspending machine
+
+# Routing enhancements
+routes:
+  # Fly-replay support for region-specific routing
+  fly_replay:
+    - path: "^/showcase/2025/sydney/"
+      region: syd
+      status: 307
+      methods: [GET]
+  
+  # Reverse proxy with method exclusions
+  reverse_proxies:
+    - path: "/api/"
+      target: "http://api.example.com"
+      headers:
+        X-API-Key: "secret"
+      exclude_methods: [POST, DELETE]  # Don't proxy these methods
 ```
 
 ## Key Features
+
+### Machine Suspension Support
+- **Fly.io Integration**: Auto-suspend machines after configurable idle timeout
+- **Request Tracking**: Monitors active requests to determine idle state
+- **Automatic Wake**: Machines wake automatically on incoming requests
+- **Configurable Timeout**: Set idle timeout duration in YAML configuration
+
+### Configuration Reload
+- **Live Reload**: Reload configuration without restart using SIGHUP signal
+- **Reload Command**: Support for `navigator -s reload` command
+- **PID File Management**: Writes PID file to /tmp/navigator.pid for signal management
+- **Atomic Updates**: Configuration changes applied atomically with no downtime
+
+### Fly-Replay Support
+- **Region Routing**: Route requests to specific Fly.io regions
+- **Pattern Matching**: Configure URL patterns for region-specific routing
+- **Status Codes**: Configurable HTTP status codes for replay responses
+- **Method Filtering**: Apply replay rules only to specific HTTP methods
+
+### Reverse Proxy Enhancements
+- **Method Exclusions**: Exclude specific HTTP methods from proxy routing
+- **Custom Headers**: Add headers to proxied requests
+- **Multiple Targets**: Support for multiple proxy configurations
+
+### Standalone Server Support
+- **External Services**: Proxy to standalone servers (e.g., Action Cable)
+- **Pattern Matching**: Use wildcard patterns for location matching
+- **WebSocket Support**: Full support for WebSocket connections
 
 ### Managed Processes
 
@@ -143,12 +214,15 @@ Navigator can manage additional processes that should run alongside the web serv
 - **Stopped gracefully** when Navigator shuts down (after Rails apps to maintain dependencies)
 - **Monitored and restarted** if they crash (when auto_restart is enabled)
 - **Started with delays** to ensure proper initialization order
+- **Environment variables**: Custom environment variables for each process
+- **Auto-restart capability**: Processes automatically restart if they crash
 
 Common use cases:
 - **Redis server**: Cache and session storage
 - **Sidekiq/Resque**: Background job processors
 - **WebSocket servers**: Additional real-time communication servers
 - **Monitoring scripts**: Health check and metrics collection
+- **File watchers**: Asset compilation or file synchronization
 
 ### Performance Optimizations
 - **Static file serving**: Bypasses Rails for assets and static content
@@ -161,13 +235,16 @@ Common use cases:
 - **On-demand startup**: Rails apps start when first requested
 - **Idle timeout**: Apps automatically shut down after 5 minutes of inactivity (configurable)
 - **Dynamic port allocation**: Finds available ports in range 4000-4099 instead of sequential assignment
-- **PID file management**: Cleans up stale PID files before starting and after stopping apps
-- **Graceful shutdown**: Handles SIGINT/SIGTERM signals to cleanly stop all Rails apps
+- **PID file management**: Automatic cleanup of stale PID files before starting and after stopping apps
+- **Graceful shutdown**: Handles SIGINT/SIGTERM signals to cleanly stop all Rails apps and managed processes
+- **Environment inheritance**: Rails apps inherit parent process environment variables
+- **Process cleanup**: Automatically removes PID files and kills stale processes
 
 ### Authentication
 - **Multiple formats**: Full htpasswd support via go-htpasswd library (APR1, bcrypt, SHA, MD5-crypt, etc.)
 - **Pattern-based exclusions**: Simple glob patterns and regex patterns for public paths
 - **Basic Auth**: Standard HTTP Basic Authentication
+- **Public paths**: Configure paths that bypass authentication entirely
 
 ## Testing
 
@@ -193,6 +270,13 @@ curl -u test:secret http://localhost:9999/showcase/2025/boston/
 - `Makefile` - Build configuration
 - `go.mod`, `go.sum` - Go module dependencies
 
+### Logging
+Navigator uses Go's `slog` package for structured logging:
+- **Log Level**: Set via `LOG_LEVEL` environment variable (debug, info, warn, error)
+- **Default Level**: Info level if not specified
+- **Debug Output**: Includes detailed request routing, auth checks, and file serving attempts
+- **Structured Format**: Text handler with consistent key-value pairs
+
 ### Building
 ```bash
 # Standard build
@@ -209,9 +293,27 @@ go mod download
 
 Navigator is designed to replace nginx + Passenger in production environments:
 - **Single binary**: No external dependencies
-- **Configuration compatibility**: Uses existing nginx config files (deprecated) or modern YAML
+- **YAML configuration**: Modern configuration format
 - **Resource efficiency**: Lower memory footprint than full nginx/Passenger stack
 - **Monitoring**: Built-in logging for requests, static files, and process management
+
+### Systemd Integration
+
+```ini
+[Unit]
+Description=Navigator Rails Proxy
+After=network.target
+
+[Service]
+Type=simple
+User=rails
+WorkingDirectory=/opt/rails/app
+ExecStart=/usr/local/bin/navigator config/navigator.yml
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
 
 ## Release Process
 
@@ -243,5 +345,3 @@ The release workflow will automatically:
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-
-For more detailed information, see [NAVIGATOR.md](NAVIGATOR.md).

@@ -18,7 +18,8 @@
 go.work
 
 # Built binaries
-navigator
+/navigator
+/bin/navigator
 navigator-*
 
 # Development files
