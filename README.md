@@ -15,6 +15,8 @@ Navigator uses YAML configuration format for:
 - **Machine suspension**: Auto-suspend Fly.io machines after idle timeout with automatic wake on requests
 - **Configuration reload**: Live configuration reload with SIGHUP signal (no restart needed)
 - **WebSocket support**: Full support for WebSocket connections and standalone servers
+- **Intelligent routing**: Smart Fly-Replay with DNS checking, automatic fallback to reverse proxy for large requests
+- **High reliability**: Automatic retry with exponential backoff for proxy failures
 
 ## Installation
 
@@ -166,7 +168,7 @@ routes:
     - path: "^/showcase/2025/sydney/"
       region: syd
       status: 307
-      methods: [GET]
+      methods: [GET, POST]  # Automatically uses reverse proxy for large POST requests
   
   # Reverse proxy with method exclusions
   reverse_proxies:
@@ -175,6 +177,10 @@ routes:
       headers:
         X-API-Key: "secret"
       exclude_methods: [POST, DELETE]  # Don't proxy these methods
+
+# Maintenance page configuration
+maintenance:
+  page: "/503.html"  # Path to custom maintenance page in public directory
 ```
 
 ## Key Features
@@ -191,16 +197,21 @@ routes:
 - **PID File Management**: Writes PID file to /tmp/navigator.pid for signal management
 - **Atomic Updates**: Configuration changes applied atomically with no downtime
 
-### Fly-Replay Support
+### Intelligent Fly-Replay Support
 - **Region Routing**: Route requests to specific Fly.io regions
+- **Smart Fallback**: Automatically uses reverse proxy for requests >1MB that Fly.io replay can't handle
+- **DNS Health Checking**: Verifies target machine availability before replay (with 30s caching)
+- **Maintenance Pages**: Serves custom maintenance page when target machines are unavailable
 - **Pattern Matching**: Configure URL patterns for region-specific routing
 - **Status Codes**: Configurable HTTP status codes for replay responses
 - **Method Filtering**: Apply replay rules only to specific HTTP methods
 
 ### Reverse Proxy Enhancements
+- **Automatic Retry**: Connection failures are retried with exponential backoff (up to 3 seconds)
 - **Method Exclusions**: Exclude specific HTTP methods from proxy routing
 - **Custom Headers**: Add headers to proxied requests
 - **Multiple Targets**: Support for multiple proxy configurations
+- **High Reliability**: Graceful handling of backend failures with automatic recovery
 
 ### Standalone Server Support
 - **External Services**: Proxy to standalone servers (e.g., Action Cable)

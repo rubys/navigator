@@ -18,8 +18,10 @@ Navigator is a Go-based web server for multi-tenant Rails applications. It provi
 ✅ **Authentication**: htpasswd support with multiple hash formats
 ✅ **Configuration Reload**: Live reload via SIGHUP signal without restart
 ✅ **Machine Suspension**: Fly.io machine auto-suspend after idle timeout
-✅ **Fly-Replay Support**: Region-specific routing for distributed deployments
+✅ **Intelligent Fly-Replay**: Smart routing with DNS health checks and automatic fallback
 ✅ **WebSocket Support**: Full WebSocket connection support with standalone servers
+✅ **High Reliability**: Automatic retry with exponential backoff for proxy failures
+✅ **Maintenance Pages**: Custom maintenance pages when target machines unavailable
 
 ## Architecture
 
@@ -52,6 +54,8 @@ The entire Navigator implementation is contained in `cmd/navigator/main.go`. Thi
    - **Rails Proxy**: Reverse proxy to Rails applications with method exclusions
    - **Standalone Servers**: Proxy support for external services (Action Cable, etc.)
    - **Suspend Tracking**: Request tracking for idle machine suspension
+   - **DNS Cache**: Target machine availability checking with 30-second TTL
+   - **Proxy Retry**: Automatic retry logic with exponential backoff
 
 4. **Static File Serving** (`serveStaticFile`, `tryFiles`)
    - **Performance**: Bypasses Rails for static content
@@ -63,6 +67,13 @@ The entire Navigator implementation is contained in `cmd/navigator/main.go`. Thi
    - **Idle Detection**: Monitors request activity
    - **Auto-Suspend**: Suspends Fly.io machines after idle timeout
    - **Auto-Wake**: Machines wake automatically on incoming requests
+   - **DNS Cache Clear**: Clears DNS cache before suspension
+
+6. **DNS Cache** (`DNSCache`)
+   - **Health Checking**: Verifies target machine availability via IPv6 DNS
+   - **Performance**: 30-second TTL to reduce DNS lookup overhead
+   - **Automatic Cleanup**: Expired entries removed every 60 seconds
+   - **Deployment Detection**: Identifies when machines are redeploying
 
 ## Configuration
 
@@ -173,12 +184,16 @@ Features:
 - **Automatic wake**: Machines resume on incoming requests
 - **Zero-downtime**: Seamless suspend/resume cycles
 
-### 5. Region Routing (Fly-Replay)
+### 5. Intelligent Region Routing (Fly-Replay)
 
+- **Smart Detection**: Automatically uses reverse proxy for requests >1MB
+- **DNS Health Checks**: Verifies target machine availability before replay
+- **Maintenance Pages**: Serves custom 503 page when targets unavailable
 - **Pattern matching**: Route specific paths to designated regions
 - **Status codes**: Configurable HTTP response codes
 - **Method filtering**: Apply rules to specific HTTP methods
 - **Deployment stamps**: Support for distributed deployment patterns
+- **Automatic Fallback**: Constructs internal URLs for direct proxy when needed
 
 ### 6. Configuration Template System
 
@@ -205,12 +220,23 @@ Navigator handles Rails process failures:
 3. **Restart**: Process restarted via `GetOrStartApp()`
 4. **Retry**: Original request retried after restart
 
+### Proxy Reliability
+
+Navigator includes robust proxy error handling:
+
+1. **Automatic Retry**: Failed proxy connections retry with exponential backoff
+2. **Smart Timeouts**: Up to 3 seconds of retries for connection failures
+3. **Request Preservation**: GET/HEAD requests safely retried
+4. **Graceful Degradation**: Falls back to error response after max retries
+
 ### Common Issues
 
 1. **Port conflicts**: Dynamic port allocation prevents conflicts
 2. **Stale PID files**: Automatic cleanup before starting
 3. **Process crashes**: Managed processes auto-restart if configured
 4. **Authentication**: Pattern-based exclusions for public assets
+5. **Machine unavailable**: Serves maintenance page during deployments
+6. **Large uploads**: Automatically falls back to reverse proxy for >1MB requests
 
 ## Testing
 
