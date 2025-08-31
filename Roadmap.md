@@ -36,7 +36,12 @@ While the application server itself is new, I've been running with this [archite
 
 The primary motivation for the creation of the Navigator tool is twofold: reduce complexity by producing a configuration file that can be directly loaded, and to avoid limitations of the nginx server.
 
-As an example: I want to make replay smarter: the normal case of a misdirected request is that a new user makes a request and fly.io's proxy simply picks a random machine in a nearby region. In such case, a replay is all that is needed. But there also are cases like fly deploy where the destination isn't ready yet, and this can be determined by dynamically checking [internal DNS](https://fly.io/docs/networking/private-networking/#fly-io-internal-dns). Eventually that could lead to starting new machines dynamically, but for now the plan is to have one machine per user, where that machine is stopped or suspended when not in use.
+Examples:
+ * Replay is smart. If content length is greater than a megabyte, a reverse proxy will be used instead.
+ * Navigator will check dns (and cache the results) before issuing a replay. If the machine is not available, a maintenance page will be shown instead.
+ * Reverse proxy will retry gateway failures with exponentional fallback.
+
+Eventually that could lead to starting new machines dynamically, but for now the plan is to have one machine per user, where that machine is stopped or suspended when not in use. A single user can still have multiple apps.
 
 ## Current status
 
@@ -51,4 +56,3 @@ I'm currently [building the Navigator](https://github.com/rubys/showcase/blob/ab
 ```dockerfile
 COPY --from=rubys/navigator /navigator /usr/local/bin/navigator
 ```
-

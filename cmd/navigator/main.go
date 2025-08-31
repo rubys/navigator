@@ -29,13 +29,86 @@ import (
 type RewriteRule struct {
 	Pattern     *regexp.Regexp
 	Replacement string
-	Flag        string // redirect, last, etc.
+	Flag        string   // redirect, last, fly-replay:region:status, etc.
+	Methods     []string // Allowed methods for this rule
 }
 
 // AuthPattern represents an auth exclusion pattern
 type AuthPattern struct {
 	Pattern *regexp.Regexp
 	Action  string // "off" or realm name
+}
+
+// DNSCacheEntry represents a cached DNS lookup result
+type DNSCacheEntry struct {
+	Available bool
+	ExpiresAt time.Time
+}
+
+// DNSCache manages cached DNS availability results
+type DNSCache struct {
+	mutex sync.RWMutex
+	cache map[string]*DNSCacheEntry
+	ttl   time.Duration
+}
+
+// NewDNSCache creates a new DNS cache with specified TTL
+func NewDNSCache(ttl time.Duration) *DNSCache {
+	return &DNSCache{
+		cache: make(map[string]*DNSCacheEntry),
+		ttl:   ttl,
+	}
+}
+
+// Get retrieves a cached DNS result if available and not expired
+func (c *DNSCache) Get(region string) (bool, bool) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	
+	entry, exists := c.cache[region]
+	if !exists {
+		return false, false
+	}
+	
+	if time.Now().After(entry.ExpiresAt) {
+		// Entry expired, will be cleaned up later
+		return false, false
+	}
+	
+	return entry.Available, true
+}
+
+// Set stores a DNS result in the cache
+func (c *DNSCache) Set(region string, available bool) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	
+	c.cache[region] = &DNSCacheEntry{
+		Available: available,
+		ExpiresAt: time.Now().Add(c.ttl),
+	}
+}
+
+// Clear removes all cached entries
+func (c *DNSCache) Clear() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	
+	c.cache = make(map[string]*DNSCacheEntry)
+	slog.Debug("DNS cache cleared")
+}
+
+// CleanExpired removes expired entries from the cache
+func (c *DNSCache) CleanExpired() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	
+	now := time.Now()
+	for region, entry := range c.cache {
+		if now.After(entry.ExpiresAt) {
+			delete(c.cache, region)
+		}
+	}
 }
 
 // Config represents the parsed configuration
@@ -66,6 +139,7 @@ type Config struct {
 	StaticExts      []string       // File extensions to serve statically
 	TryFilesSuffixes []string      // Suffixes for try_files behavior
 	PublicDir       string         // Default public directory
+	MaintenancePage string         // Path to maintenance page (e.g., "/503.html")
 	ManagedProcesses []struct {    // Managed processes to start/stop with Navigator
 		Name        string            `yaml:"name"`
 		Command     string            `yaml:"command"`
@@ -649,6 +723,12 @@ func (sm *SuspendManager) suspendMachine() {
 		return
 	}
 	
+	// Clear DNS cache before suspending
+	if dnsCache != nil {
+		dnsCache.Clear()
+		slog.Debug("DNS cache cleared before machine suspend")
+	}
+	
 	slog.Info("Suspending machine", "app", appName, "machine", machineId)
 	
 	// Create HTTP client with Unix socket transport
@@ -776,6 +856,9 @@ func sendReloadSignal() error {
 	return nil
 }
 
+// Global DNS cache for target machine availability checks
+var dnsCache *DNSCache
+
 func main() {
 	// Initialize logger with level from environment variable
 	logLevel := slog.LevelInfo // Default to Info level
@@ -798,6 +881,9 @@ func main() {
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
 	slog.SetDefault(logger)
+	
+	// Initialize DNS cache with 30-second TTL
+	dnsCache = NewDNSCache(30 * time.Second)
 	
 	// Handle -s reload option
 	if len(os.Args) > 1 && os.Args[1] == "-s" {
@@ -874,6 +960,18 @@ func main() {
 		log.Printf("Starting %d managed processes", len(config.ManagedProcesses))
 		processManager.StartAll(config.ManagedProcesses)
 	}
+	
+	// Start DNS cache cleanup goroutine
+	go func() {
+		ticker := time.NewTicker(60 * time.Second) // Clean every minute
+		defer ticker.Stop()
+		
+		for range ticker.C {
+			if dnsCache != nil {
+				dnsCache.CleanExpired()
+			}
+		}
+	}()
 	
 	// Create a mutable handler wrapper for configuration reloading
 	handler := CreateHandler(config, manager, auth, suspendManager)
@@ -1077,6 +1175,7 @@ func ParseYAML(content []byte) (*Config, error) {
 				Pattern:     re,
 				Replacement: flyReplay.Path, // Keep original path for fly-replay
 				Flag:        fmt.Sprintf("fly-replay:%s:%d", flyReplay.Region, flyReplay.Status),
+				Methods:     flyReplay.Methods,
 			})
 		}
 	}
@@ -1497,8 +1596,10 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 		}
 
 		// Check if path should be excluded from auth using parsed patterns
-		needsAuth := auth != nil && auth.Realm != "off" && !shouldExcludeFromAuth(r.URL.Path, config)
-		slog.Debug("Auth check", "needed", needsAuth)
+		// This tells us if the path is "public" regardless of whether auth is actually enabled
+		isPublicPath := shouldExcludeFromAuth(r.URL.Path, config)
+		needsAuth := auth != nil && auth.Realm != "off" && !isPublicPath
+		slog.Debug("Auth check", "needed", needsAuth, "isPublic", isPublicPath)
 
 		// Apply basic auth if needed
 		if needsAuth && !checkAuth(r, auth) {
@@ -1512,9 +1613,34 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 			return
 		}
 
-		// For non-authenticated routes, try try_files behavior
-		// This attempts to serve static files with common extensions before falling back to Rails
-		if !needsAuth && tryFiles(w, r, config) {
+		// Find matching location early to determine if this is a Rails app
+		var bestMatch *Location
+		bestMatchLen := 0
+		
+		// First, check for pattern matches
+		for _, location := range config.Locations {
+			if location.MatchPattern != "" {
+				if matched, _ := filepath.Match(location.MatchPattern, r.URL.Path); matched {
+					bestMatch = location
+					break  // Pattern matches take priority
+				}
+			}
+		}
+		
+		// If no pattern match, use prefix matching (existing logic)
+		if bestMatch == nil {
+			for path, location := range config.Locations {
+				if strings.HasPrefix(r.URL.Path, path) && len(path) > bestMatchLen {
+					bestMatch = location
+					bestMatchLen = len(path)
+				}
+			}
+		}
+
+		// Try tryFiles for public paths (those that would be excluded from auth)
+		// This ensures static content is served for public paths like /showcase/regions/
+		// while Rails apps (which would require auth if enabled) are always proxied
+		if isPublicPath && tryFiles(w, r, config) {
 			return
 		}
 
@@ -1539,30 +1665,7 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 			}
 		}
 
-		// Find matching location
-		var bestMatch *Location
-		bestMatchLen := 0
-		
-		// First, check for pattern matches
-		for _, location := range config.Locations {
-			if location.MatchPattern != "" {
-				if matched, _ := filepath.Match(location.MatchPattern, r.URL.Path); matched {
-					bestMatch = location
-					break  // Pattern matches take priority
-				}
-			}
-		}
-		
-		// If no pattern match, use prefix matching (existing logic)
-		if bestMatch == nil {
-			for path, location := range config.Locations {
-				if strings.HasPrefix(r.URL.Path, path) && len(path) > bestMatchLen {
-					bestMatch = location
-					bestMatchLen = len(path)
-				}
-			}
-		}
-
+		// Now check if we still don't have a match (moved from after proxy routes)
 		if bestMatch == nil {
 			// Try root location
 			if rootLoc, ok := config.Locations["/"]; ok {
@@ -1583,8 +1686,7 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 				http.Error(w, "Invalid standalone server configuration", http.StatusInternalServerError)
 				return
 			}
-			proxy := httputil.NewSingleHostReverseProxy(target)
-			proxy.ServeHTTP(w, r)
+			proxyWithRetry(w, r, target, 3*time.Second)
 			return
 		}
 
@@ -1597,7 +1699,6 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 
 		// Proxy to Rails app
 		target, _ := url.Parse(fmt.Sprintf("http://localhost:%d", app.Port))
-		proxy := httputil.NewSingleHostReverseProxy(target)
 		
 		// For Rails apps, preserve the full path - don't strip the location prefix
 		// Rails routing expects to see the full path like "/2025/adelaide/adelaide-combined/"
@@ -1617,7 +1718,8 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 		
 		slog.Info("Proxying to Rails", "path", originalPath, "port", app.Port, "location", bestMatch.Path)
 		
-		proxy.ServeHTTP(w, r)
+		// Use retry logic for Rails apps too
+		proxyWithRetry(w, r, target, 3*time.Second)
 	})
 }
 
@@ -1655,22 +1757,50 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 					region := parts[1]
 					status := parts[2]
 					
-					// Only apply fly-replay for GET requests (if methods not specified) or specified methods
-					if r.Method == "GET" {
-						w.Header().Set("Fly-Replay", fmt.Sprintf("region=%s", region))
-						statusCode := http.StatusTemporaryRedirect
-						if code, err := strconv.Atoi(status); err == nil {
-							statusCode = code
+					// Check if method is allowed for this rule
+					methodAllowed := len(rule.Methods) == 0 // If no methods specified, allow all
+					if len(rule.Methods) > 0 {
+						for _, method := range rule.Methods {
+							if r.Method == method {
+								methodAllowed = true
+								break
+							}
 						}
-						
-						slog.Info("Sending fly-replay response", 
-							"path", path, 
-							"region", region, 
-							"status", statusCode, 
-							"method", r.Method)
-						
-						w.WriteHeader(statusCode)
-						return true
+					}
+					
+					if methodAllowed {
+						if shouldUseFlyReplay(r) {
+							// Check if target machine is available via DNS
+							if !checkTargetMachineAvailable(region) {
+								// Target machine unavailable, serve maintenance page
+								slog.Info("Target machine unavailable, serving maintenance page", 
+									"path", path, 
+									"region", region, 
+									"method", r.Method)
+								
+								serveMaintenancePage(w, r, config)
+								return true
+							}
+							
+							w.Header().Set("Fly-Replay", fmt.Sprintf("region=%s", region))
+							statusCode := http.StatusTemporaryRedirect
+							if code, err := strconv.Atoi(status); err == nil {
+								statusCode = code
+							}
+							
+							slog.Info("Sending fly-replay response", 
+								"path", path, 
+								"region", region, 
+								"status", statusCode, 
+								"method", r.Method,
+								"contentLength", r.ContentLength)
+							
+							w.WriteHeader(statusCode)
+							return true
+						} else {
+							// Automatically reverse proxy instead of fly-replay
+							return handleFlyReplayFallback(w, r, region, config)
+						}
 					}
 				}
 			} else if rule.Flag == "last" {
@@ -1686,6 +1816,192 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 	
 	slog.Debug("No rewrite rules matched", "path", path)
 	return false
+}
+
+// shouldUseFlyReplay determines if a request should use fly-replay based on content length
+// Fly replay can handle any method as long as the content length is less than 1MB
+func shouldUseFlyReplay(r *http.Request) bool {
+	const maxFlyReplaySize = 1000000 // 1 million bytes
+
+	// If Content-Length is explicitly set and >= 1MB, use reverse proxy
+	if r.ContentLength >= maxFlyReplaySize {
+		slog.Debug("Using reverse proxy due to large content length", 
+			"method", r.Method, 
+			"contentLength", r.ContentLength)
+		return false
+	}
+	
+	// If Content-Length is missing (-1) on methods that typically require content
+	// (POST, PUT, PATCH), be conservative and use reverse proxy
+	if r.ContentLength == -1 {
+		methodsRequiringContent := []string{"POST", "PUT", "PATCH"}
+		for _, method := range methodsRequiringContent {
+			if r.Method == method {
+				slog.Debug("Using reverse proxy due to missing content length on body method", 
+					"method", r.Method)
+				return false
+			}
+		}
+	}
+	
+	// For GET, HEAD, DELETE, OPTIONS and other methods without content, or 
+	// methods with content < 1MB, use fly-replay
+	return true
+}
+
+// checkTargetMachineAvailable checks if the target machine is available via IPv6 DNS
+// This helps detect if a machine is in the process of redeploying
+// Results are cached to avoid expensive DNS lookups
+func checkTargetMachineAvailable(region string) bool {
+	flyAppName := os.Getenv("FLY_APP_NAME")
+	if flyAppName == "" {
+		return true // Can't check without app name, assume available
+	}
+	
+	// Check cache first
+	if available, found := dnsCache.Get(region); found {
+		slog.Debug("DNS cache hit for target machine", 
+			"region", region, 
+			"available", available)
+		return available
+	}
+	
+	// Construct the IPv6 DNS name for the target machine
+	dnsName := fmt.Sprintf("%s.%s.internal", region, flyAppName)
+	
+	// Set a reasonable timeout for DNS lookup
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	
+	// Perform IPv6 DNS lookup
+	resolver := &net.Resolver{}
+	addrs, err := resolver.LookupIPAddr(ctx, dnsName)
+	if err != nil {
+		slog.Debug("DNS lookup failed for target machine", 
+			"dnsName", dnsName, 
+			"error", err)
+		// Cache negative result
+		dnsCache.Set(region, false)
+		return false
+	}
+	
+	// Check if we found any IPv6 addresses
+	hasIPv6 := false
+	for _, addr := range addrs {
+		if addr.IP.To4() == nil { // IPv6 address
+			hasIPv6 = true
+			break
+		}
+	}
+	
+	slog.Debug("DNS lookup result for target machine", 
+		"dnsName", dnsName, 
+		"addressCount", len(addrs),
+		"hasIPv6", hasIPv6)
+	
+	// Cache the result
+	dnsCache.Set(region, hasIPv6)
+	return hasIPv6
+}
+
+// serveMaintenancePage serves a maintenance page when target machine is unavailable
+func serveMaintenancePage(w http.ResponseWriter, r *http.Request, config *Config) {
+	// Set appropriate status code
+	w.WriteHeader(http.StatusServiceUnavailable)
+	
+	// Try to serve the configured maintenance page file
+	maintenancePath := config.MaintenancePage
+	if maintenancePath == "" {
+		maintenancePath = "/503.html" // Default fallback
+	}
+	if config.PublicDir != "" {
+		fullPath := filepath.Join(config.PublicDir, maintenancePath)
+		if content, err := os.ReadFile(fullPath); err == nil {
+			// Set content type based on file extension
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+			
+			w.Write(content)
+			slog.Debug("Served maintenance page from file", "path", fullPath)
+			return
+		} else {
+			slog.Debug("Could not read maintenance page file", "path", fullPath, "error", err)
+		}
+	}
+	
+	// Fallback to simple HTML response if no maintenance page file found
+	fallbackHTML := `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Temporarily Unavailable</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #d73502; }
+        p { color: #666; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Service Temporarily Unavailable</h1>
+        <p>The service you are trying to reach is currently unavailable. This may be due to maintenance or a temporary deployment.</p>
+        <p>Please try again in a few minutes.</p>
+    </div>
+</body>
+</html>`
+	
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	
+	w.Write([]byte(fallbackHTML))
+	slog.Debug("Served fallback maintenance page")
+}
+
+// handleFlyReplayFallback automatically reverse proxies the request when fly-replay isn't suitable
+// Constructs the target URL as http://<region>.<FLY_APP_NAME>.internal:<port><path>
+func handleFlyReplayFallback(w http.ResponseWriter, r *http.Request, region string, config *Config) bool {
+	flyAppName := os.Getenv("FLY_APP_NAME")
+	if flyAppName == "" {
+		slog.Debug("FLY_APP_NAME not set, cannot construct fallback proxy URL")
+		return false
+	}
+	
+	// Construct the target URL: http://<region>.<FLY_APP_NAME>.internal:<port><path>
+	listenPort := config.ListenPort
+	if listenPort == 0 {
+		listenPort = 3000 // Default port
+	}
+	
+	targetURL := fmt.Sprintf("http://%s.%s.internal:%d%s", region, flyAppName, listenPort, r.URL.Path)
+	if r.URL.RawQuery != "" {
+		targetURL += "?" + r.URL.RawQuery
+	}
+	
+	target, err := url.Parse(targetURL)
+	if err != nil {
+		slog.Debug("Failed to parse fallback proxy URL", "url", targetURL, "error", err)
+		return false
+	}
+	
+	// Set forwarding headers
+	r.Header.Set("X-Forwarded-Host", r.Host)
+	
+	slog.Info("Using automatic reverse proxy fallback for fly-replay", 
+		"originalPath", r.URL.Path,
+		"targetURL", targetURL,
+		"region", region,
+		"method", r.Method,
+		"contentLength", r.ContentLength)
+	
+	// Use the existing retry proxy logic
+	proxyWithRetry(w, r, target, 3*time.Second)
+	return true
 }
 
 // shouldExcludeFromAuth checks if a path should be excluded from authentication using parsed patterns
@@ -1846,7 +2162,42 @@ func tryFiles(w http.ResponseWriter, r *http.Request, config *Config) bool {
 		return false
 	}
 	
-	// Find the best matching location for this path
+	// First, check static directories from config
+	var bestStaticDir *StaticDir
+	bestStaticDirLen := 0
+	
+	for _, staticDir := range config.StaticDirs {
+		if strings.HasPrefix(path, staticDir.URLPath) && len(staticDir.URLPath) > bestStaticDirLen {
+			bestStaticDir = staticDir
+			bestStaticDirLen = len(staticDir.URLPath)
+		}
+	}
+	
+	// If we found a matching static directory, try to serve from there
+	if bestStaticDir != nil {
+		// Remove the URL prefix to get the relative path
+		relativePath := strings.TrimPrefix(path, bestStaticDir.URLPath)
+		if relativePath == "" {
+			relativePath = "/"
+		}
+		if relativePath[0] != '/' {
+			relativePath = "/" + relativePath
+		}
+		
+		// Use extensions from config
+		extensions := config.TryFilesSuffixes
+		
+		for _, ext := range extensions {
+			// Build the full filesystem path
+			fsPath := filepath.Join(config.PublicDir, bestStaticDir.LocalPath, relativePath+ext)
+			slog.Debug("tryFiles checking static", "fsPath", fsPath)
+			if _, err := os.Stat(fsPath); err == nil {
+				return serveFile(w, r, fsPath, path+ext)
+			}
+		}
+	}
+	
+	// Fall back to checking locations (for backward compatibility)
 	var bestMatch *Location
 	bestMatchLen := 0
 	
@@ -1939,7 +2290,90 @@ func setContentType(w http.ResponseWriter, fsPath string) {
 	}
 }
 
-// proxyRequest proxies a request to another server
+// proxyWithRetry handles proxying with automatic retry on 502 errors
+func proxyWithRetry(w http.ResponseWriter, r *http.Request, target *url.URL, maxRetryDuration time.Duration) {
+	startTime := time.Now()
+	retryCount := 0
+	sleepDuration := 100 * time.Millisecond // Start with 100ms
+	
+	for {
+		// Create a new proxy for each attempt
+		proxy := httputil.NewSingleHostReverseProxy(target)
+		
+		// Track if we got an error
+		errorOccurred := false
+		errorHandled := false
+		
+		// Custom error handler to detect connection errors
+		proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+			errorOccurred = true
+			
+			// Check if we should retry
+			if time.Since(startTime) < maxRetryDuration {
+				// We'll retry, don't write response yet
+				return
+			}
+			
+			// Max retry time exceeded or non-retryable error
+			if !errorHandled {
+				errorHandled = true
+				slog.Warn("Proxy error after retries", 
+					"target", target.String(), 
+					"error", err,
+					"retries", retryCount,
+					"duration", time.Since(startTime))
+				http.Error(rw, "Bad Gateway", http.StatusBadGateway)
+			}
+		}
+		
+		// Attempt the proxy request
+		proxy.ServeHTTP(w, r)
+		
+		// If no error occurred, we're done
+		if !errorOccurred {
+			return
+		}
+		
+		// Check if we've exceeded max retry duration
+		if time.Since(startTime) >= maxRetryDuration {
+			if !errorHandled {
+				slog.Warn("Proxy retry timeout", 
+					"target", target.String(), 
+					"retries", retryCount,
+					"duration", time.Since(startTime))
+				http.Error(w, "Bad Gateway", http.StatusBadGateway)
+			}
+			return
+		}
+		
+		// Log retry attempt
+		retryCount++
+		slog.Debug("Retrying proxy request", 
+			"target", target.String(), 
+			"retry", retryCount,
+			"sleep", sleepDuration)
+		
+		// Sleep before retry with exponential backoff
+		time.Sleep(sleepDuration)
+		sleepDuration = sleepDuration * 2
+		if sleepDuration > 500*time.Millisecond {
+			sleepDuration = 500 * time.Millisecond // Cap at 500ms
+		}
+		
+		// Clone the request for retry (body might have been consumed)
+		if r.Body != nil && r.ContentLength > 0 {
+			// For retries with body, we'd need to buffer the body
+			// For now, we'll only retry GET/HEAD requests without body
+			if r.Method != "GET" && r.Method != "HEAD" {
+				slog.Debug("Not retrying request with body", "method", r.Method)
+				http.Error(w, "Bad Gateway", http.StatusBadGateway)
+				return
+			}
+		}
+	}
+}
+
+// proxyRequest proxies a request to another server with retry logic
 func proxyRequest(w http.ResponseWriter, r *http.Request, route *ProxyRoute) {
 	target, err := url.Parse(route.ProxyPass)
 	if err != nil {
@@ -1947,12 +2381,11 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, route *ProxyRoute) {
 		return
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(target)
-	
 	// Add custom headers
 	for k, v := range route.SetHeaders {
 		r.Header.Set(k, v)
 	}
 	
-	proxy.ServeHTTP(w, r)
+	// Use the retry proxy helper
+	proxyWithRetry(w, r, target, 3*time.Second)
 }
