@@ -109,7 +109,7 @@ pools:
 | Section | Purpose | Required | Details |
 |---------|---------|----------|---------|
 | [server](server.md) | HTTP server settings | ✓ | Port, hostname, paths |
-| [pools](pools.md) | Process pool management | | Resource limits |
+| pools | Process pool management | | Resource limits |
 | [auth](authentication.md) | Authentication setup | | htpasswd support |
 | [static](static-files.md) | Static file serving | | Direct filesystem serving |
 | [applications](applications.md) | Rails applications | ✓ | Tenants and environment |
@@ -231,7 +231,7 @@ static:
 
 ## Migration from nginx
 
-If migrating from nginx + Passenger, see [Migration Guide](../migration/from-nginx.md) for configuration mapping.
+Migration from nginx + Passenger is supported with configuration mapping.
 
 ## Complete Example
 

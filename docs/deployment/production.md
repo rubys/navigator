@@ -594,4 +594,3 @@ watch 'free -h'
 - [Configuration Reference](../configuration/yaml-reference.md)
 - [systemd Integration](../examples/systemd.md)
 - [Monitoring Guide](monitoring.md)
-- [Security Best Practices](../security/index.md)

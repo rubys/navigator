@@ -201,4 +201,3 @@ Navigator provides a comprehensive set of features designed specifically for Rai
 - [Configuration Guide](../configuration/index.md)
 - [Examples](../examples/index.md)
 - [Deployment Guide](../deployment/index.md)
-- [Migration Guide](../migration/index.md)

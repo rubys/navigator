@@ -114,5 +114,5 @@ pools:
 ## Need Help?
 
 - Can't find your scenario? Check the [Configuration Guide](../configuration/index.md)
-- Having issues? See [Troubleshooting](../troubleshooting/index.md)
+- Having issues? Check the documentation or [open an issue](https://github.com/rubys/navigator/issues)
 - Want to contribute an example? [Open a PR](https://github.com/rubys/navigator/pulls)
