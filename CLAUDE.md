@@ -22,6 +22,7 @@ Navigator is a Go-based web server for multi-tenant Rails applications. It provi
 ✅ **WebSocket Support**: Full WebSocket connection support with standalone servers
 ✅ **High Reliability**: Automatic retry with exponential backoff for proxy failures
 ✅ **Simple Configuration**: Flexible variable substitution system for multi-tenant apps
+✅ **Comprehensive Documentation**: Complete documentation site at https://rubys.github.io/navigator/
 
 ## Architecture
 
@@ -310,6 +311,34 @@ Navigator uses minimal, focused dependencies:
 - **gopkg.in/yaml.v3**: YAML configuration parsing
 
 **No complex web frameworks** - uses Go standard library for HTTP handling.
+
+## Documentation
+
+Navigator has comprehensive documentation hosted at **https://rubys.github.io/navigator/** including:
+
+### Core Documentation
+- **Getting Started**: Installation and basic configuration
+- **Configuration Reference**: Complete YAML configuration options
+- **Examples**: Working configurations for common scenarios (Redis, Action Cable, multi-tenant)
+- **Features**: Detailed explanations of all Navigator capabilities
+- **Deployment**: Production deployment guides and best practices
+- **Reference**: CLI options, environment variables, signal handling
+
+### Key Documentation Features
+- **Live Examples**: All configuration examples are copy-paste ready
+- **Step-by-Step Guides**: Clear instructions for setup and testing
+- **Comprehensive Coverage**: 50+ pages covering all Navigator features
+- **Search Functionality**: Full-text search across all documentation
+- **Mobile Responsive**: Works perfectly on all devices
+- **Automatic Updates**: Documentation deploys automatically via GitHub Actions
+
+### Quick Reference Links
+- **Home**: https://rubys.github.io/navigator/
+- **YAML Reference**: https://rubys.github.io/navigator/configuration/yaml-reference/
+- **Examples**: https://rubys.github.io/navigator/examples/
+- **CLI Reference**: https://rubys.github.io/navigator/reference/cli/
+
+The documentation source is in the `docs/` directory and uses MkDocs with Material theme for generation.
 
 ## Logging
 

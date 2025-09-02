@@ -291,9 +291,17 @@ curl -u test:secret http://localhost:9999/showcase/2025/boston/
 
 ## Documentation
 
-Navigator has comprehensive documentation with examples and guides.
+📚 **Complete documentation is available at: https://rubys.github.io/navigator/**
 
-### Quick Start (Local Documentation)
+The documentation includes:
+- **Getting Started**: Installation and basic configuration
+- **Configuration Reference**: Complete YAML options with examples
+- **Working Examples**: Redis, Action Cable, multi-tenant setups
+- **Feature Guides**: Process management, routing, authentication
+- **Deployment**: Production deployment and best practices
+- **CLI Reference**: Command-line options and usage
+
+### Local Documentation Development
 
 ```bash
 # Set up development environment
@@ -316,20 +324,6 @@ pip install -r requirements.txt
 # Serve documentation
 mkdocs serve
 ```
-
-### Deploy Documentation
-
-```bash
-# Deploy to GitHub Pages
-mkdocs gh-deploy
-```
-
-The documentation includes:
-- Getting started guides
-- Configuration reference
-- Complete working examples
-- Deployment guides
-- Troubleshooting tips
 
 ## Development
 
