@@ -56,10 +56,6 @@ RUN mkdir -p tmp/pids log storage
 # Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/up || exit 1
-
 # Start Navigator
 CMD ["navigator", "/app/config/navigator.yml"]
 ```
