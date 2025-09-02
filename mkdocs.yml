@@ -80,6 +80,7 @@ nav:
     - With Sidekiq: examples/with-sidekiq.md
     - Action Cable: examples/action-cable.md
     - systemd Service: examples/systemd.md
+    - Fly.io Deployment: examples/fly-deployment.md
   - Configuration:
     - configuration/index.md
     - YAML Reference: configuration/yaml-reference.md
@@ -90,6 +91,7 @@ nav:
     - Static Files: configuration/static-files.md
     - Routing: configuration/routing.md
     - Processes: configuration/processes.md
+    - Suspend: configuration/suspend.md
   - Features:
     - features/index.md
     - Process Management: features/process-management.md
@@ -97,13 +99,17 @@ nav:
     - Fly-Replay: features/fly-replay.md
     - Hot Reload: features/hot-reload.md
     - Machine Suspend: features/machine-suspend.md
+    - WebSocket Support: features/websocket-support.md
+    - Logging: features/logging.md
   - Reference:
     - reference/index.md
     - CLI Options: reference/cli.md
     - Environment Variables: reference/environment.md
     - Signals: reference/signals.md
   - Deployment:
+    - deployment/index.md
     - Production: deployment/production.md
+    - Fly.io: deployment/fly-io.md
     - Monitoring: deployment/monitoring.md
   - Documentation Overview: DOCUMENTATION_OVERVIEW.md
 
