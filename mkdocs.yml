@@ -82,6 +82,8 @@ nav:
   - Configuration:
     - configuration/index.md
     - YAML Reference: configuration/yaml-reference.md
+    - Server: configuration/server.md
+    - Applications: configuration/applications.md
     - Authentication: configuration/authentication.md
     - Static Files: configuration/static-files.md
     - Routing: configuration/routing.md
@@ -97,6 +99,9 @@ nav:
     - CLI Options: reference/cli.md
     - Environment Variables: reference/environment.md
     - Signals: reference/signals.md
+  - Deployment:
+    - Production: deployment/production.md
+  - Documentation Overview: DOCUMENTATION_OVERVIEW.md
 
 extra:
   social:

@@ -500,9 +500,9 @@ managed_processes:
 - Ensure Rails app can enqueue jobs
 
 ## See Also
-- [Managed Processes](/features/process-management/)
-- [Environment Variables](/configuration/templates/)
-- [Production Deployment](/deployment/production/)
+- [Managed Processes](features/process-management.md)
+- [Environment Variables](configuration/templates.md)
+- [Production Deployment](deployment/production.md)
 ```
 
 ## Implementation Status
