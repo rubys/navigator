@@ -178,6 +178,10 @@ Features:
 
 ### 5. Intelligent Region Routing (Fly-Replay)
 
+- **Multi-Target Routing**: Support for three routing types:
+  - **App-based**: Route to any instance of a specific app
+  - **Machine-based**: Route to a specific machine instance
+  - **Region-based**: Route to a specific Fly.io region
 - **Smart Detection**: Automatically uses reverse proxy for requests >1MB
 - **Automatic Fallback**: Uses reverse proxy for requests >1MB
 - **Maintenance Pages**: Serves custom 503 page when targets unavailable

@@ -28,24 +28,24 @@ import (
 // Constants for configuration defaults and limits
 const (
 	// Timeout constants
-	DefaultIdleTimeout   = 10 * time.Minute
-	RailsStartupTimeout  = 30 * time.Second
-	ProxyRetryTimeout    = 3 * time.Second
-	ProcessStopTimeout   = 10 * time.Second
-	RailsStartupDelay    = 5 * time.Second
+	DefaultIdleTimeout  = 10 * time.Minute
+	RailsStartupTimeout = 30 * time.Second
+	ProxyRetryTimeout   = 3 * time.Second
+	ProcessStopTimeout  = 10 * time.Second
+	RailsStartupDelay   = 5 * time.Second
 
 	// Port configuration
-	DefaultStartPort = 4000
-	MaxPortRange     = 100
+	DefaultStartPort  = 4000
+	MaxPortRange      = 100
 	DefaultListenPort = 3000
 
 	// Proxy configuration
-	MaxFlyReplaySize = 1000000 // 1MB
+	MaxFlyReplaySize       = 1000000 // 1MB
 	ProxyRetryInitialDelay = 100 * time.Millisecond
-	ProxyRetryMaxDelay = 500 * time.Millisecond
+	ProxyRetryMaxDelay     = 500 * time.Millisecond
 
 	// File paths
-	NavigatorPIDFile = "/tmp/navigator.pid"
+	NavigatorPIDFile       = "/tmp/navigator.pid"
 	DefaultMaintenancePage = "/503.html"
 )
 
@@ -74,7 +74,6 @@ type AuthPattern struct {
 	Action  string // "off" or realm name
 }
 
-
 // Config represents the parsed configuration
 type Config struct {
 	ServerName       string
@@ -91,13 +90,13 @@ type Config struct {
 	PassengerRuby    string
 	MinInstances     int
 	PreloadBundler   bool
-	IdleTimeout      time.Duration // Idle timeout for app processes
-	StartPort        int           // Starting port for Rails apps
-	StaticDirs       []*StaticDir  // Static directory mappings
-	StaticExts       []string      // File extensions to serve statically
-	TryFilesSuffixes []string      // Suffixes for try_files behavior
-	PublicDir        string        // Default public directory
-	MaintenancePage  string        // Path to maintenance page (e.g., "/503.html")
+	IdleTimeout      time.Duration          // Idle timeout for app processes
+	StartPort        int                    // Starting port for Rails apps
+	StaticDirs       []*StaticDir           // Static directory mappings
+	StaticExts       []string               // File extensions to serve statically
+	TryFilesSuffixes []string               // Suffixes for try_files behavior
+	PublicDir        string                 // Default public directory
+	MaintenancePage  string                 // Path to maintenance page (e.g., "/503.html")
 	ManagedProcesses []ManagedProcessConfig // Managed processes to start/stop with Navigator
 
 	// Suspend configuration
@@ -184,6 +183,8 @@ type YAMLConfig struct {
 		FlyReplay []struct {
 			Path    string   `yaml:"path"`
 			Region  string   `yaml:"region"`
+			App     string   `yaml:"app"`
+			Machine string   `yaml:"machine"`
 			Status  int      `yaml:"status"`
 			Methods []string `yaml:"methods"`
 		} `yaml:"fly_replay"`
@@ -632,7 +633,6 @@ func (sm *SuspendManager) suspendMachine() {
 		return
 	}
 
-
 	slog.Info("Suspending machine", "app", appName, "machine", machineId)
 
 	// Create HTTP client with Unix socket transport
@@ -756,7 +756,6 @@ func sendReloadSignal() error {
 	return nil
 }
 
-
 func main() {
 	// Initialize logger with level from environment variable
 	logLevel := slog.LevelInfo // Default to Info level
@@ -779,7 +778,6 @@ func main() {
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
 	slog.SetDefault(logger)
-
 
 	// Handle -s reload option
 	if len(os.Args) > 1 && os.Args[1] == "-s" {
@@ -862,7 +860,6 @@ func main() {
 		slog.Info("Starting managed processes", "count", len(config.ManagedProcesses))
 		processManager.StartAll(config.ManagedProcesses)
 	}
-
 
 	// Create a mutable handler wrapper for configuration reloading
 	handler := CreateHandler(config, manager, auth, suspendManager)
@@ -1062,10 +1059,20 @@ func ParseYAML(content []byte) (*Config, error) {
 	// Convert fly-replay routes
 	for _, flyReplay := range yamlConfig.Routes.FlyReplay {
 		if re, err := regexp.Compile(flyReplay.Path); err == nil {
+			// Support app, region, and machine based fly-replay
+			var target string
+			if flyReplay.Machine != "" && flyReplay.App != "" {
+				target = fmt.Sprintf("machine=%s:%s", flyReplay.Machine, flyReplay.App)
+			} else if flyReplay.App != "" {
+				target = fmt.Sprintf("app=%s", flyReplay.App)
+			} else {
+				target = flyReplay.Region
+			}
+			
 			config.RewriteRules = append(config.RewriteRules, &RewriteRule{
 				Pattern:     re,
 				Replacement: flyReplay.Path, // Keep original path for fly-replay
-				Flag:        fmt.Sprintf("fly-replay:%s:%d", flyReplay.Region, flyReplay.Status),
+				Flag:        fmt.Sprintf("fly-replay:%s:%d", target, flyReplay.Status),
 				Methods:     flyReplay.Methods,
 			})
 		}
@@ -1127,7 +1134,6 @@ func ParseYAML(content []byte) (*Config, error) {
 	config.PassengerRuby = yamlConfig.Process.Ruby
 	config.PreloadBundler = yamlConfig.Process.BundlerPreload
 	config.MinInstances = yamlConfig.Process.MinInstances
-
 
 	// Set idle timeout from pools config
 	if yamlConfig.Pools.IdleTimeout > 0 {
@@ -1651,10 +1657,10 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 				http.Redirect(w, r, newPath, http.StatusFound)
 				return true
 			} else if strings.HasPrefix(rule.Flag, "fly-replay:") {
-				// Handle fly-replay: fly-replay:region:status
+				// Handle fly-replay: fly-replay:target:status (target can be region or app=name)
 				parts := strings.Split(rule.Flag, ":")
 				if len(parts) == 3 {
-					region := parts[1]
+					target := parts[1]
 					status := parts[2]
 
 					// Check if method is allowed for this rule
@@ -1675,7 +1681,7 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 								// Retry detected, serve maintenance page
 								slog.Info("Retry detected, serving maintenance page",
 									"path", path,
-									"region", region,
+									"target", target,
 									"method", r.Method,
 									"navigatorRetry", r.Header.Get("X-Navigator-Retry"))
 
@@ -1689,23 +1695,71 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 								statusCode = code
 							}
 
-							slog.Info("Sending fly-replay response",
-								"path", path,
-								"region", region,
-								"status", statusCode,
-								"method", r.Method,
-								"contentLength", r.ContentLength)
+							// Parse target to determine if it's machine, app, or region
+							var responseMap map[string]interface{}
+							if strings.HasPrefix(target, "machine=") {
+								// Machine-based fly-replay: machine=machine_id:app_name
+								machineAndApp := strings.TrimPrefix(target, "machine=")
+								parts := strings.Split(machineAndApp, ":")
+								if len(parts) == 2 {
+									machineID := parts[0]
+									appName := parts[1]
+									slog.Info("Sending fly-replay response",
+										"path", path,
+										"machine", machineID,
+										"app", appName,
+										"status", statusCode,
+										"method", r.Method,
+										"contentLength", r.ContentLength)
+
+									responseMap = map[string]interface{}{
+										"app": appName,
+										"prefer_instance": machineID,
+										"transform": map[string]interface{}{
+											"set_headers": []map[string]string{
+												{"name": "X-Navigator-Retry", "value": "true"},
+											},
+										},
+									}
+								}
+							} else if strings.HasPrefix(target, "app=") {
+								// App-based fly-replay
+								appName := strings.TrimPrefix(target, "app=")
+								slog.Info("Sending fly-replay response",
+									"path", path,
+									"app", appName,
+									"status", statusCode,
+									"method", r.Method,
+									"contentLength", r.ContentLength)
+
+								responseMap = map[string]interface{}{
+									"app": appName,
+									"transform": map[string]interface{}{
+										"set_headers": []map[string]string{
+											{"name": "X-Navigator-Retry", "value": "true"},
+										},
+									},
+								}
+							} else {
+								// Region-based fly-replay
+								slog.Info("Sending fly-replay response",
+									"path", path,
+									"region", target,
+									"status", statusCode,
+									"method", r.Method,
+									"contentLength", r.ContentLength)
+
+								responseMap = map[string]interface{}{
+									"region": target,
+									"transform": map[string]interface{}{
+										"set_headers": []map[string]string{
+											{"name": "X-Navigator-Retry", "value": "true"},
+										},
+									},
+								}
+							}
 
 							w.WriteHeader(statusCode)
-
-							// Write the JSON body with transform instructions
-							responseMap := map[string]interface{}{
-								"transform": map[string]interface{}{
-									"set_headers": []map[string]string{
-										{"name": "X-Navigator-Retry", "value": "true"},
-									},
-								},
-							}
 
 							responseBodyBytes, err := json.Marshal(responseMap)
 							if err != nil {
@@ -1717,7 +1771,7 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 							return true
 						} else {
 							// Automatically reverse proxy instead of fly-replay
-							return handleFlyReplayFallback(w, r, region, config)
+							return handleFlyReplayFallback(w, r, target, config)
 						}
 					}
 				}
@@ -1765,7 +1819,6 @@ func shouldUseFlyReplay(r *http.Request) bool {
 	// methods with content < 1MB, use fly-replay
 	return true
 }
-
 
 // serveMaintenancePage serves a maintenance page when target machine is unavailable
 func serveMaintenancePage(w http.ResponseWriter, r *http.Request, config *Config) {
@@ -1827,26 +1880,49 @@ func serveMaintenancePage(w http.ResponseWriter, r *http.Request, config *Config
 }
 
 // handleFlyReplayFallback automatically reverse proxies the request when fly-replay isn't suitable
-// Constructs the target URL as http://<region>.<FLY_APP_NAME>.internal:<port><path>
-func handleFlyReplayFallback(w http.ResponseWriter, r *http.Request, region string, config *Config) bool {
+// Constructs the target URL based on target type:
+// - Machine: http://<machine_id>.vm.<appname>.internal:<port><path>
+// - App: http://<appname>.internal:<port><path>
+// - Region: http://<region>.<FLY_APP_NAME>.internal:<port><path>
+func handleFlyReplayFallback(w http.ResponseWriter, r *http.Request, target string, config *Config) bool {
 	flyAppName := os.Getenv("FLY_APP_NAME")
 	if flyAppName == "" {
 		slog.Debug("FLY_APP_NAME not set, cannot construct fallback proxy URL")
 		return false
 	}
 
-	// Construct the target URL: http://<region>.<FLY_APP_NAME>.internal:<port><path>
+	// Construct the target URL based on target type
 	listenPort := config.ListenPort
 	if listenPort == 0 {
 		listenPort = DefaultListenPort
 	}
 
-	targetURL := fmt.Sprintf("http://%s.%s.internal:%d%s", region, flyAppName, listenPort, r.URL.Path)
+	var targetURL string
+	if strings.HasPrefix(target, "machine=") {
+		// Machine-based: http://<machine_id>.vm.<appname>.internal:<port><path>
+		machineAndApp := strings.TrimPrefix(target, "machine=")
+		parts := strings.Split(machineAndApp, ":")
+		if len(parts) == 2 {
+			machineID := parts[0]
+			appName := parts[1]
+			targetURL = fmt.Sprintf("http://%s.vm.%s.internal:%d%s", machineID, appName, listenPort, r.URL.Path)
+		} else {
+			slog.Debug("Invalid machine target format", "target", target)
+			return false
+		}
+	} else if strings.HasPrefix(target, "app=") {
+		// App-based: http://<appname>.internal:<port><path>
+		appName := strings.TrimPrefix(target, "app=")
+		targetURL = fmt.Sprintf("http://%s.internal:%d%s", appName, listenPort, r.URL.Path)
+	} else {
+		// Region-based: http://<region>.<FLY_APP_NAME>.internal:<port><path>
+		targetURL = fmt.Sprintf("http://%s.%s.internal:%d%s", target, flyAppName, listenPort, r.URL.Path)
+	}
 	if r.URL.RawQuery != "" {
 		targetURL += "?" + r.URL.RawQuery
 	}
 
-	target, err := url.Parse(targetURL)
+	targetParsed, err := url.Parse(targetURL)
 	if err != nil {
 		slog.Debug("Failed to parse fallback proxy URL", "url", targetURL, "error", err)
 		return false
@@ -1858,12 +1934,12 @@ func handleFlyReplayFallback(w http.ResponseWriter, r *http.Request, region stri
 	slog.Info("Using automatic reverse proxy fallback for fly-replay",
 		"originalPath", r.URL.Path,
 		"targetURL", targetURL,
-		"region", region,
+		"target", target,
 		"method", r.Method,
 		"contentLength", r.ContentLength)
 
 	// Use the existing retry proxy logic
-	proxyWithRetry(w, r, target, ProxyRetryTimeout)
+	proxyWithRetry(w, r, targetParsed, ProxyRetryTimeout)
 	return true
 }
 
