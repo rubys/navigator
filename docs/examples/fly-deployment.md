@@ -73,16 +73,12 @@ kill_signal = "SIGTERM"
 kill_timeout = "60s"
 
 [build]
-  dockerfile = "Dockerfile"
 
 [deploy]
   release_command = "bundle exec rails db:migrate"
-  strategy = "rolling"
 
 [env]
   RAILS_ENV = "production"
-  RAILS_LOG_TO_STDOUT = "1"
-  RAILS_SERVE_STATIC_FILES = "false"
   LOG_LEVEL = "info"
 
 [http_service]
@@ -101,21 +97,6 @@ kill_timeout = "60s"
     port = 3000
     timeout = "5s"
     type = "http"
-
-[machines]
-  auto_start = true
-  auto_stop = true
-  min_machines_running = 1
-
-# Multi-region configuration
-[[regions]]
-  name = "ord"  # Primary: Chicago
-
-[[regions]]  
-  name = "fra"  # Secondary: Frankfurt
-
-[[regions]]
-  name = "nrt"  # Secondary: Tokyo
 
 # VM configuration
 [[vm]]
