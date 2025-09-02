@@ -65,8 +65,7 @@ static:
     enabled: false
 
 applications:
-  global_env: {}
-  standard_vars: {}
+  env: {}
   tenants: []
 
 managed_processes: []
