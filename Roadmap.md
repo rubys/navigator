@@ -38,7 +38,7 @@ The primary motivation for the creation of the Navigator tool is twofold: reduce
 
 Examples:
  * Replay is smart. If content length is greater than a megabyte, a reverse proxy will be used instead.
- * Navigator will check dns (and cache the results) before issuing a replay. If the machine is not available, a maintenance page will be shown instead.
+ * If a replay fails a maintenance page will be shown in response.
  * Reverse proxy will retry gateway failures with exponentional fallback.
 
 Eventually that could lead to starting new machines dynamically, but for now the plan is to have one machine per user, where that machine is stopped or suspended when not in use. A single user can still have multiple apps.

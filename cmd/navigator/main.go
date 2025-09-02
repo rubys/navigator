@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -20,10 +20,45 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	
+
 	"github.com/tg123/go-htpasswd"
 	"gopkg.in/yaml.v3"
 )
+
+// Constants for configuration defaults and limits
+const (
+	// Timeout constants
+	DefaultIdleTimeout   = 10 * time.Minute
+	RailsStartupTimeout  = 30 * time.Second
+	ProxyRetryTimeout    = 3 * time.Second
+	ProcessStopTimeout   = 10 * time.Second
+	RailsStartupDelay    = 5 * time.Second
+
+	// Port configuration
+	DefaultStartPort = 4000
+	MaxPortRange     = 100
+	DefaultListenPort = 3000
+
+	// Proxy configuration
+	MaxFlyReplaySize = 1000000 // 1MB
+	ProxyRetryInitialDelay = 100 * time.Millisecond
+	ProxyRetryMaxDelay = 500 * time.Millisecond
+
+	// File paths
+	NavigatorPIDFile = "/tmp/navigator.pid"
+	DefaultMaintenancePage = "/503.html"
+)
+
+// ManagedProcessConfig represents configuration for a managed process
+type ManagedProcessConfig struct {
+	Name        string            `yaml:"name"`
+	Command     string            `yaml:"command"`
+	Args        []string          `yaml:"args"`
+	WorkingDir  string            `yaml:"working_dir"`
+	Env         map[string]string `yaml:"env"`
+	AutoRestart bool              `yaml:"auto_restart"`
+	StartDelay  int               `yaml:"start_delay"`
+}
 
 // RewriteRule represents a rewrite rule
 type RewriteRule struct {
@@ -39,117 +74,32 @@ type AuthPattern struct {
 	Action  string // "off" or realm name
 }
 
-// DNSCacheEntry represents a cached DNS lookup result
-type DNSCacheEntry struct {
-	Available bool
-	ExpiresAt time.Time
-}
-
-// DNSCache manages cached DNS availability results
-type DNSCache struct {
-	mutex sync.RWMutex
-	cache map[string]*DNSCacheEntry
-	ttl   time.Duration
-}
-
-// NewDNSCache creates a new DNS cache with specified TTL
-func NewDNSCache(ttl time.Duration) *DNSCache {
-	return &DNSCache{
-		cache: make(map[string]*DNSCacheEntry),
-		ttl:   ttl,
-	}
-}
-
-// Get retrieves a cached DNS result if available and not expired
-func (c *DNSCache) Get(region string) (bool, bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	
-	entry, exists := c.cache[region]
-	if !exists {
-		return false, false
-	}
-	
-	if time.Now().After(entry.ExpiresAt) {
-		// Entry expired, will be cleaned up later
-		return false, false
-	}
-	
-	return entry.Available, true
-}
-
-// Set stores a DNS result in the cache
-func (c *DNSCache) Set(region string, available bool) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	
-	c.cache[region] = &DNSCacheEntry{
-		Available: available,
-		ExpiresAt: time.Now().Add(c.ttl),
-	}
-}
-
-// Clear removes all cached entries
-func (c *DNSCache) Clear() {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	
-	c.cache = make(map[string]*DNSCacheEntry)
-	slog.Debug("DNS cache cleared")
-}
-
-// CleanExpired removes expired entries from the cache
-func (c *DNSCache) CleanExpired() {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	
-	now := time.Now()
-	for region, entry := range c.cache {
-		if now.After(entry.ExpiresAt) {
-			delete(c.cache, region)
-		}
-	}
-}
 
 // Config represents the parsed configuration
 type Config struct {
-	ServerName      string
-	ListenPort      int
-	MaxPoolSize     int
-	DefaultUser     string
-	DefaultGroup    string
-	LogFile         string
-	ErrorLog        string
-	AccessLog       string
-	AuthFile        string
-	AuthRealm       string
-	AuthExclude     []string
-	AuthPatterns    []*AuthPattern
-	RewriteRules    []*RewriteRule
-	ProxyRoutes     map[string]*ProxyRoute
-	Locations       map[string]*Location
-	GlobalEnvVars   map[string]string
-	ClientMaxBody   string
-	PassengerRuby   string
-	MinInstances    int
-	PreloadBundler  bool
-	IdleTimeout     time.Duration  // Idle timeout for app processes
-	StartPort       int            // Starting port for Rails apps
-	StaticDirs      []*StaticDir   // Static directory mappings
-	StaticExts      []string       // File extensions to serve statically
+	ServerName       string
+	ListenPort       int
+	MaxPoolSize      int
+	AuthFile         string
+	AuthRealm        string
+	AuthExclude      []string
+	AuthPatterns     []*AuthPattern
+	RewriteRules     []*RewriteRule
+	ProxyRoutes      map[string]*ProxyRoute
+	Locations        map[string]*Location
+	GlobalEnvVars    map[string]string
+	PassengerRuby    string
+	MinInstances     int
+	PreloadBundler   bool
+	IdleTimeout      time.Duration // Idle timeout for app processes
+	StartPort        int           // Starting port for Rails apps
+	StaticDirs       []*StaticDir  // Static directory mappings
+	StaticExts       []string      // File extensions to serve statically
 	TryFilesSuffixes []string      // Suffixes for try_files behavior
-	PublicDir       string         // Default public directory
-	MaintenancePage string         // Path to maintenance page (e.g., "/503.html")
-	ManagedProcesses []struct {    // Managed processes to start/stop with Navigator
-		Name        string            `yaml:"name"`
-		Command     string            `yaml:"command"`
-		Args        []string          `yaml:"args"`
-		WorkingDir  string            `yaml:"working_dir"`
-		Env         map[string]string `yaml:"env"`
-		AutoRestart bool              `yaml:"auto_restart"`
-		StartDelay  int               `yaml:"start_delay"`
-	}
-	
+	PublicDir        string        // Default public directory
+	MaintenancePage  string        // Path to maintenance page (e.g., "/503.html")
+	ManagedProcesses []ManagedProcessConfig // Managed processes to start/stop with Navigator
+
 	// Suspend configuration
 	SuspendEnabled     bool
 	SuspendIdleTimeout time.Duration
@@ -167,31 +117,28 @@ type ProxyRoute struct {
 	Pattern        string
 	ProxyPass      string
 	SetHeaders     map[string]string
-	SSLVerify      bool
 	ExcludeMethods []string // Methods to exclude from proxying
 }
 
 // Location represents a Rails application location
 type Location struct {
-	Path            string
-	Root            string
-	AppGroupName    string
-	EnvVars         map[string]string
-	BaseURI         string
-	MatchPattern    string  // Pattern for matching request paths (e.g., "*/cable")
-	StandaloneServer string  // If set, proxy to this server instead of Rails app
+	Path             string
+	Root             string
+	EnvVars          map[string]string
+	MatchPattern     string // Pattern for matching request paths (e.g., "*/cable")
+	StandaloneServer string // If set, proxy to this server instead of Rails app
 }
 
 // RailsApp represents a running Rails application
 type RailsApp struct {
-	Location    *Location
-	Process     *exec.Cmd
-	Port        int
-	LastAccess  time.Time
-	Starting    bool
-	mutex       sync.RWMutex
-	ctx         context.Context
-	cancel      context.CancelFunc
+	Location   *Location
+	Process    *exec.Cmd
+	Port       int
+	LastAccess time.Time
+	Starting   bool
+	mutex      sync.RWMutex
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
 // YAMLConfig represents the new YAML configuration format
@@ -202,24 +149,24 @@ type YAMLConfig struct {
 		RootPath  string `yaml:"root_path"`
 		PublicDir string `yaml:"public_dir"`
 	} `yaml:"server"`
-	
+
 	Pools struct {
 		MaxSize     int `yaml:"max_size"`
 		IdleTimeout int `yaml:"idle_timeout"`
 		StartPort   int `yaml:"start_port"`
 	} `yaml:"pools"`
-	
+
 	Auth struct {
-		Enabled        bool     `yaml:"enabled"`
-		Realm          string   `yaml:"realm"`
-		HTPasswd       string   `yaml:"htpasswd"`
-		PublicPaths    []string `yaml:"public_paths"`
+		Enabled         bool     `yaml:"enabled"`
+		Realm           string   `yaml:"realm"`
+		HTPasswd        string   `yaml:"htpasswd"`
+		PublicPaths     []string `yaml:"public_paths"`
 		ExcludePatterns []struct {
 			Pattern     string `yaml:"pattern"`
 			Description string `yaml:"description"`
 		} `yaml:"exclude_patterns"`
 	} `yaml:"auth"`
-	
+
 	Routes struct {
 		Redirects []struct {
 			From string `yaml:"from"`
@@ -247,7 +194,7 @@ type YAMLConfig struct {
 			ExcludeMethods []string          `yaml:"exclude_methods"`
 		} `yaml:"reverse_proxies"`
 	} `yaml:"routes"`
-	
+
 	Static struct {
 		Directories []struct {
 			Path  string `yaml:"path"`
@@ -261,60 +208,33 @@ type YAMLConfig struct {
 			Fallback string   `yaml:"fallback"`
 		} `yaml:"try_files"`
 	} `yaml:"static"`
-	
+
 	Applications struct {
-		GlobalEnv    map[string]string `yaml:"global_env"`
-		StandardVars map[string]string `yaml:"standard_vars"`
-		Tenants      []struct {
-			Name                      string            `yaml:"name"`
-			Path                      string            `yaml:"path"`
-			Group                     string            `yaml:"group"`
-			Database                  string            `yaml:"database"`
-			Owner                     string            `yaml:"owner"`
-			Storage                   string            `yaml:"storage"`
-			Scope                     string            `yaml:"scope"`
-			Root                      string            `yaml:"root"`
-			Special                   bool              `yaml:"special"`
-			MatchPattern              string            `yaml:"match_pattern"`
-			StandaloneServer          string            `yaml:"standalone_server"`
-			Env                       map[string]string `yaml:"env"`
-			ForceMaxConcurrentRequests int              `yaml:"force_max_concurrent_requests"`
+		Env     map[string]string `yaml:"env"`
+		Tenants []struct {
+			Path                       string            `yaml:"path"`
+			Root                       string            `yaml:"root"`
+			Special                    bool              `yaml:"special"`
+			MatchPattern               string            `yaml:"match_pattern"`
+			StandaloneServer           string            `yaml:"standalone_server"`
+			Env                        map[string]string `yaml:"env"`
+			Var                        map[string]string `yaml:"var"`
+			ForceMaxConcurrentRequests int               `yaml:"force_max_concurrent_requests"`
 		} `yaml:"tenants"`
 	} `yaml:"applications"`
-	
+
 	Process struct {
 		Ruby           string `yaml:"ruby"`
 		BundlerPreload bool   `yaml:"bundler_preload"`
 		MinInstances   int    `yaml:"min_instances"`
 	} `yaml:"process"`
-	
-	Logging struct {
-		AccessLog string `yaml:"access_log"`
-		ErrorLog  string `yaml:"error_log"`
-		Level     string `yaml:"level"`
-		Format    string `yaml:"format"`
-	} `yaml:"logging"`
-	
-	Health struct {
-		Endpoint string `yaml:"endpoint"`
-		Timeout  int    `yaml:"timeout"`
-		Interval int    `yaml:"interval"`
-	} `yaml:"health"`
-	
+
 	Suspend struct {
 		Enabled     bool `yaml:"enabled"`
 		IdleTimeout int  `yaml:"idle_timeout"` // Seconds of inactivity before suspend
 	} `yaml:"suspend"`
-	
-	ManagedProcesses []struct {
-		Name        string            `yaml:"name"`
-		Command     string            `yaml:"command"`
-		Args        []string          `yaml:"args"`
-		WorkingDir  string            `yaml:"working_dir"`
-		Env         map[string]string `yaml:"env"`
-		AutoRestart bool              `yaml:"auto_restart"`
-		StartDelay  int               `yaml:"start_delay"`  // Delay in seconds before starting
-	} `yaml:"managed_processes"`
+
+	ManagedProcesses []ManagedProcessConfig `yaml:"managed_processes"`
 }
 
 // ManagedProcess represents an external process managed by Navigator
@@ -355,8 +275,8 @@ type AppManager struct {
 	config      *Config
 	mutex       sync.RWMutex
 	idleTimeout time.Duration
-	minPort     int  // Minimum port for Rails apps
-	maxPort     int  // Maximum port for Rails apps
+	minPort     int // Minimum port for Rails apps
+	maxPort     int // Maximum port for Rails apps
 }
 
 // cleanupPidFile checks for and removes stale PID file
@@ -364,7 +284,7 @@ func cleanupPidFile(pidfilePath string) error {
 	if pidfilePath == "" {
 		return nil
 	}
-	
+
 	// Check if PID file exists
 	data, err := os.ReadFile(pidfilePath)
 	if err != nil {
@@ -373,36 +293,36 @@ func cleanupPidFile(pidfilePath string) error {
 		}
 		return fmt.Errorf("error reading PID file %s: %v", pidfilePath, err)
 	}
-	
+
 	// Parse PID
 	pidStr := strings.TrimSpace(string(data))
 	pid, err := strconv.Atoi(pidStr)
 	if err != nil {
-		log.Printf("Invalid PID in file %s: %s", pidfilePath, pidStr)
+		slog.Warn("Invalid PID in file", "file", pidfilePath, "pid", pidStr)
 		// Remove invalid PID file
 		os.Remove(pidfilePath)
 		return nil
 	}
-	
+
 	// Try to kill the process
 	process, err := os.FindProcess(pid)
 	if err == nil {
 		// Send SIGTERM
 		err = process.Signal(syscall.SIGTERM)
 		if err == nil {
-			log.Printf("Killed stale process %d from %s", pid, pidfilePath)
+			slog.Info("Killed stale process", "pid", pid, "file", pidfilePath)
 			// Give it a moment to exit cleanly
 			time.Sleep(100 * time.Millisecond)
 		}
 		// Try SIGKILL if needed
 		process.Signal(syscall.SIGKILL)
 	}
-	
+
 	// Remove PID file
 	if err := os.Remove(pidfilePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("error removing PID file %s: %v", pidfilePath, err)
 	}
-	
+
 	return nil
 }
 
@@ -432,54 +352,56 @@ func getPidFilePath(envVars map[string]string) string {
 func (m *AppManager) UpdateConfig(newConfig *Config) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	
+
 	m.config = newConfig
-	
+
 	// Update idle timeout if changed
 	idleTimeout := newConfig.IdleTimeout
 	if idleTimeout == 0 {
-		idleTimeout = 10 * time.Minute
+		idleTimeout = DefaultIdleTimeout
 	}
 	m.idleTimeout = idleTimeout
-	
+
 	// Update port range if changed
 	startPort := newConfig.StartPort
 	if startPort == 0 {
-		startPort = 4000
+		startPort = DefaultStartPort
 	}
 	m.minPort = startPort
-	m.maxPort = startPort + 100
-	
-	log.Printf("Updated AppManager configuration: idle timeout=%v, port range=%d-%d", 
-		m.idleTimeout, m.minPort, m.maxPort)
+	m.maxPort = startPort + MaxPortRange
+
+	slog.Info("Updated AppManager configuration",
+		"idleTimeout", m.idleTimeout,
+		"minPort", m.minPort,
+		"maxPort", m.maxPort)
 }
 
 // Cleanup stops all running Rails applications
 func (m *AppManager) Cleanup() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	
-	log.Println("Cleaning up all Rails applications...")
-	
+
+	slog.Info("Cleaning up all Rails applications")
+
 	for path, app := range m.apps {
-		log.Printf("Stopping Rails app for %s", path)
-		
+		slog.Info("Stopping Rails app", "path", path)
+
 		// Clean up PID file
 		pidfilePath := getPidFilePath(app.Location.EnvVars)
 		if pidfilePath != "" {
 			if err := os.Remove(pidfilePath); err != nil && !os.IsNotExist(err) {
-				log.Printf("Warning: Error removing PID file %s: %v", pidfilePath, err)
+				slog.Warn("Error removing PID file", "file", pidfilePath, "error", err)
 			}
 		}
-		
+
 		if app.cancel != nil {
 			app.cancel()
 		}
 	}
-	
+
 	// Clear the apps map
 	m.apps = make(map[string]*RailsApp)
-	
+
 	// Give processes a moment to exit cleanly
 	time.Sleep(500 * time.Millisecond)
 }
@@ -495,82 +417,77 @@ func NewProcessManager() *ProcessManager {
 func (pm *ProcessManager) StartProcess(mp *ManagedProcess) error {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
-	
+
 	// Add delay if specified
 	if mp.StartDelay > 0 {
-		log.Printf("Waiting %v before starting process %s", mp.StartDelay, mp.Name)
+		slog.Info("Waiting before starting process", "delay", mp.StartDelay, "name", mp.Name)
 		time.Sleep(mp.StartDelay)
 	}
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	mp.Cancel = cancel
-	
+
 	// Create the command
 	cmd := exec.CommandContext(ctx, mp.Command, mp.Args...)
-	
+
 	if mp.WorkingDir != "" {
 		cmd.Dir = mp.WorkingDir
 	}
-	
+
 	// Set up environment
 	env := os.Environ()
 	for k, v := range mp.Env {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 	cmd.Env = env
-	
+
 	// Set up output
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	mp.Process = cmd
-	
-	log.Printf("Starting managed process '%s': %s %s", mp.Name, mp.Command, strings.Join(mp.Args, " "))
-	
+
+	slog.Info("Starting managed process",
+		"name", mp.Name,
+		"command", mp.Command,
+		"args", strings.Join(mp.Args, " "))
+
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start process %s: %v", mp.Name, err)
 	}
-	
+
 	// Monitor the process
 	pm.wg.Add(1)
 	go func() {
 		defer pm.wg.Done()
 		err := cmd.Wait()
-		
+
 		mp.mutex.Lock()
 		shouldRestart := mp.AutoRestart
 		mp.mutex.Unlock()
-		
+
 		if err != nil {
-			log.Printf("Process '%s' exited with error: %v", mp.Name, err)
+			slog.Error("Process exited with error", "name", mp.Name, "error", err)
 		} else {
-			log.Printf("Process '%s' exited normally", mp.Name)
+			slog.Info("Process exited normally", "name", mp.Name)
 		}
-		
+
 		// Auto-restart if configured
 		if shouldRestart && err != nil {
-			log.Printf("Auto-restarting process '%s' in 5 seconds", mp.Name)
+			slog.Info("Auto-restarting process in 5 seconds", "name", mp.Name)
 			time.Sleep(5 * time.Second)
 			if err := pm.StartProcess(mp); err != nil {
-				log.Printf("Failed to restart process '%s': %v", mp.Name, err)
+				slog.Error("Failed to restart process", "name", mp.Name, "error", err)
 			}
 		}
 	}()
-	
+
 	pm.processes = append(pm.processes, mp)
 	return nil
 }
 
 // StartAll starts all configured processes
-func (pm *ProcessManager) StartAll(processes []struct {
-	Name        string            `yaml:"name"`
-	Command     string            `yaml:"command"`
-	Args        []string          `yaml:"args"`
-	WorkingDir  string            `yaml:"working_dir"`
-	Env         map[string]string `yaml:"env"`
-	AutoRestart bool              `yaml:"auto_restart"`
-	StartDelay  int               `yaml:"start_delay"`
-}) {
+func (pm *ProcessManager) StartAll(processes []ManagedProcessConfig) {
 	for _, proc := range processes {
 		mp := &ManagedProcess{
 			Name:        proc.Name,
@@ -581,9 +498,9 @@ func (pm *ProcessManager) StartAll(processes []struct {
 			AutoRestart: proc.AutoRestart,
 			StartDelay:  time.Duration(proc.StartDelay) * time.Second,
 		}
-		
+
 		if err := pm.StartProcess(mp); err != nil {
-			log.Printf("Failed to start process '%s': %v", proc.Name, err)
+			slog.Error("Failed to start process", "name", proc.Name, "error", err)
 		}
 	}
 }
@@ -592,28 +509,28 @@ func (pm *ProcessManager) StartAll(processes []struct {
 func (pm *ProcessManager) StopAll() {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
-	
-	log.Println("Stopping all managed processes...")
-	
+
+	slog.Info("Stopping all managed processes")
+
 	for _, mp := range pm.processes {
 		if mp.Cancel != nil {
-			log.Printf("Stopping process '%s'", mp.Name)
+			slog.Info("Stopping process", "name", mp.Name)
 			mp.Cancel()
 		}
 	}
-	
+
 	// Wait for all processes to finish with timeout
 	done := make(chan struct{})
 	go func() {
 		pm.wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
-		log.Println("All managed processes stopped")
-	case <-time.After(10 * time.Second):
-		log.Println("Timeout waiting for processes to stop, forcing shutdown")
+		slog.Info("All managed processes stopped")
+	case <-time.After(ProcessStopTimeout):
+		slog.Warn("Timeout waiting for processes to stop, forcing shutdown")
 		for _, mp := range pm.processes {
 			if mp.Process != nil && mp.Process.Process != nil {
 				mp.Process.Process.Kill()
@@ -623,25 +540,17 @@ func (pm *ProcessManager) StopAll() {
 }
 
 // UpdateConfig updates the process manager configuration
-func (pm *ProcessManager) UpdateConfig(processes []struct {
-	Name        string            `yaml:"name"`
-	Command     string            `yaml:"command"`
-	Args        []string          `yaml:"args"`
-	WorkingDir  string            `yaml:"working_dir"`
-	Env         map[string]string `yaml:"env"`
-	AutoRestart bool              `yaml:"auto_restart"`
-	StartDelay  int               `yaml:"start_delay"`
-}) {
+func (pm *ProcessManager) UpdateConfig(processes []ManagedProcessConfig) {
 	slog.Info("Updating managed processes configuration", "count", len(processes))
-	
+
 	// Stop all existing processes
 	pm.StopAll()
-	
+
 	// Clear the process list
 	pm.mutex.Lock()
 	pm.processes = make([]*ManagedProcess, 0)
 	pm.mutex.Unlock()
-	
+
 	// Start new processes with updated config
 	pm.StartAll(processes)
 }
@@ -651,7 +560,7 @@ func NewSuspendManager(enabled bool, idleTimeout time.Duration) *SuspendManager 
 	if !enabled {
 		return &SuspendManager{enabled: false}
 	}
-	
+
 	return &SuspendManager{
 		enabled:      true,
 		idleTimeout:  idleTimeout,
@@ -664,19 +573,19 @@ func (sm *SuspendManager) RequestStarted() {
 	if !sm.enabled {
 		return
 	}
-	
+
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
-	
+
 	sm.activeRequests++
 	sm.lastActivity = time.Now()
-	
+
 	// Cancel existing timer since we have activity
 	if sm.timer != nil {
 		sm.timer.Stop()
 		sm.timer = nil
 	}
-	
+
 	slog.Debug("Request started", "activeRequests", sm.activeRequests)
 }
 
@@ -685,15 +594,15 @@ func (sm *SuspendManager) RequestFinished() {
 	if !sm.enabled {
 		return
 	}
-	
+
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
-	
+
 	sm.activeRequests--
 	sm.lastActivity = time.Now()
-	
+
 	slog.Debug("Request finished", "activeRequests", sm.activeRequests)
-	
+
 	// Start suspend timer if no active requests
 	if sm.activeRequests == 0 {
 		sm.startSuspendTimer()
@@ -705,11 +614,11 @@ func (sm *SuspendManager) startSuspendTimer() {
 	if sm.timer != nil {
 		sm.timer.Stop()
 	}
-	
+
 	sm.timer = time.AfterFunc(sm.idleTimeout, func() {
 		sm.suspendMachine()
 	})
-	
+
 	slog.Debug("Suspend timer started", "timeout", sm.idleTimeout)
 }
 
@@ -717,20 +626,15 @@ func (sm *SuspendManager) startSuspendTimer() {
 func (sm *SuspendManager) suspendMachine() {
 	appName := os.Getenv("FLY_APP_NAME")
 	machineId := os.Getenv("FLY_MACHINE_ID")
-	
+
 	if appName == "" || machineId == "" {
 		slog.Warn("Cannot suspend: missing FLY_APP_NAME or FLY_MACHINE_ID")
 		return
 	}
-	
-	// Clear DNS cache before suspending
-	if dnsCache != nil {
-		dnsCache.Clear()
-		slog.Debug("DNS cache cleared before machine suspend")
-	}
-	
+
+
 	slog.Info("Suspending machine", "app", appName, "machine", machineId)
-	
+
 	// Create HTTP client with Unix socket transport
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -740,7 +644,7 @@ func (sm *SuspendManager) suspendMachine() {
 		},
 		Timeout: 10 * time.Second,
 	}
-	
+
 	// Create suspend request
 	url := fmt.Sprintf("http://flaps/v1/apps/%s/machines/%s/suspend", appName, machineId)
 	req, err := http.NewRequest("POST", url, nil)
@@ -748,7 +652,7 @@ func (sm *SuspendManager) suspendMachine() {
 		slog.Error("Failed to create suspend request", "error", err)
 		return
 	}
-	
+
 	// Execute request
 	resp, err := client.Do(req)
 	if err != nil {
@@ -756,14 +660,14 @@ func (sm *SuspendManager) suspendMachine() {
 		return
 	}
 	defer resp.Body.Close()
-	
+
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		slog.Error("Failed to read suspend response", "error", err)
 		return
 	}
-	
+
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		slog.Info("Machine suspend requested successfully", "status", resp.StatusCode, "response", string(body))
 	} else {
@@ -775,16 +679,16 @@ func (sm *SuspendManager) suspendMachine() {
 func (sm *SuspendManager) UpdateConfig(enabled bool, idleTimeout time.Duration) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
-	
+
 	// Stop existing timer if configuration is changing
 	if sm.timer != nil {
 		sm.timer.Stop()
 		sm.timer = nil
 	}
-	
+
 	sm.enabled = enabled
 	sm.idleTimeout = idleTimeout
-	
+
 	if enabled {
 		slog.Info("Suspend feature enabled", "idleTimeout", idleTimeout)
 		sm.lastActivity = time.Now()
@@ -804,43 +708,39 @@ type BasicAuth struct {
 	Exclude []string
 }
 
-// Placeholder for removed APR1 implementation - now handled by go-htpasswd library
-
-const navigatorPIDFile = "/tmp/navigator.pid"
-
 // writePIDFile writes the current process PID to a file
 func writePIDFile() error {
 	pid := os.Getpid()
-	return os.WriteFile(navigatorPIDFile, []byte(strconv.Itoa(pid)), 0644)
+	return os.WriteFile(NavigatorPIDFile, []byte(strconv.Itoa(pid)), 0644)
 }
 
 // removePIDFile removes the PID file
 func removePIDFile() {
-	os.Remove(navigatorPIDFile)
+	os.Remove(NavigatorPIDFile)
 }
 
 // sendReloadSignal sends a HUP signal to the running navigator process
 func sendReloadSignal() error {
 	// Read PID from file
-	pidData, err := os.ReadFile(navigatorPIDFile)
+	pidData, err := os.ReadFile(NavigatorPIDFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("navigator is not running (PID file not found)")
 		}
 		return fmt.Errorf("failed to read PID file: %v", err)
 	}
-	
+
 	pid, err := strconv.Atoi(strings.TrimSpace(string(pidData)))
 	if err != nil {
 		return fmt.Errorf("invalid PID in file: %v", err)
 	}
-	
+
 	// Find the process
 	process, err := os.FindProcess(pid)
 	if err != nil {
 		return fmt.Errorf("failed to find process %d: %v", pid, err)
 	}
-	
+
 	// Send HUP signal
 	if err := process.Signal(syscall.SIGHUP); err != nil {
 		// Check if process exists
@@ -851,13 +751,11 @@ func sendReloadSignal() error {
 		}
 		return fmt.Errorf("failed to send signal to process %d: %v", pid, err)
 	}
-	
-	log.Printf("Reload signal sent to navigator (PID: %d)", pid)
+
+	slog.Info("Reload signal sent to navigator", "pid", pid)
 	return nil
 }
 
-// Global DNS cache for target machine availability checks
-var dnsCache *DNSCache
 
 func main() {
 	// Initialize logger with level from environment variable
@@ -874,31 +772,32 @@ func main() {
 			logLevel = slog.LevelError
 		}
 	}
-	
+
 	// Create text handler with the specified level
 	opts := &slog.HandlerOptions{
 		Level: logLevel,
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
 	slog.SetDefault(logger)
-	
-	// Initialize DNS cache with 30-second TTL
-	dnsCache = NewDNSCache(30 * time.Second)
-	
+
+
 	// Handle -s reload option
 	if len(os.Args) > 1 && os.Args[1] == "-s" {
 		if len(os.Args) > 2 && os.Args[2] == "reload" {
 			if err := sendReloadSignal(); err != nil {
-				log.Fatalf("Failed to reload: %v", err)
+				slog.Error("Failed to reload", "error", err)
+				os.Exit(1)
 			}
 			os.Exit(0)
 		} else if len(os.Args) > 2 {
-			log.Fatalf("Unknown signal: %s (only 'reload' is supported)", os.Args[2])
+			slog.Error("Unknown signal (only 'reload' is supported)", "signal", os.Args[2])
+			os.Exit(1)
 		} else {
-			log.Fatalf("Option -s requires a signal name (e.g., -s reload)")
+			slog.Error("Option -s requires a signal name (e.g., -s reload)")
+			os.Exit(1)
 		}
 	}
-	
+
 	// Handle --help option
 	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
 		fmt.Println("Navigator - Rails application server")
@@ -924,141 +823,138 @@ func main() {
 
 	// Write PID file for -s reload functionality
 	if err := writePIDFile(); err != nil {
-		log.Printf("Warning: Could not write PID file: %v", err)
+		slog.Warn("Could not write PID file", "error", err)
 	}
 	defer removePIDFile()
 
-	log.Printf("Loading configuration from %s", configFile)
+	slog.Info("Loading configuration", "file", configFile)
 	config, err := LoadConfig(configFile)
 	if err != nil {
-		log.Fatalf("Failed to parse config: %v", err)
+		slog.Error("Failed to parse config", "error", err)
+		os.Exit(1)
 	}
 
-	log.Printf("Loaded %d locations and %d proxy routes", len(config.Locations), len(config.ProxyRoutes))
-	
+	slog.Info("Loaded configuration",
+		"locations", len(config.Locations),
+		"proxyRoutes", len(config.ProxyRoutes))
+
 	var auth *BasicAuth
 	if config.AuthFile != "" {
 		auth, err = LoadAuthFile(config.AuthFile, config.AuthRealm, config.AuthExclude)
 		if err != nil {
-			log.Printf("Warning: Failed to load auth file %s: %v", config.AuthFile, err)
+			slog.Warn("Failed to load auth file", "file", config.AuthFile, "error", err)
 		} else {
-			log.Printf("Loaded authentication from %s", config.AuthFile)
+			slog.Info("Loaded authentication", "file", config.AuthFile)
 		}
 	}
 
 	manager := NewAppManager(config)
-	
+
 	// Create suspend manager
 	suspendManager := NewSuspendManager(config.SuspendEnabled, config.SuspendIdleTimeout)
 	if suspendManager.enabled {
 		slog.Info("Suspend feature enabled", "idleTimeout", config.SuspendIdleTimeout)
 	}
-	
+
 	// Create and start process manager for managed processes
 	processManager := NewProcessManager()
 	if len(config.ManagedProcesses) > 0 {
-		log.Printf("Starting %d managed processes", len(config.ManagedProcesses))
+		slog.Info("Starting managed processes", "count", len(config.ManagedProcesses))
 		processManager.StartAll(config.ManagedProcesses)
 	}
-	
-	// Start DNS cache cleanup goroutine
-	go func() {
-		ticker := time.NewTicker(60 * time.Second) // Clean every minute
-		defer ticker.Stop()
-		
-		for range ticker.C {
-			if dnsCache != nil {
-				dnsCache.CleanExpired()
-			}
-		}
-	}()
-	
+
+
 	// Create a mutable handler wrapper for configuration reloading
 	handler := CreateHandler(config, manager, auth, suspendManager)
-	
+
 	// Wrapper handler that delegates to the current configuration
 	var handlerMutex sync.RWMutex
 	currentHandler := handler
-	
+
 	mainHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerMutex.RLock()
 		h := currentHandler
 		handlerMutex.RUnlock()
 		h.ServeHTTP(w, r)
 	})
-	
+
 	// Set up signal handling for graceful shutdown and reload
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-	
+
 	// Start signal handler goroutine
 	go func() {
 		for sig := range sigChan {
 			switch sig {
 			case syscall.SIGHUP:
 				// Reload configuration
-				log.Println("Received SIGHUP signal, reloading configuration...")
-				
+				slog.Info("Received SIGHUP signal, reloading configuration")
+
 				newConfig, err := LoadConfig(configFile)
 				if err != nil {
-					log.Printf("Error reloading configuration: %v", err)
+					slog.Error("Error reloading configuration", "error", err)
 					continue
 				}
-				
-				log.Printf("Reloaded %d locations and %d proxy routes", len(newConfig.Locations), len(newConfig.ProxyRoutes))
-				
+
+				slog.Info("Reloaded configuration",
+					"locations", len(newConfig.Locations),
+					"proxyRoutes", len(newConfig.ProxyRoutes))
+
 				// Reload auth if configured
 				var newAuth *BasicAuth
 				if newConfig.AuthFile != "" {
 					newAuth, err = LoadAuthFile(newConfig.AuthFile, newConfig.AuthRealm, newConfig.AuthExclude)
 					if err != nil {
-						log.Printf("Warning: Failed to reload auth file %s: %v", newConfig.AuthFile, err)
+						slog.Warn("Failed to reload auth file", "file", newConfig.AuthFile, "error", err)
 						// Keep existing auth on error
 						newAuth = auth
 					} else {
-						log.Printf("Reloaded authentication from %s", newConfig.AuthFile)
+						slog.Info("Reloaded authentication", "file", newConfig.AuthFile)
 					}
 				}
-				
+
 				// Update manager configuration
 				manager.UpdateConfig(newConfig)
-				
+
 				// Update suspend manager configuration
 				suspendManager.UpdateConfig(newConfig.SuspendEnabled, newConfig.SuspendIdleTimeout)
-				
+
 				// Update process manager configuration
 				processManager.UpdateConfig(newConfig.ManagedProcesses)
-				
+
 				// Create new handler with updated config
 				newHandler := CreateHandler(newConfig, manager, newAuth, suspendManager)
-				
+
 				// Atomically swap the handler
 				handlerMutex.Lock()
 				currentHandler = newHandler
 				config = newConfig
 				auth = newAuth
 				handlerMutex.Unlock()
-				
-				log.Println("Configuration reload complete")
-				
+
+				slog.Info("Configuration reload complete")
+
 			case os.Interrupt, syscall.SIGTERM:
-				log.Println("Received interrupt signal, cleaning up...")
-				manager.Cleanup()          // Stop Rails apps first
-				processManager.StopAll()  // Then stop managed processes
+				slog.Info("Received interrupt signal, cleaning up")
+				manager.Cleanup()        // Stop Rails apps first
+				processManager.StopAll() // Then stop managed processes
 				os.Exit(0)
 			}
 		}
 	}()
-	
+
 	go manager.IdleChecker()
-	
+
 	addr := fmt.Sprintf(":%d", config.ListenPort)
-	log.Printf("Starting Navigator server on %s", addr)
-	log.Printf("Max pool size: %d, Idle timeout: %v", config.MaxPoolSize, manager.idleTimeout)
-	log.Printf("Send SIGHUP to reload configuration without restart (kill -HUP %d)", os.Getpid())
-	
+	slog.Info("Starting Navigator server", "address", addr)
+	slog.Info("Server configuration",
+		"maxPoolSize", config.MaxPoolSize,
+		"idleTimeout", manager.idleTimeout)
+	slog.Info("Configuration reload available", "signal", "SIGHUP", "pid", os.Getpid())
+
 	if err := http.ListenAndServe(addr, mainHandler); err != nil {
-		log.Fatalf("Server failed: %v", err)
+		slog.Error("Server failed", "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -1068,34 +964,29 @@ func LoadConfig(filename string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	
-	log.Println("Loading YAML configuration")
+
+	slog.Debug("Loading YAML configuration")
 	return ParseYAML(content)
 }
 
 // substituteVars replaces template variables with tenant values
 func substituteVars(template string, tenant struct {
-	Name                      string            `yaml:"name"`
-	Path                      string            `yaml:"path"`
-	Group                     string            `yaml:"group"`
-	Database                  string            `yaml:"database"`
-	Owner                     string            `yaml:"owner"`
-	Storage                   string            `yaml:"storage"`
-	Scope                     string            `yaml:"scope"`
-	Root                      string            `yaml:"root"`
-	Special                   bool              `yaml:"special"`
-	MatchPattern              string            `yaml:"match_pattern"`
-	StandaloneServer          string            `yaml:"standalone_server"`
-	Env                       map[string]string `yaml:"env"`
-	ForceMaxConcurrentRequests int              `yaml:"force_max_concurrent_requests"`
+	Path                       string            `yaml:"path"`
+	Root                       string            `yaml:"root"`
+	Special                    bool              `yaml:"special"`
+	MatchPattern               string            `yaml:"match_pattern"`
+	StandaloneServer           string            `yaml:"standalone_server"`
+	Env                        map[string]string `yaml:"env"`
+	Var                        map[string]string `yaml:"var"`
+	ForceMaxConcurrentRequests int               `yaml:"force_max_concurrent_requests"`
 }) string {
 	result := template
-	result = strings.ReplaceAll(result, "${tenant.name}", tenant.Name)
-	result = strings.ReplaceAll(result, "${tenant.database}", tenant.Database)
-	result = strings.ReplaceAll(result, "${tenant.owner}", tenant.Owner)
-	result = strings.ReplaceAll(result, "${tenant.storage}", tenant.Storage)
-	result = strings.ReplaceAll(result, "${tenant.scope}", tenant.Scope)
-	result = strings.ReplaceAll(result, "${tenant.group}", tenant.Group)
+	// Replace ${var} with values from the Var map
+	if tenant.Var != nil {
+		for key, value := range tenant.Var {
+			result = strings.ReplaceAll(result, "${"+key+"}", value)
+		}
+	}
 	return result
 }
 
@@ -1105,7 +996,7 @@ func ParseYAML(content []byte) (*Config, error) {
 	if err := yaml.Unmarshal(content, &yamlConfig); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
-	
+
 	// Convert YAML config to internal Config structure
 	config := &Config{
 		ServerName:    yamlConfig.Server.Hostname,
@@ -1113,17 +1004,17 @@ func ParseYAML(content []byte) (*Config, error) {
 		MaxPoolSize:   yamlConfig.Pools.MaxSize,
 		Locations:     make(map[string]*Location),
 		ProxyRoutes:   make(map[string]*ProxyRoute),
-		GlobalEnvVars: yamlConfig.Applications.GlobalEnv,
+		GlobalEnvVars: make(map[string]string),
 		RewriteRules:  []*RewriteRule{},
 		AuthPatterns:  []*AuthPattern{},
 	}
-	
+
 	// Set authentication config
 	if yamlConfig.Auth.Enabled {
 		config.AuthFile = yamlConfig.Auth.HTPasswd
 		config.AuthRealm = yamlConfig.Auth.Realm
 		config.AuthExclude = yamlConfig.Auth.PublicPaths
-		
+
 		// Convert exclude patterns
 		for _, pattern := range yamlConfig.Auth.ExcludePatterns {
 			if re, err := regexp.Compile(pattern.Pattern); err == nil {
@@ -1132,11 +1023,11 @@ func ParseYAML(content []byte) (*Config, error) {
 					Action:  "off",
 				})
 			} else {
-				log.Printf("Warning: Invalid auth pattern %s: %v", pattern.Pattern, err)
+				slog.Warn("Invalid auth pattern", "pattern", pattern.Pattern, "error", err)
 			}
 		}
 	}
-	
+
 	// Convert redirects to rewrite rules
 	for _, redirect := range yamlConfig.Routes.Redirects {
 		if re, err := regexp.Compile(redirect.From); err == nil {
@@ -1147,7 +1038,7 @@ func ParseYAML(content []byte) (*Config, error) {
 			})
 		}
 	}
-	
+
 	// Convert internal rewrites
 	for _, rewrite := range yamlConfig.Routes.Rewrites {
 		if re, err := regexp.Compile(rewrite.From); err == nil {
@@ -1158,7 +1049,7 @@ func ParseYAML(content []byte) (*Config, error) {
 			})
 		}
 	}
-	
+
 	// Convert proxy routes
 	for _, proxy := range yamlConfig.Routes.Proxies {
 		config.ProxyRoutes[proxy.Path] = &ProxyRoute{
@@ -1167,7 +1058,7 @@ func ParseYAML(content []byte) (*Config, error) {
 			SetHeaders: proxy.Headers,
 		}
 	}
-	
+
 	// Convert fly-replay routes
 	for _, flyReplay := range yamlConfig.Routes.FlyReplay {
 		if re, err := regexp.Compile(flyReplay.Path); err == nil {
@@ -1179,7 +1070,7 @@ func ParseYAML(content []byte) (*Config, error) {
 			})
 		}
 	}
-	
+
 	// Convert reverse proxy routes
 	for _, reverseProxy := range yamlConfig.Routes.ReverseProxies {
 		config.ProxyRoutes[reverseProxy.Path] = &ProxyRoute{
@@ -1189,65 +1080,72 @@ func ParseYAML(content []byte) (*Config, error) {
 			ExcludeMethods: reverseProxy.ExcludeMethods,
 		}
 	}
-	
+
+	// Process applications.env to separate global vars from templates
+	for varName, value := range yamlConfig.Applications.Env {
+		// If the value doesn't contain variables, it's a global env var
+		if !strings.Contains(value, "${") {
+			config.GlobalEnvVars[varName] = value
+		}
+	}
+
 	// Convert tenant applications to locations
 	for _, tenant := range yamlConfig.Applications.Tenants {
 		location := &Location{
 			Path:             tenant.Path,
-			AppGroupName:     tenant.Group,
 			EnvVars:          make(map[string]string),
 			MatchPattern:     tenant.MatchPattern,
 			StandaloneServer: tenant.StandaloneServer,
 		}
-		
+
 		// Copy tenant environment variables
 		for k, v := range tenant.Env {
 			location.EnvVars[k] = v
 		}
-		
-		// Add standard variables (unless it's a special tenant)
+
+		// Add variables from applications.env that need substitution (unless it's a special tenant)
 		if !tenant.Special {
-			for varName, template := range yamlConfig.Applications.StandardVars {
-				value := substituteVars(template, tenant)
-				location.EnvVars[varName] = value
+			for varName, template := range yamlConfig.Applications.Env {
+				// Only process templates that contain variables
+				if strings.Contains(template, "${") {
+					value := substituteVars(template, tenant)
+					location.EnvVars[varName] = value
+				}
 			}
 		}
-		
+
 		if tenant.Root != "" {
 			location.Root = tenant.Root
 		} else if yamlConfig.Server.PublicDir != "" {
 			location.Root = yamlConfig.Server.PublicDir
 		}
-		
+
 		config.Locations[tenant.Path] = location
 	}
-	
+
 	// Set process config
 	config.PassengerRuby = yamlConfig.Process.Ruby
 	config.PreloadBundler = yamlConfig.Process.BundlerPreload
 	config.MinInstances = yamlConfig.Process.MinInstances
-	
-	// Set logging config
-	config.AccessLog = yamlConfig.Logging.AccessLog
-	config.ErrorLog = yamlConfig.Logging.ErrorLog
-	
+
+
 	// Set idle timeout from pools config
 	if yamlConfig.Pools.IdleTimeout > 0 {
 		config.IdleTimeout = time.Duration(yamlConfig.Pools.IdleTimeout) * time.Second
 	} else {
-		config.IdleTimeout = 10 * time.Minute // Default
+		config.IdleTimeout = DefaultIdleTimeout
 	}
-	
+
 	// Set start port for Rails apps
 	if yamlConfig.Pools.StartPort > 0 {
 		config.StartPort = yamlConfig.Pools.StartPort
 	} else {
-		config.StartPort = 4000 // Default
+		config.StartPort = DefaultStartPort
 	}
-	
+
 	// Set public directory
 	config.PublicDir = yamlConfig.Server.PublicDir
-	
+
 	// Set static file configuration
 	config.StaticDirs = []*StaticDir{}
 	for _, dir := range yamlConfig.Static.Directories {
@@ -1257,15 +1155,15 @@ func ParseYAML(content []byte) (*Config, error) {
 			CacheTTL:  dir.Cache,
 		})
 	}
-	
+
 	// Set static file extensions
 	config.StaticExts = yamlConfig.Static.Extensions
 	if len(config.StaticExts) == 0 {
 		// Default extensions if not specified
-		config.StaticExts = []string{"html", "htm", "txt", "xml", "json", "css", "js", 
+		config.StaticExts = []string{"html", "htm", "txt", "xml", "json", "css", "js",
 			"png", "jpg", "jpeg", "gif", "svg", "ico", "woff", "woff2", "ttf", "eot"}
 	}
-	
+
 	// Set try_files suffixes
 	if yamlConfig.Static.TryFiles.Enabled {
 		config.TryFilesSuffixes = yamlConfig.Static.TryFiles.Suffixes
@@ -1274,39 +1172,38 @@ func ParseYAML(content []byte) (*Config, error) {
 			config.TryFilesSuffixes = []string{".html", ".htm", ".txt", ".xml", ".json"}
 		}
 	}
-	
+
 	// Set managed processes
 	config.ManagedProcesses = yamlConfig.ManagedProcesses
-	
+
 	// Set suspend configuration
 	config.SuspendEnabled = yamlConfig.Suspend.Enabled
 	if yamlConfig.Suspend.IdleTimeout > 0 {
 		config.SuspendIdleTimeout = time.Duration(yamlConfig.Suspend.IdleTimeout) * time.Second
 	} else {
-		config.SuspendIdleTimeout = 10 * time.Minute // Default
+		config.SuspendIdleTimeout = DefaultIdleTimeout
 	}
-	
+
 	return config, nil
 }
-
 
 // NewAppManager creates a new application manager
 func NewAppManager(config *Config) *AppManager {
 	idleTimeout := config.IdleTimeout
 	if idleTimeout == 0 {
-		idleTimeout = 10 * time.Minute // Default if not set
+		idleTimeout = DefaultIdleTimeout
 	}
-	
+
 	startPort := config.StartPort
 	if startPort == 0 {
-		startPort = 4000 // Default if not set
+		startPort = DefaultStartPort
 	}
-	
+
 	return &AppManager{
 		apps:        make(map[string]*RailsApp),
 		config:      config,
 		minPort:     startPort,
-		maxPort:     startPort + 100, // Allow up to 100 Rails apps
+		maxPort:     startPort + MaxPortRange,
 		idleTimeout: idleTimeout,
 	}
 }
@@ -1316,25 +1213,25 @@ func (m *AppManager) GetOrStartApp(location *Location) (*RailsApp, error) {
 	m.mutex.Lock()
 	key := location.Path
 	app, exists := m.apps[key]
-	
+
 	if exists {
 		m.mutex.Unlock()
 		app.mutex.Lock()
 		app.LastAccess = time.Now()
 		isStarting := app.Starting
 		app.mutex.Unlock()
-		
+
 		if !isStarting {
 			return app, nil
 		}
-		
+
 		// Wait if app is still starting (with timeout)
-		timeout := time.NewTimer(30 * time.Second)
+		timeout := time.NewTimer(RailsStartupTimeout)
 		defer timeout.Stop()
-		
+
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-timeout.C:
@@ -1369,14 +1266,14 @@ func (m *AppManager) GetOrStartApp(location *Location) (*RailsApp, error) {
 
 	// Start app in background
 	go m.startApp(app)
-	
+
 	// Wait for app to start (with timeout)
-	timeout := time.NewTimer(30 * time.Second)
+	timeout := time.NewTimer(RailsStartupTimeout)
 	defer timeout.Stop()
-	
+
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-timeout.C:
@@ -1400,17 +1297,17 @@ func (m *AppManager) startApp(app *RailsApp) {
 
 	// Build environment variables
 	env := os.Environ()
-	
+
 	// Add global env vars
 	for k, v := range m.config.GlobalEnvVars {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
-	
+
 	// Add location-specific env vars
 	for k, v := range app.Location.EnvVars {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
-	
+
 	// Add port
 	env = append(env, fmt.Sprintf("PORT=%d", app.Port))
 
@@ -1418,7 +1315,7 @@ func (m *AppManager) startApp(app *RailsApp) {
 	pidfilePath := getPidFilePath(app.Location.EnvVars)
 	if pidfilePath != "" {
 		if err := cleanupPidFile(pidfilePath); err != nil {
-			log.Printf("Warning: Error cleaning up PID file for %s: %v", app.Location.Path, err)
+			slog.Warn("Error cleaning up PID file", "path", app.Location.Path, "error", err)
 		}
 	}
 
@@ -1427,7 +1324,7 @@ func (m *AppManager) startApp(app *RailsApp) {
 	if app.Location.Root != "" {
 		railsDir = strings.TrimSuffix(app.Location.Root, "/public")
 	}
-	
+
 	// Try to use the current working directory if /rails doesn't exist
 	if _, err := os.Stat(railsDir); os.IsNotExist(err) {
 		if cwd, err := os.Getwd(); err == nil {
@@ -1437,7 +1334,7 @@ func (m *AppManager) startApp(app *RailsApp) {
 
 	// Determine which command to use
 	var cmd *exec.Cmd
-	
+
 	// Always use rails server directly to control the port
 	// bin/dev starts on port 3000 which conflicts with navigator
 	binRails := filepath.Join(railsDir, "bin", "rails")
@@ -1451,7 +1348,7 @@ func (m *AppManager) startApp(app *RailsApp) {
 		}
 		cmd = exec.CommandContext(ctx, rubyPath, "bin/rails", "server", "-p", strconv.Itoa(app.Port))
 	}
-	
+
 	cmd.Dir = railsDir
 	cmd.Env = env
 	cmd.Stdout = os.Stdout
@@ -1460,11 +1357,14 @@ func (m *AppManager) startApp(app *RailsApp) {
 	app.mutex.Lock()
 	app.Process = cmd
 	app.mutex.Unlock()
-	
-	log.Printf("Starting Rails app for %s on port %d in %s", app.Location.Path, app.Port, railsDir)
-	
+
+	slog.Info("Starting Rails app",
+		"path", app.Location.Path,
+		"port", app.Port,
+		"directory", railsDir)
+
 	if err := cmd.Start(); err != nil {
-		log.Printf("Failed to start Rails app for %s: %v", app.Location.Path, err)
+		slog.Error("Failed to start Rails app", "path", app.Location.Path, "error", err)
 		app.mutex.Lock()
 		app.Starting = false
 		app.mutex.Unlock()
@@ -1472,24 +1372,24 @@ func (m *AppManager) startApp(app *RailsApp) {
 	}
 
 	// Wait a moment for Rails to start, then mark as ready
-	time.Sleep(5 * time.Second)
+	time.Sleep(RailsStartupDelay)
 	app.mutex.Lock()
 	app.Starting = false
 	app.mutex.Unlock()
-	log.Printf("Rails app for %s ready on port %d", app.Location.Path, app.Port)
+	slog.Info("Rails app ready", "path", app.Location.Path, "port", app.Port)
 
 	// Wait for process to exit in background
 	go func() {
 		cmd.Wait()
-		log.Printf("Rails app for %s on port %d exited", app.Location.Path, app.Port)
-		
+		slog.Info("Rails app exited", "path", app.Location.Path, "port", app.Port)
+
 		// Clean up PID file when app exits
 		if pidfilePath != "" {
 			if err := os.Remove(pidfilePath); err != nil && !os.IsNotExist(err) {
-				log.Printf("Warning: Error removing PID file %s: %v", pidfilePath, err)
+				slog.Warn("Error removing PID file", "file", pidfilePath, "error", err)
 			}
 		}
-		
+
 		// Remove from apps map when process exits
 		m.mutex.Lock()
 		delete(m.apps, app.Location.Path)
@@ -1507,20 +1407,20 @@ func (m *AppManager) StopApp(path string) {
 		return
 	}
 
-	log.Printf("Stopping Rails app for %s", path)
-	
+	slog.Info("Stopping Rails app", "path", path)
+
 	// Clean up PID file
 	pidfilePath := getPidFilePath(app.Location.EnvVars)
 	if pidfilePath != "" {
 		if err := os.Remove(pidfilePath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Warning: Error removing PID file %s: %v", pidfilePath, err)
+			slog.Warn("Error removing PID file", "file", pidfilePath, "error", err)
 		}
 	}
-	
+
 	if app.cancel != nil {
 		app.cancel()
 	}
-	
+
 	delete(m.apps, path)
 }
 
@@ -1533,7 +1433,7 @@ func (m *AppManager) IdleChecker() {
 		now := time.Now()
 		m.mutex.RLock()
 		toStop := []string{}
-		
+
 		for path, app := range m.apps {
 			app.mutex.RLock()
 			if now.Sub(app.LastAccess) > m.idleTimeout {
@@ -1544,7 +1444,7 @@ func (m *AppManager) IdleChecker() {
 		m.mutex.RUnlock()
 
 		for _, path := range toStop {
-			log.Printf("Stopping idle app: %s", path)
+			slog.Info("Stopping idle app", "path", path)
 			m.StopApp(path)
 		}
 	}
@@ -1587,9 +1487,9 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 		// Track request for suspend management
 		suspendManager.RequestStarted()
 		defer suspendManager.RequestFinished()
-		
+
 		slog.Debug("Request received", "method", r.Method, "path", r.URL.Path)
-		
+
 		// Handle rewrites/redirects first
 		if handleRewrites(w, r, config) {
 			return
@@ -1616,17 +1516,17 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 		// Find matching location early to determine if this is a Rails app
 		var bestMatch *Location
 		bestMatchLen := 0
-		
+
 		// First, check for pattern matches
 		for _, location := range config.Locations {
 			if location.MatchPattern != "" {
 				if matched, _ := filepath.Match(location.MatchPattern, r.URL.Path); matched {
 					bestMatch = location
-					break  // Pattern matches take priority
+					break // Pattern matches take priority
 				}
 			}
 		}
-		
+
 		// If no pattern match, use prefix matching (existing logic)
 		if bestMatch == nil {
 			for path, location := range config.Locations {
@@ -1656,7 +1556,7 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 						break
 					}
 				}
-				
+
 				// Only proxy if method is not excluded
 				if !excluded {
 					proxyRequest(w, r, route)
@@ -1686,7 +1586,7 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 				http.Error(w, "Invalid standalone server configuration", http.StatusInternalServerError)
 				return
 			}
-			proxyWithRetry(w, r, target, 3*time.Second)
+			proxyWithRetry(w, r, target, ProxyRetryTimeout)
 			return
 		}
 
@@ -1699,7 +1599,7 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 
 		// Proxy to Rails app
 		target, _ := url.Parse(fmt.Sprintf("http://localhost:%d", app.Port))
-		
+
 		// For Rails apps, preserve the full path - don't strip the location prefix
 		// Rails routing expects to see the full path like "/2025/adelaide/adelaide-combined/"
 		// Only strip if the location is "/" (root)
@@ -1710,16 +1610,16 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, suspend
 		} else {
 			// Root location - path is already correct
 		}
-		
+
 		// Add headers
 		r.Header.Set("X-Forwarded-For", r.RemoteAddr)
 		r.Header.Set("X-Forwarded-Host", r.Host)
 		r.Header.Set("X-Forwarded-Proto", "http")
-		
+
 		slog.Info("Proxying to Rails", "path", originalPath, "port", app.Port, "location", bestMatch.Path)
-		
+
 		// Use retry logic for Rails apps too
-		proxyWithRetry(w, r, target, 3*time.Second)
+		proxyWithRetry(w, r, target, ProxyRetryTimeout)
 	})
 }
 
@@ -1737,16 +1637,16 @@ func checkAuth(r *http.Request, auth *BasicAuth) bool {
 // handleRewrites handles rewrite rules from config
 func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool {
 	path := r.URL.Path
-	
+
 	slog.Debug("Checking rewrites", "path", path, "rulesCount", len(config.RewriteRules))
-	
+
 	for _, rule := range config.RewriteRules {
 		slog.Debug("Checking rewrite rule", "pattern", rule.Pattern.String())
 		if rule.Pattern.MatchString(path) {
 			// Apply the rewrite
 			newPath := rule.Pattern.ReplaceAllString(path, rule.Replacement)
 			slog.Debug("Rewrite matched", "originalPath", path, "newPath", newPath, "flag", rule.Flag)
-			
+
 			if rule.Flag == "redirect" {
 				http.Redirect(w, r, newPath, http.StatusFound)
 				return true
@@ -1756,7 +1656,7 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 				if len(parts) == 3 {
 					region := parts[1]
 					status := parts[2]
-					
+
 					// Check if method is allowed for this rule
 					methodAllowed := len(rule.Methods) == 0 // If no methods specified, allow all
 					if len(rule.Methods) > 0 {
@@ -1767,35 +1667,53 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 							}
 						}
 					}
-					
+
 					if methodAllowed {
 						if shouldUseFlyReplay(r) {
-							// Check if target machine is available via DNS
-							if !checkTargetMachineAvailable(region) {
-								// Target machine unavailable, serve maintenance page
-								slog.Info("Target machine unavailable, serving maintenance page", 
-									"path", path, 
-									"region", region, 
-									"method", r.Method)
-								
+							// Check if this is a retry
+							if r.Header.Get("X-Navigator-Retry") == "true" {
+								// Retry detected, serve maintenance page
+								slog.Info("Retry detected, serving maintenance page",
+									"path", path,
+									"region", region,
+									"method", r.Method,
+									"navigatorRetry", r.Header.Get("X-Navigator-Retry"))
+
 								serveMaintenancePage(w, r, config)
 								return true
 							}
-							
-							w.Header().Set("Fly-Replay", fmt.Sprintf("region=%s", region))
+
+							w.Header().Set("Content-Type", "application/vnd.fly.replay+json")
 							statusCode := http.StatusTemporaryRedirect
 							if code, err := strconv.Atoi(status); err == nil {
 								statusCode = code
 							}
-							
-							slog.Info("Sending fly-replay response", 
-								"path", path, 
-								"region", region, 
-								"status", statusCode, 
+
+							slog.Info("Sending fly-replay response",
+								"path", path,
+								"region", region,
+								"status", statusCode,
 								"method", r.Method,
 								"contentLength", r.ContentLength)
-							
+
 							w.WriteHeader(statusCode)
+
+							// Write the JSON body with transform instructions
+							responseMap := map[string]interface{}{
+								"transform": map[string]interface{}{
+									"set_headers": []map[string]string{
+										{"name": "X-Navigator-Retry", "value": "true"},
+									},
+								},
+							}
+
+							responseBodyBytes, err := json.Marshal(responseMap)
+							if err != nil {
+								http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+								return true
+							}
+							slog.Debug("Fly replay response body", "body", string(responseBodyBytes))
+							w.Write(responseBodyBytes)
 							return true
 						} else {
 							// Automatically reverse proxy instead of fly-replay
@@ -1813,7 +1731,7 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 			}
 		}
 	}
-	
+
 	slog.Debug("No rewrite rules matched", "path", path)
 	return false
 }
@@ -1821,94 +1739,39 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 // shouldUseFlyReplay determines if a request should use fly-replay based on content length
 // Fly replay can handle any method as long as the content length is less than 1MB
 func shouldUseFlyReplay(r *http.Request) bool {
-	const maxFlyReplaySize = 1000000 // 1 million bytes
 
 	// If Content-Length is explicitly set and >= 1MB, use reverse proxy
-	if r.ContentLength >= maxFlyReplaySize {
-		slog.Debug("Using reverse proxy due to large content length", 
-			"method", r.Method, 
+	if r.ContentLength >= MaxFlyReplaySize {
+		slog.Debug("Using reverse proxy due to large content length",
+			"method", r.Method,
 			"contentLength", r.ContentLength)
 		return false
 	}
-	
+
 	// If Content-Length is missing (-1) on methods that typically require content
 	// (POST, PUT, PATCH), be conservative and use reverse proxy
 	if r.ContentLength == -1 {
 		methodsRequiringContent := []string{"POST", "PUT", "PATCH"}
 		for _, method := range methodsRequiringContent {
 			if r.Method == method {
-				slog.Debug("Using reverse proxy due to missing content length on body method", 
+				slog.Debug("Using reverse proxy due to missing content length on body method",
 					"method", r.Method)
 				return false
 			}
 		}
 	}
-	
-	// For GET, HEAD, DELETE, OPTIONS and other methods without content, or 
+
+	// For GET, HEAD, DELETE, OPTIONS and other methods without content, or
 	// methods with content < 1MB, use fly-replay
 	return true
 }
 
-// checkTargetMachineAvailable checks if the target machine is available via IPv6 DNS
-// This helps detect if a machine is in the process of redeploying
-// Results are cached to avoid expensive DNS lookups
-func checkTargetMachineAvailable(region string) bool {
-	flyAppName := os.Getenv("FLY_APP_NAME")
-	if flyAppName == "" {
-		return true // Can't check without app name, assume available
-	}
-	
-	// Check cache first
-	if available, found := dnsCache.Get(region); found {
-		slog.Debug("DNS cache hit for target machine", 
-			"region", region, 
-			"available", available)
-		return available
-	}
-	
-	// Construct the IPv6 DNS name for the target machine
-	dnsName := fmt.Sprintf("%s.%s.internal", region, flyAppName)
-	
-	// Set a reasonable timeout for DNS lookup
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	
-	// Perform IPv6 DNS lookup
-	resolver := &net.Resolver{}
-	addrs, err := resolver.LookupIPAddr(ctx, dnsName)
-	if err != nil {
-		slog.Debug("DNS lookup failed for target machine", 
-			"dnsName", dnsName, 
-			"error", err)
-		// Cache negative result
-		dnsCache.Set(region, false)
-		return false
-	}
-	
-	// Check if we found any IPv6 addresses
-	hasIPv6 := false
-	for _, addr := range addrs {
-		if addr.IP.To4() == nil { // IPv6 address
-			hasIPv6 = true
-			break
-		}
-	}
-	
-	slog.Debug("DNS lookup result for target machine", 
-		"dnsName", dnsName, 
-		"addressCount", len(addrs),
-		"hasIPv6", hasIPv6)
-	
-	// Cache the result
-	dnsCache.Set(region, hasIPv6)
-	return hasIPv6
-}
 
 // serveMaintenancePage serves a maintenance page when target machine is unavailable
 func serveMaintenancePage(w http.ResponseWriter, r *http.Request, config *Config) {
 	// Set appropriate status code
 	w.WriteHeader(http.StatusServiceUnavailable)
-	
+
 	// Try to serve the configured maintenance page file
 	maintenancePath := config.MaintenancePage
 	if maintenancePath == "" {
@@ -1922,7 +1785,7 @@ func serveMaintenancePage(w http.ResponseWriter, r *http.Request, config *Config
 			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 			w.Header().Set("Pragma", "no-cache")
 			w.Header().Set("Expires", "0")
-			
+
 			w.Write(content)
 			slog.Debug("Served maintenance page from file", "path", fullPath)
 			return
@@ -1930,7 +1793,7 @@ func serveMaintenancePage(w http.ResponseWriter, r *http.Request, config *Config
 			slog.Debug("Could not read maintenance page file", "path", fullPath, "error", err)
 		}
 	}
-	
+
 	// Fallback to simple HTML response if no maintenance page file found
 	fallbackHTML := `<!DOCTYPE html>
 <html lang="en">
@@ -1953,12 +1816,12 @@ func serveMaintenancePage(w http.ResponseWriter, r *http.Request, config *Config
     </div>
 </body>
 </html>`
-	
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Expires", "0")
-	
+
 	w.Write([]byte(fallbackHTML))
 	slog.Debug("Served fallback maintenance page")
 }
@@ -1971,36 +1834,36 @@ func handleFlyReplayFallback(w http.ResponseWriter, r *http.Request, region stri
 		slog.Debug("FLY_APP_NAME not set, cannot construct fallback proxy URL")
 		return false
 	}
-	
+
 	// Construct the target URL: http://<region>.<FLY_APP_NAME>.internal:<port><path>
 	listenPort := config.ListenPort
 	if listenPort == 0 {
-		listenPort = 3000 // Default port
+		listenPort = DefaultListenPort
 	}
-	
+
 	targetURL := fmt.Sprintf("http://%s.%s.internal:%d%s", region, flyAppName, listenPort, r.URL.Path)
 	if r.URL.RawQuery != "" {
 		targetURL += "?" + r.URL.RawQuery
 	}
-	
+
 	target, err := url.Parse(targetURL)
 	if err != nil {
 		slog.Debug("Failed to parse fallback proxy URL", "url", targetURL, "error", err)
 		return false
 	}
-	
+
 	// Set forwarding headers
 	r.Header.Set("X-Forwarded-Host", r.Host)
-	
-	slog.Info("Using automatic reverse proxy fallback for fly-replay", 
+
+	slog.Info("Using automatic reverse proxy fallback for fly-replay",
 		"originalPath", r.URL.Path,
 		"targetURL", targetURL,
 		"region", region,
 		"method", r.Method,
 		"contentLength", r.ContentLength)
-	
+
 	// Use the existing retry proxy logic
-	proxyWithRetry(w, r, target, 3*time.Second)
+	proxyWithRetry(w, r, target, ProxyRetryTimeout)
 	return true
 }
 
@@ -2032,14 +1895,14 @@ func shouldExcludeFromAuth(path string, config *Config) bool {
 			}
 		}
 	}
-	
+
 	// Check regex auth patterns from the config file
 	for _, authPattern := range config.AuthPatterns {
 		if authPattern.Pattern.MatchString(path) && authPattern.Action == "off" {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -2047,44 +1910,44 @@ func shouldExcludeFromAuth(path string, config *Config) bool {
 func serveStaticFile(w http.ResponseWriter, r *http.Request, config *Config) bool {
 	// Check if this is a request for static assets
 	path := r.URL.Path
-	
-	slog.Debug("Checking static file", 
-		"path", path, 
+
+	slog.Debug("Checking static file",
+		"path", path,
 		"staticDirsCount", len(config.StaticDirs),
 		"publicDir", config.PublicDir)
-	
+
 	// First check static directories from config
 	for _, staticDir := range config.StaticDirs {
-		slog.Debug("Checking static dir", 
-			"urlPath", staticDir.URLPath, 
+		slog.Debug("Checking static dir",
+			"urlPath", staticDir.URLPath,
 			"localPath", staticDir.LocalPath)
 		if strings.HasPrefix(path, staticDir.URLPath) {
 			// Calculate the local file path
 			relativePath := strings.TrimPrefix(path, staticDir.URLPath)
 			fsPath := filepath.Join(config.PublicDir, staticDir.LocalPath, relativePath)
-			
+
 			slog.Debug("Checking file", "fsPath", fsPath)
-			
+
 			// Check if file exists
 			if info, err := os.Stat(fsPath); err == nil && !info.IsDir() {
 				// Set cache headers if configured
 				if staticDir.CacheTTL > 0 {
 					w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", staticDir.CacheTTL))
 				}
-				
+
 				// Set content type and serve
 				setContentType(w, fsPath)
 				http.ServeFile(w, r, fsPath)
 				slog.Info("Serving static file", "path", path, "fsPath", fsPath)
 				return true
 			} else {
-				slog.Debug("File not found or is directory", 
-					"error", err, 
+				slog.Debug("File not found or is directory",
+					"error", err,
 					"isDir", info != nil && info.IsDir())
 			}
 		}
 	}
-	
+
 	// Check if file has a static extension from config
 	isStatic := false
 	ext := strings.TrimPrefix(filepath.Ext(path), ".")
@@ -2096,36 +1959,36 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, config *Config) boo
 			}
 		}
 	}
-	
+
 	if !isStatic {
 		return false
 	}
-	
+
 	// Find the best matching location for this path
 	var bestMatch *Location
 	bestMatchLen := 0
-	
+
 	for locPath, location := range config.Locations {
 		if strings.HasPrefix(path, locPath) && len(locPath) > bestMatchLen {
 			bestMatch = location
 			bestMatchLen = len(locPath)
 		}
 	}
-	
+
 	if bestMatch == nil || bestMatch.Root == "" {
 		return false
 	}
-	
+
 	// Construct the filesystem path
 	// Remove the location prefix from the URL path
 	relativePath := strings.TrimPrefix(path, bestMatch.Path)
 	if relativePath == "" || relativePath[0] != '/' {
 		relativePath = "/" + relativePath
 	}
-	
+
 	// The root typically ends with /public, and we need to serve from there
 	fsPath := filepath.Join(bestMatch.Root, relativePath)
-	
+
 	// Check if file exists
 	if _, err := os.Stat(fsPath); os.IsNotExist(err) {
 		// If not found in root, try in public directory explicitly
@@ -2135,11 +1998,11 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, config *Config) boo
 		}
 		fsPath = publicPath
 	}
-	
+
 	// Set content type and serve the file
 	setContentType(w, fsPath)
 	http.ServeFile(w, r, fsPath)
-	log.Printf("Serving static file: %s -> %s", path, fsPath)
+	slog.Info("Serving static file", "path", path, "fsPath", fsPath)
 	return true
 }
 
@@ -2147,32 +2010,32 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, config *Config) boo
 // Attempts to serve static files with common extensions before falling back to Rails
 func tryFiles(w http.ResponseWriter, r *http.Request, config *Config) bool {
 	path := r.URL.Path
-	
+
 	slog.Debug("tryFiles checking", "path", path)
-	
+
 	// Only try files for paths that don't already have an extension
 	if filepath.Ext(path) != "" {
 		slog.Debug("tryFiles skipping - path has extension")
 		return false
 	}
-	
+
 	// Skip if try_files is disabled (no suffixes configured)
 	if len(config.TryFilesSuffixes) == 0 {
 		slog.Debug("tryFiles disabled - no suffixes configured")
 		return false
 	}
-	
+
 	// First, check static directories from config
 	var bestStaticDir *StaticDir
 	bestStaticDirLen := 0
-	
+
 	for _, staticDir := range config.StaticDirs {
 		if strings.HasPrefix(path, staticDir.URLPath) && len(staticDir.URLPath) > bestStaticDirLen {
 			bestStaticDir = staticDir
 			bestStaticDirLen = len(staticDir.URLPath)
 		}
 	}
-	
+
 	// If we found a matching static directory, try to serve from there
 	if bestStaticDir != nil {
 		// Remove the URL prefix to get the relative path
@@ -2183,10 +2046,10 @@ func tryFiles(w http.ResponseWriter, r *http.Request, config *Config) bool {
 		if relativePath[0] != '/' {
 			relativePath = "/" + relativePath
 		}
-		
+
 		// Use extensions from config
 		extensions := config.TryFilesSuffixes
-		
+
 		for _, ext := range extensions {
 			// Build the full filesystem path
 			fsPath := filepath.Join(config.PublicDir, bestStaticDir.LocalPath, relativePath+ext)
@@ -2196,45 +2059,45 @@ func tryFiles(w http.ResponseWriter, r *http.Request, config *Config) bool {
 			}
 		}
 	}
-	
+
 	// Fall back to checking locations (for backward compatibility)
 	var bestMatch *Location
 	bestMatchLen := 0
-	
+
 	for locPath, location := range config.Locations {
 		if strings.HasPrefix(path, locPath) && len(locPath) > bestMatchLen {
 			bestMatch = location
 			bestMatchLen = len(locPath)
 		}
 	}
-	
+
 	if bestMatch == nil || bestMatch.Root == "" {
 		return false
 	}
-	
+
 	// Remove the location prefix from the URL path
 	relativePath := strings.TrimPrefix(path, bestMatch.Path)
 	if relativePath == "" || relativePath[0] != '/' {
 		relativePath = "/" + relativePath
 	}
-	
+
 	// Use extensions from config
 	extensions := config.TryFilesSuffixes
-	
+
 	for _, ext := range extensions {
 		// Try in the root directory first
 		fsPath := filepath.Join(bestMatch.Root, relativePath+ext)
 		if _, err := os.Stat(fsPath); err == nil {
 			return serveFile(w, r, fsPath, path+ext)
 		}
-		
+
 		// If not found in root, try in public directory explicitly
 		publicPath := filepath.Join(strings.TrimSuffix(bestMatch.Root, "/public"), "public", relativePath+ext)
 		if _, err := os.Stat(publicPath); err == nil {
 			return serveFile(w, r, publicPath, path+ext)
 		}
 	}
-	
+
 	return false
 }
 
@@ -2242,10 +2105,10 @@ func tryFiles(w http.ResponseWriter, r *http.Request, config *Config) bool {
 func serveFile(w http.ResponseWriter, r *http.Request, fsPath, requestPath string) bool {
 	// Set appropriate content type
 	setContentType(w, fsPath)
-	
+
 	// Serve the file
 	http.ServeFile(w, r, fsPath)
-	log.Printf("Try files: %s -> %s", requestPath, fsPath)
+	slog.Info("Try files served", "requestPath", requestPath, "fsPath", fsPath)
 	return true
 }
 
@@ -2295,71 +2158,71 @@ func proxyWithRetry(w http.ResponseWriter, r *http.Request, target *url.URL, max
 	startTime := time.Now()
 	retryCount := 0
 	sleepDuration := 100 * time.Millisecond // Start with 100ms
-	
+
 	for {
 		// Create a new proxy for each attempt
 		proxy := httputil.NewSingleHostReverseProxy(target)
-		
+
 		// Track if we got an error
 		errorOccurred := false
 		errorHandled := false
-		
+
 		// Custom error handler to detect connection errors
 		proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
 			errorOccurred = true
-			
+
 			// Check if we should retry
 			if time.Since(startTime) < maxRetryDuration {
 				// We'll retry, don't write response yet
 				return
 			}
-			
+
 			// Max retry time exceeded or non-retryable error
 			if !errorHandled {
 				errorHandled = true
-				slog.Warn("Proxy error after retries", 
-					"target", target.String(), 
+				slog.Warn("Proxy error after retries",
+					"target", target.String(),
 					"error", err,
 					"retries", retryCount,
 					"duration", time.Since(startTime))
 				http.Error(rw, "Bad Gateway", http.StatusBadGateway)
 			}
 		}
-		
+
 		// Attempt the proxy request
 		proxy.ServeHTTP(w, r)
-		
+
 		// If no error occurred, we're done
 		if !errorOccurred {
 			return
 		}
-		
+
 		// Check if we've exceeded max retry duration
 		if time.Since(startTime) >= maxRetryDuration {
 			if !errorHandled {
-				slog.Warn("Proxy retry timeout", 
-					"target", target.String(), 
+				slog.Warn("Proxy retry timeout",
+					"target", target.String(),
 					"retries", retryCount,
 					"duration", time.Since(startTime))
 				http.Error(w, "Bad Gateway", http.StatusBadGateway)
 			}
 			return
 		}
-		
+
 		// Log retry attempt
 		retryCount++
-		slog.Debug("Retrying proxy request", 
-			"target", target.String(), 
+		slog.Debug("Retrying proxy request",
+			"target", target.String(),
 			"retry", retryCount,
 			"sleep", sleepDuration)
-		
+
 		// Sleep before retry with exponential backoff
 		time.Sleep(sleepDuration)
 		sleepDuration = sleepDuration * 2
 		if sleepDuration > 500*time.Millisecond {
 			sleepDuration = 500 * time.Millisecond // Cap at 500ms
 		}
-		
+
 		// Clone the request for retry (body might have been consumed)
 		if r.Body != nil && r.ContentLength > 0 {
 			// For retries with body, we'd need to buffer the body
@@ -2385,7 +2248,7 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, route *ProxyRoute) {
 	for k, v := range route.SetHeaders {
 		r.Header.Set(k, v)
 	}
-	
+
 	// Use the retry proxy helper
-	proxyWithRetry(w, r, target, 3*time.Second)
+	proxyWithRetry(w, r, target, ProxyRetryTimeout)
 }

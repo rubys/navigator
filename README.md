@@ -15,7 +15,7 @@ Navigator uses YAML configuration format for:
 - **Machine suspension**: Auto-suspend Fly.io machines after idle timeout with automatic wake on requests
 - **Configuration reload**: Live configuration reload with SIGHUP signal (no restart needed)
 - **WebSocket support**: Full support for WebSocket connections and standalone servers
-- **Intelligent routing**: Smart Fly-Replay with DNS checking, automatic fallback to reverse proxy for large requests
+- **Intelligent routing**: Smart Fly-Replay with automatic fallback to reverse proxy for large requests
 - **High reliability**: Automatic retry with exponential backoff for proxy failures
 
 ## Installation
@@ -99,26 +99,27 @@ applications:
   global_env:
     RAILS_RELATIVE_URL_ROOT: /showcase
   
-  # Standard environment variables applied to all tenants (except special ones)
-  standard_vars:
-    RAILS_APP_DB: "${tenant.database}"
-    RAILS_APP_OWNER: "${tenant.owner}"  # Studio name only
-    RAILS_STORAGE: "/path/to/storage"   # Root storage path (not tenant-specific)
-    RAILS_APP_SCOPE: "${tenant.scope}"
-    PIDFILE: "/path/to/pids/${tenant.database}.pid"
+  # Environment variables with template substitution
+  env:
+    RAILS_APP_DB: "${database}"
+    RAILS_APP_OWNER: "${owner}"  # Studio name only
+    RAILS_STORAGE: "${storage}"
+    RAILS_APP_SCOPE: "${scope}"
+    PIDFILE: "/path/to/pids/${database}.pid"
   
   tenants:
     - name: 2025-boston
       path: /showcase/2025/boston/
       group: showcase-2025-boston
-      database: 2025-boston
-      owner: "Boston Dance Studio"
-      storage: "/path/to/storage/2025-boston"
-      scope: "2025/boston"
+      var:
+        database: "2025-boston"
+        owner: "Boston Dance Studio"
+        storage: "/path/to/storage/2025-boston"
+        scope: "2025/boston"
       env:
         SHOWCASE_LOGO: "boston-logo.png"
     
-    # Special tenants that don't use standard_vars
+    # Special tenants that don't use variable substitution
     - name: cable
       path: /cable
       group: showcase-cable
@@ -178,9 +179,9 @@ routes:
         X-API-Key: "secret"
       exclude_methods: [POST, DELETE]  # Don't proxy these methods
 
-# Maintenance page configuration
+# Maintenance page configuration (optional)
 maintenance:
-  page: "/503.html"  # Path to custom maintenance page in public directory
+  page: "/503.html"  # Path to custom maintenance page (currently unused)
 ```
 
 ## Key Features
@@ -200,8 +201,8 @@ maintenance:
 ### Intelligent Fly-Replay Support
 - **Region Routing**: Route requests to specific Fly.io regions
 - **Smart Fallback**: Automatically uses reverse proxy for requests >1MB that Fly.io replay can't handle
-- **DNS Health Checking**: Verifies target machine availability before replay (with 30s caching)
-- **Maintenance Pages**: Serves custom maintenance page when target machines are unavailable
+- **Automatic Fallback**: Uses reverse proxy for requests >1MB that Fly.io replay can't handle
+- **Method Filtering**: Apply routing rules only to specific HTTP methods
 - **Pattern Matching**: Configure URL patterns for region-specific routing
 - **Status Codes**: Configurable HTTP status codes for replay responses
 - **Method Filtering**: Apply replay rules only to specific HTTP methods

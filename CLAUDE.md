@@ -18,10 +18,10 @@ Navigator is a Go-based web server for multi-tenant Rails applications. It provi
 ✅ **Authentication**: htpasswd support with multiple hash formats
 ✅ **Configuration Reload**: Live reload via SIGHUP signal without restart
 ✅ **Machine Suspension**: Fly.io machine auto-suspend after idle timeout
-✅ **Intelligent Fly-Replay**: Smart routing with DNS health checks and automatic fallback
+✅ **Intelligent Fly-Replay**: Smart routing with automatic fallback for large requests
 ✅ **WebSocket Support**: Full WebSocket connection support with standalone servers
 ✅ **High Reliability**: Automatic retry with exponential backoff for proxy failures
-✅ **Maintenance Pages**: Custom maintenance pages when target machines unavailable
+✅ **Simple Configuration**: Flexible variable substitution system for multi-tenant apps
 
 ## Architecture
 
@@ -54,7 +54,6 @@ The entire Navigator implementation is contained in `cmd/navigator/main.go`. Thi
    - **Rails Proxy**: Reverse proxy to Rails applications with method exclusions
    - **Standalone Servers**: Proxy support for external services (Action Cable, etc.)
    - **Suspend Tracking**: Request tracking for idle machine suspension
-   - **DNS Cache**: Target machine availability checking with 30-second TTL
    - **Proxy Retry**: Automatic retry logic with exponential backoff
 
 4. **Static File Serving** (`serveStaticFile`, `tryFiles`)
@@ -67,13 +66,6 @@ The entire Navigator implementation is contained in `cmd/navigator/main.go`. Thi
    - **Idle Detection**: Monitors request activity
    - **Auto-Suspend**: Suspends Fly.io machines after idle timeout
    - **Auto-Wake**: Machines wake automatically on incoming requests
-   - **DNS Cache Clear**: Clears DNS cache before suspension
-
-6. **DNS Cache** (`DNSCache`)
-   - **Health Checking**: Verifies target machine availability via IPv6 DNS
-   - **Performance**: 30-second TTL to reduce DNS lookup overhead
-   - **Automatic Cleanup**: Expired entries removed every 60 seconds
-   - **Deployment Detection**: Identifies when machines are redeploying
 
 ## Configuration
 
@@ -101,7 +93,7 @@ kill -HUP $(cat /tmp/navigator.pid)
 
 1. **YAML configuration**: Create and maintain YAML configuration files
 2. **Navigator loads**: YAML configuration with tenant template variables
-3. **Environment variables**: Standard variables applied to each tenant
+3. **Environment variables**: Flexible variable substitution for each tenant
 4. **Process startup**: Rails apps and managed processes started as needed
 
 ## Development Commands
@@ -187,7 +179,7 @@ Features:
 ### 5. Intelligent Region Routing (Fly-Replay)
 
 - **Smart Detection**: Automatically uses reverse proxy for requests >1MB
-- **DNS Health Checks**: Verifies target machine availability before replay
+- **Automatic Fallback**: Uses reverse proxy for requests >1MB
 - **Maintenance Pages**: Serves custom 503 page when targets unavailable
 - **Pattern matching**: Route specific paths to designated regions
 - **Status codes**: Configurable HTTP response codes
@@ -197,17 +189,25 @@ Features:
 
 ### 6. Configuration Template System
 
-YAML supports template variables for tenant configuration:
+YAML supports flexible variable substitution for tenant configuration:
 
 ```yaml
-standard_vars:
-  RAILS_APP_DB: "${tenant.database}"
-  RAILS_APP_OWNER: "${tenant.owner}"
-  RAILS_STORAGE: "${tenant.storage}"
-  PIDFILE: "pids/${tenant.database}.pid"
+applications:
+  env:
+    RAILS_APP_DB: "${database}"
+    RAILS_APP_OWNER: "${owner}"
+    RAILS_STORAGE: "${storage}"
+    PIDFILE: "pids/${database}.pid"
+  
+  tenants:
+    - name: 2025-boston
+      var:
+        database: "2025-boston"
+        owner: "Boston Dance Studio"
+        storage: "/path/to/storage/2025-boston"
 ```
 
-Variables are substituted for each tenant during configuration loading.
+Variables defined in the `var` map are substituted using `${variable}` syntax in environment templates.
 
 ## Error Handling
 
@@ -358,7 +358,7 @@ Navigator aims to simplify deployment of multi-tenant Rails applications by prov
 - **Development environments**: Replace complex nginx/Passenger setups
 
 ### Future Enhancements
-- **Dynamic DNS checking**: Smart replay decisions based on machine availability
+- **Simplified configuration**: More flexible variable substitution system
 - **Dynamic machine startup**: Start new machines based on demand
 - **Per-user machines**: One machine per user with auto-suspend
 - **Metrics**: Prometheus/OpenTelemetry integration
