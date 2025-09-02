@@ -289,12 +289,56 @@ curl -u username:password http://localhost:9999/protected/path
 curl -u test:secret http://localhost:9999/showcase/2025/boston/
 ```
 
+## Documentation
+
+Navigator has comprehensive documentation with examples and guides.
+
+### Quick Start (Local Documentation)
+
+```bash
+# Set up development environment
+mise trust
+mise settings experimental=true
+uv venv
+uv pip install -r pyproject.toml
+
+# Serve documentation locally
+mkdocs serve
+# Open http://localhost:8000 in your browser
+```
+
+### Alternative Setup (without mise)
+
+```bash
+# Install dependencies directly
+pip install -r requirements.txt
+
+# Serve documentation
+mkdocs serve
+```
+
+### Deploy Documentation
+
+```bash
+# Deploy to GitHub Pages
+mkdocs gh-deploy
+```
+
+The documentation includes:
+- Getting started guides
+- Configuration reference
+- Complete working examples
+- Deployment guides
+- Troubleshooting tips
+
 ## Development
 
 ### File Structure
 - `cmd/navigator/main.go` - Main application entry point
 - `Makefile` - Build configuration
 - `go.mod`, `go.sum` - Go module dependencies
+- `docs/` - Documentation source files
+- `mkdocs.yml` - Documentation configuration
 
 ### Logging
 Navigator uses Go's `slog` package for structured logging:

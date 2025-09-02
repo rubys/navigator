@@ -50,3 +50,10 @@ configs/*.yml
 # Test artifacts
 coverage.html
 coverage.out
+
+# Python/Documentation
+.venv/
+__pycache__/
+*.pyc
+site/
+.mise.local.toml
