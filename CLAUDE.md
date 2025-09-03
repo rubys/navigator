@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ## Project Overview
 
-Navigator is a Go-based web server for multi-tenant Rails applications. It provides intelligent request routing, dynamic process management, authentication, static file serving, managed external processes, and support for deployment patterns like Microsoft Azure's Deployment Stamps and Fly.io's preferred instance routing.
+Navigator is a Go-based web server for multi-tenant web applications. It provides framework independence, intelligent request routing, dynamic process management, authentication, static file serving, managed external processes, and support for deployment patterns like Microsoft Azure's Deployment Stamps and Fly.io's preferred instance routing.
 
 ## Current Implementation Status
 
+✅ **Framework Independence**: Support for Rails, Django, Node.js, and other web frameworks
 ✅ **Single-File Go Implementation**: Simple, self-contained Go application in `cmd/navigator/main.go`
 ✅ **YAML Configuration Support**: Modern YAML-based configuration
 ✅ **Managed Processes**: External process management (Redis, Sidekiq, workers, etc.)
@@ -42,7 +43,8 @@ The entire Navigator implementation is contained in `cmd/navigator/main.go`. Thi
    - Live configuration reload via SIGHUP signal
 
 2. **Process Management** (`AppManager`, `ProcessManager`)
-   - **Rails Apps**: On-demand startup with dynamic port allocation
+   - **Web Apps**: On-demand startup with dynamic port allocation
+   - **Framework Configuration**: Configurable runtime and server executables
    - **Managed Processes**: External process lifecycle management
    - **PID File Handling**: Automatic cleanup of stale processes
    - **Graceful Shutdown**: Clean termination of all processes
@@ -52,14 +54,14 @@ The entire Navigator implementation is contained in `cmd/navigator/main.go`. Thi
    - **Authentication**: Pattern-based auth exclusions with htpasswd
    - **Static Files**: Direct filesystem serving with caching
    - **Try Files**: File resolution for public content with multiple extensions
-   - **Rails Proxy**: Reverse proxy to Rails applications with method exclusions
+   - **Web App Proxy**: Reverse proxy to web applications with method exclusions
    - **Standalone Servers**: Proxy support for external services (Action Cable, etc.)
    - **Suspend Tracking**: Request tracking for idle machine suspension
    - **Proxy Retry**: Automatic retry logic with exponential backoff
 
 4. **Static File Serving** (`serveStaticFile`, `tryFiles`)
-   - **Performance**: Bypasses Rails for static content
-   - **Try Files**: Attempts multiple file extensions before Rails fallback
+   - **Performance**: Bypasses web framework for static content
+   - **Try Files**: Attempts multiple file extensions before web app fallback
    - **Content Types**: Automatic MIME type detection
    - **Caching**: Configurable cache headers
 
@@ -93,9 +95,10 @@ kill -HUP $(cat /tmp/navigator.pid)
 ### Configuration Flow
 
 1. **YAML configuration**: Create and maintain YAML configuration files
-2. **Navigator loads**: YAML configuration with tenant template variables
-3. **Environment variables**: Flexible variable substitution for each tenant
-4. **Process startup**: Rails apps and managed processes started as needed
+2. **Navigator loads**: YAML configuration with framework and tenant settings
+3. **Framework configuration**: Runtime executable and server settings applied
+4. **Environment variables**: Flexible variable substitution for each tenant
+5. **Process startup**: Web apps and managed processes started as needed
 
 ## Development Commands
 
@@ -153,19 +156,19 @@ Features:
 - **Auto-restart**: Processes restart on crash if configured
 - **Start delays**: Ensures proper initialization order
 - **Environment variables**: Custom env for each process
-- **Graceful shutdown**: Stopped after Rails apps to preserve dependencies
+- **Graceful shutdown**: Stopped after web apps to preserve dependencies
 - **Configuration updates**: Managed processes updated on configuration reload
 
 ### 2. Process Management Improvements
 
-- **PID file cleanup**: Removes stale PID files before starting Rails apps
+- **PID file cleanup**: Removes stale PID files before starting web apps
 - **Dynamic port allocation**: Finds available ports in range 4000-4099
 - **Graceful shutdown**: SIGINT/SIGTERM handling with proper cleanup
-- **Environment inheritance**: Rails apps inherit parent environment variables
+- **Environment inheritance**: Web apps inherit parent environment variables
 
 ### 3. Static File Optimization
 
-- **Direct serving**: Static files served without Rails overhead
+- **Direct serving**: Static files served without web framework overhead
 - **Try files**: File resolution with multiple extensions
 - **Content-Type detection**: Automatic MIME type setting
 - **Public routes**: Serves studios, regions, docs without authentication
@@ -218,7 +221,7 @@ Variables defined in the `var` map are substituted using `${variable}` syntax in
 
 ### Process Recovery
 
-Navigator handles Rails process failures:
+Navigator handles web app process failures:
 
 1. **Detection**: Connection refused errors detected
 2. **Cleanup**: Stale PID files and processes cleaned up
@@ -257,7 +260,7 @@ curl -I http://localhost:3000/assets/application.js
 # Test try_files behavior
 curl -I http://localhost:3000/studios/raleigh  # → raleigh.html
 
-# Test Rails proxy
+# Test web app proxy
 curl http://localhost:3000/2025/boston/
 ```
 
@@ -354,14 +357,14 @@ Navigator uses Go's `slog` package for structured logging:
 
 1. **Single binary**: No external dependencies beyond htpasswd files
 2. **YAML configuration**: Create and maintain YAML configuration files
-3. **Process monitoring**: Navigator manages Rails and external processes
+3. **Process monitoring**: Navigator manages web apps and external processes
 4. **Resource efficiency**: Lower memory footprint than nginx/Passenger
 
 ### Systemd Integration
 
 ```ini
 [Unit]
-Description=Navigator Rails Proxy
+Description=Navigator Web Application Proxy
 After=network.target
 
 [Service]
@@ -377,7 +380,7 @@ WantedBy=multi-user.target
 
 ## Vision and Roadmap
 
-Navigator aims to simplify deployment of multi-tenant Rails applications by providing a single binary that handles:
+Navigator aims to simplify deployment of multi-tenant web applications by providing a single binary that handles:
 - Application lifecycle management
 - Request routing and authentication
 - Static file serving
@@ -411,7 +414,7 @@ Navigator aims to simplify deployment of multi-tenant Rails applications by prov
 
 - **YAML configuration**: YAML is the only supported configuration format
 - **Single file design**: All logic in one Go file for simplicity
-- **Process management**: Navigator handles both Rails apps and external processes
+- **Process management**: Navigator handles both web apps and external processes
 - **Graceful shutdown**: All processes cleaned up properly on termination
 - **Configuration reload**: Update configuration without restart using SIGHUP
 - **Production ready**: Used in production with 75+ dance studios across 8 countries

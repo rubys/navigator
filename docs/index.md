@@ -1,10 +1,10 @@
 # Navigator
 
-A lightweight, fast Go-based web server for multi-tenant Rails applications with on-demand process management.
+A lightweight, fast Go-based web server for multi-tenant web applications with on-demand process management. Framework-independent with built-in support for Rails, Django, Node.js, and other frameworks.
 
 ## What is Navigator?
 
-Navigator is a modern alternative to nginx + Passenger, designed specifically for multi-tenant Rails applications. It provides intelligent request routing, dynamic process management, and built-in support for modern deployment patterns.
+Navigator is a modern alternative to nginx + Passenger, designed for multi-tenant web applications across different frameworks. It provides intelligent request routing, dynamic process management, and built-in support for modern deployment patterns like Fly.io, Azure Deployment Stamps, and container orchestration.
 
 <div class="grid cards" markdown>
 
@@ -18,7 +18,7 @@ Navigator is a modern alternative to nginx + Passenger, designed specifically fo
 
     ---
 
-    Starts Rails apps on-demand, manages Redis/Sidekiq, automatic cleanup of stale processes.
+    Starts web apps on-demand, manages Redis/Sidekiq, automatic cleanup of stale processes. Framework-agnostic with configurable commands.
 
 -   :shield: **Production Ready**
 

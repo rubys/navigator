@@ -1,17 +1,18 @@
 # Navigator - Go Web Server
 
-Navigator is a Go-based web server that provides multi-tenant Rails application hosting with on-demand process management.
+Navigator is a Go-based web server that provides multi-tenant web application hosting with on-demand process management. It supports multiple web frameworks through configurable settings.
 
 ## Overview
 
 Navigator uses YAML configuration format for:
-- **Multi-tenant hosting**: Manages multiple Rails applications with separate databases
-- **On-demand process management**: Starts Rails apps when needed, stops after idle timeout
+- **Multi-tenant hosting**: Manages multiple web applications with separate databases
+- **Framework independence**: Supports Rails, Django, Node.js, and other frameworks via configuration
+- **On-demand process management**: Starts web apps when needed, stops after idle timeout
 - **Managed processes**: Start and stop additional processes alongside Navigator (Redis, workers, etc.)
 - **Static file serving**: Serves assets, images, and static content directly from filesystem with configurable caching
 - **Authentication**: Full htpasswd support (APR1, bcrypt, SHA, etc.) with pattern-based exclusions
 - **URL rewriting**: Rewrite rules with redirect, last, and fly-replay flags for region-specific routing
-- **Reverse proxy**: Forwards dynamic requests to Rails applications with method-based exclusions and custom headers
+- **Reverse proxy**: Forwards dynamic requests to web applications with method-based exclusions and custom headers
 - **Machine suspension**: Auto-suspend Fly.io machines after idle timeout with automatic wake on requests
 - **Configuration reload**: Live configuration reload with SIGHUP signal (no restart needed)
 - **WebSocket support**: Full support for WebSocket connections and standalone servers
@@ -52,7 +53,7 @@ kill -HUP $(cat /tmp/navigator.pid)
 
 The navigator will:
 - Start listening on the configured port (default: 9999 for local, 3000 for production)
-- Dynamically allocate ports for Rails applications (4000-4099)
+- Dynamically allocate ports for web applications (4000-4099)
 - Clean up stale PID files before starting apps
 - Handle graceful shutdown on interrupt signals
 
@@ -96,6 +97,15 @@ static:
     fallback: rails
 
 applications:
+  framework:
+    runtime_executable: ruby
+    server_executable: bin/rails
+    server_command: server
+    server_args: ["-p", "${port}"]
+    app_directory: /rails
+    port_env_var: PORT
+    startup_delay: 5
+  
   global_env:
     RAILS_RELATIVE_URL_ROOT: /showcase
   
@@ -285,7 +295,7 @@ curl -I http://localhost:9999/showcase/regions/dfw           # → dfw.html
 # Test authentication
 curl -u username:password http://localhost:9999/protected/path
 
-# Test Rails proxy (authenticated routes)
+# Test web app proxy (authenticated routes)
 curl -u test:secret http://localhost:9999/showcase/2025/boston/
 ```
 
@@ -358,6 +368,7 @@ go mod download
 Navigator is designed to replace nginx + Passenger in production environments:
 - **Single binary**: No external dependencies
 - **YAML configuration**: Modern configuration format
+- **Framework independence**: Support for Rails, Django, Node.js, and other web frameworks
 - **Resource efficiency**: Lower memory footprint than full nginx/Passenger stack
 - **Monitoring**: Built-in logging for requests, static files, and process management
 

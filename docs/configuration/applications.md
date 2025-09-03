@@ -1,11 +1,21 @@
 # Application Configuration
 
-The `applications` section defines how Navigator manages Rails applications, including routing, environment variables, and tenant configurations.
+The `applications` section defines how Navigator manages web applications across different frameworks, including routing, environment variables, and tenant configurations.
 
 ## Basic Structure
 
 ```yaml
 applications:
+  # Framework-specific configuration
+  framework:
+    runtime_executable: ruby
+    server_executable: bin/rails
+    server_command: server
+    server_args: ["-p", "${port}"]
+    app_directory: /rails
+    port_env_var: PORT
+    startup_delay: 5
+  
   # Global environment variables for all applications
   global_env:
     RAILS_ENV: production
@@ -27,9 +37,96 @@ applications:
         owner: "My Company"
 ```
 
+## Framework Configuration
+
+Navigator supports multiple web frameworks through the `framework` section. This makes Navigator framework-independent while providing sensible Rails defaults:
+
+```yaml
+applications:
+  framework:
+    runtime_executable: ruby           # Runtime interpreter (ruby, node, python)
+    server_executable: bin/rails       # Server command (bin/rails, server.js, manage.py)
+    server_command: server             # Subcommand (server, runserver)
+    server_args: ["-p", "${port}"]    # Arguments (port will be substituted)
+    app_directory: /rails              # Working directory for apps
+    port_env_var: PORT                 # Environment variable for port
+    startup_delay: 5                   # Seconds to wait before marking ready
+```
+
+### Framework Examples
+
+=== "Rails (Default)"
+
+    ```yaml
+    framework:
+      runtime_executable: ruby
+      server_executable: bin/rails
+      server_command: server
+      server_args: ["-p", "${port}"]
+      app_directory: /rails
+      port_env_var: PORT
+      startup_delay: 5
+    ```
+
+=== "Django"
+
+    ```yaml
+    framework:
+      runtime_executable: python
+      server_executable: manage.py
+      server_command: runserver
+      server_args: ["0.0.0.0:${port}"]
+      app_directory: /app
+      port_env_var: PORT
+      startup_delay: 3
+    ```
+
+=== "Node.js"
+
+    ```yaml
+    framework:
+      runtime_executable: node
+      server_executable: server.js
+      server_command: ""              # No subcommand needed
+      server_args: []                 # Port handled via environment
+      app_directory: /app
+      port_env_var: PORT
+      startup_delay: 2
+    ```
+
+=== "Custom Framework"
+
+    ```yaml
+    framework:
+      runtime_executable: /usr/local/bin/myruntime
+      server_executable: bin/start-server
+      server_command: production
+      server_args: ["--port", "${port}", "--workers", "4"]
+      app_directory: /myapp
+      port_env_var: SERVER_PORT
+      startup_delay: 10
+    ```
+
+### Configuration Fields
+
+| Field | Required | Description | Example |
+|-------|----------|-------------|---------|
+| `runtime_executable` | Yes | Runtime interpreter command | `ruby`, `python`, `node` |
+| `server_executable` | Yes | Server script/command | `bin/rails`, `manage.py`, `server.js` |
+| `server_command` | No | Subcommand for server | `server`, `runserver` |
+| `server_args` | No | Additional arguments | `["-p", "${port}"]` |
+| `app_directory` | No | Working directory | `/rails`, `/app` (defaults to `/app`) |
+| `port_env_var` | No | Port environment variable | `PORT` (default) |
+| `startup_delay` | No | Startup delay in seconds | `5` (default) |
+
+### Template Variables
+
+- `${port}` - Dynamically allocated port number
+- Can be used in `server_args` for port substitution
+
 ## Global Environment Variables
 
-The `global_env` section sets environment variables for all Rails applications:
+The `global_env` section sets environment variables for all web applications:
 
 ```yaml
 applications:
