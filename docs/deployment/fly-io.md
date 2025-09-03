@@ -23,10 +23,9 @@ Navigator works excellently with Fly.io's machine architecture:
 ```dockerfile title="Dockerfile"
 FROM ruby:3.2-slim
 
-# Install Navigator
-ARG NAVIGATOR_VERSION=latest
-ADD https://github.com/rubys/navigator/releases/latest/download/navigator-linux-amd64.tar.gz /tmp/
-RUN cd /tmp && tar xzf navigator-linux-amd64.tar.gz && mv navigator /usr/local/bin/ && chmod +x /usr/local/bin/navigator
+# Copy Navigator binary from Docker Hub image
+COPY --from=samruby/navigator:latest /navigator /usr/local/bin/navigator
+RUN chmod +x /usr/local/bin/navigator
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \

@@ -164,3 +164,21 @@ jobs:
         name: navigator-release-${{ env.VERSION }}
         path: dist/
         retention-days: 90
+    
+    - name: Build and push Docker image
+      env:
+        DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+        DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+      run: |
+        # Log in to Docker Hub
+        echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
+        
+        # Build the Docker image
+        docker build -t samruby/navigator:${{ env.VERSION }} -t samruby/navigator:latest .
+        
+        # Push both tags to Docker Hub
+        docker push samruby/navigator:${{ env.VERSION }}
+        docker push samruby/navigator:latest
+        
+        # Log out from Docker Hub
+        docker logout

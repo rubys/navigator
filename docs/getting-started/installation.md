@@ -80,19 +80,38 @@ sudo cp bin/navigator /usr/local/bin/
 
 ### Docker
 
-Navigator is available as a Docker image:
+Navigator is available as a Docker Hub image containing the Linux AMD64 binary:
 
-```bash
-# Pull the latest image
-docker pull rubys/navigator:latest
+#### Using in Your Dockerfile
 
-# Run with your configuration
-docker run -d \
-  --name navigator \
-  -v $(pwd)/config:/config \
-  -v $(pwd)/app:/app \
-  -p 3000:3000 \
-  rubys/navigator:latest /config/navigator.yml
+The recommended way to use Navigator is to copy the binary from the Docker Hub image into your own Docker image:
+
+```dockerfile
+# Copy Navigator binary from Docker Hub
+COPY --from=samruby/navigator:latest /navigator /usr/local/bin/navigator
+RUN chmod +x /usr/local/bin/navigator
+```
+
+#### Available Tags
+
+- `samruby/navigator:latest` - Latest stable release
+- `samruby/navigator:v1.0.0` - Specific version (replace with actual version)
+
+#### Example Dockerfile
+
+```dockerfile
+FROM ruby:3.2-slim
+
+# Copy Navigator from Docker Hub
+COPY --from=samruby/navigator:latest /navigator /usr/local/bin/navigator
+RUN chmod +x /usr/local/bin/navigator
+
+# Your application setup
+WORKDIR /app
+COPY . .
+RUN bundle install
+
+CMD ["navigator", "config/navigator.yml"]
 ```
 
 ### Package Managers

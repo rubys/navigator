@@ -31,13 +31,11 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     nodejs \
     npm \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Navigator
-RUN curl -L https://github.com/rubys/navigator/releases/latest/download/navigator-linux-amd64.tar.gz | \
-    tar xzf - -C /usr/local/bin && \
-    chmod +x /usr/local/bin/navigator
+# Copy Navigator binary from Docker Hub
+COPY --from=samruby/navigator:latest /navigator /usr/local/bin/navigator
+RUN chmod +x /usr/local/bin/navigator
 
 # Set up Rails app
 WORKDIR /app
@@ -444,8 +442,7 @@ jobs:
 
       - name: Validate Navigator config
         run: |
-          curl -L https://github.com/rubys/navigator/releases/latest/download/navigator-linux-amd64.tar.gz | tar xzf - 
-          ./navigator --validate config/navigator.yml
+          docker run --rm -v $(pwd):/app samruby/navigator:latest /navigator --validate /app/config/navigator.yml
 
   deploy:
     if: github.ref == 'refs/heads/main'
