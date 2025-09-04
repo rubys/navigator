@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -296,6 +297,31 @@ type AppManager struct {
 	maxPort     int // Maximum port for web apps
 }
 
+// LogWriter wraps output streams to add source identification
+type LogWriter struct {
+	source string     // app name or process name
+	stream string     // "stdout" or "stderr"
+	output io.Writer
+}
+
+// Write implements io.Writer interface, prefixing each line with source metadata
+func (w *LogWriter) Write(p []byte) (n int, err error) {
+	// Split input into lines
+	lines := bytes.Split(p, []byte("\n"))
+	for i, line := range lines {
+		// Skip empty lines at the end
+		if len(line) == 0 && i == len(lines)-1 {
+			continue
+		}
+		// Write prefixed line
+		prefix := fmt.Sprintf("[%s.%s] ", w.source, w.stream)
+		w.output.Write([]byte(prefix))
+		w.output.Write(line)
+		w.output.Write([]byte("\n"))
+	}
+	return len(p), nil
+}
+
 // cleanupPidFile checks for and removes stale PID file
 func cleanupPidFile(pidfilePath string) error {
 	if pidfilePath == "" {
@@ -458,9 +484,9 @@ func (pm *ProcessManager) StartProcess(mp *ManagedProcess) error {
 	}
 	cmd.Env = env
 
-	// Set up output
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Set up output with source identification
+	cmd.Stdout = &LogWriter{source: mp.Name, stream: "stdout", output: os.Stdout}
+	cmd.Stderr = &LogWriter{source: mp.Name, stream: "stderr", output: os.Stderr}
 
 	mp.Process = cmd
 
@@ -1401,8 +1427,13 @@ func (m *AppManager) startApp(app *WebApp) {
 
 	cmd.Dir = appDir
 	cmd.Env = env
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Use the location path as the source identifier
+	appName := strings.TrimPrefix(app.Location.Path, "/")
+	if appName == "" {
+		appName = "root"
+	}
+	cmd.Stdout = &LogWriter{source: appName, stream: "stdout", output: os.Stdout}
+	cmd.Stderr = &LogWriter{source: appName, stream: "stderr", output: os.Stderr}
 
 	app.mutex.Lock()
 	app.Process = cmd
