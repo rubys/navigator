@@ -115,11 +115,9 @@ applications:
     port_env_var: PORT
     startup_delay: 5
   
-  global_env:
-    RAILS_RELATIVE_URL_ROOT: /showcase
-  
-  # Environment variables with template substitution
+  # Environment variables with template substitution  
   env:
+    RAILS_RELATIVE_URL_ROOT: /showcase
     RAILS_APP_DB: "${database}"
     RAILS_APP_OWNER: "${owner}"  # Studio name only
     RAILS_STORAGE: "${storage}"
@@ -127,9 +125,7 @@ applications:
     PIDFILE: "/path/to/pids/${database}.pid"
   
   tenants:
-    - name: 2025-boston
-      path: /showcase/2025/boston/
-      group: showcase-2025-boston
+    - path: /showcase/2025/boston/
       var:
         database: "2025-boston"
         owner: "Boston Dance Studio"
@@ -139,23 +135,18 @@ applications:
         SHOWCASE_LOGO: "boston-logo.png"
     
     # Special tenants that don't use variable substitution
-    - name: cable
-      path: /cable
-      group: showcase-cable
+    - path: /cable
       special: true
       force_max_concurrent_requests: 0
     
     # Tenants with pattern matching for WebSocket support
-    - name: cable-pattern
-      path: /cable-specific
-      group: showcase-cable
+    - path: /cable-specific
       match_pattern: "*/cable"  # Matches any path ending with /cable
       special: true
     
     # Tenants with standalone servers (e.g., Action Cable)
-    - name: external-service
-      path: /external/
-      standalone_server: "localhost:28080"  # Proxy to standalone server instead of Rails
+    - path: /external/
+      standalone_server: "localhost:28080"  # Proxy to standalone server instead of app
 
 managed_processes:
   - name: redis
