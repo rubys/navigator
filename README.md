@@ -21,7 +21,16 @@ Navigator uses YAML configuration format for:
 
 ## Installation
 
-Download the latest release from [GitHub Releases](https://github.com/rubys/navigator/releases) or build from source:
+Modify your Dockerfile:
+
+```Dockerfile
+COPY --from=samruby/navigator:latest /navigator /usr/local/bin/navigator
+CMD ["navigator", "/app/navigator.yml"]
+```
+
+Download the latest release from [GitHub Releases](https://github.com/rubys/navigator/releases) 
+
+Build from source:
 
 ```bash
 # Clone the repository
@@ -296,7 +305,7 @@ curl -I http://localhost:9999/showcase/regions/dfw           # → dfw.html
 curl -u username:password http://localhost:9999/protected/path
 
 # Test web app proxy (authenticated routes)
-curl -u test:secret http://localhost:9999/showcase/2025/boston/
+curl -u username:password http://localhost:9999/showcase/2025/boston/
 ```
 
 ## Documentation
@@ -369,7 +378,6 @@ Navigator is designed to replace nginx + Passenger in production environments:
 - **Single binary**: No external dependencies
 - **YAML configuration**: Modern configuration format
 - **Framework independence**: Support for Rails, Django, Node.js, and other web frameworks
-- **Resource efficiency**: Lower memory footprint than full nginx/Passenger stack
 - **Monitoring**: Built-in logging for requests, static files, and process management
 
 ### Systemd Integration
