@@ -1,0 +1,89 @@
+# Sample Vector configuration for Navigator integration
+# This file configures Vector to receive logs from Navigator via Unix socket
+
+# Source: Unix socket to receive logs from Navigator
+[sources.navigator]
+type = "socket"
+mode = "unix"
+path = "/tmp/navigator-vector.sock"
+
+# Transform: Parse JSON logs from Navigator
+[transforms.parse_json]
+type = "remap" 
+inputs = ["navigator"]
+source = '''
+  # Try to parse as JSON, fallback to raw message
+  parsed = parse_json(.message) ?? null
+  if parsed != null {
+    . = parsed
+  }
+  
+  # Add metadata
+  .environment = get_env_var("RAILS_ENV") ?? "development"
+  .hostname = get_hostname() ?? "localhost"
+  .vector_timestamp = now()
+'''
+
+# Transform: Route logs by source
+[transforms.route_by_source]
+type = "route"
+inputs = ["parse_json"]
+
+# Route web app logs
+route.web_apps = '.source != null && !starts_with(.source, "vector")'
+
+# Route managed process logs
+route.managed = '.source != null && (.source == "redis" || .source == "sidekiq")'
+
+# Route Navigator internal logs
+route.navigator = '.source == null && .level != null'
+
+# Sink: Console output (for debugging)
+[sinks.console]
+type = "console"
+inputs = ["route_by_source.web_apps", "route_by_source.managed", "route_by_source.navigator"]
+encoding.codec = "json"
+# Comment out in production
+# target = "stdout"
+
+# Sink: File output for web apps
+[sinks.web_app_files]
+type = "file"
+inputs = ["route_by_source.web_apps"]
+path = "/var/log/navigator/apps/{{ source }}.log"
+encoding.codec = "json"
+
+# Sink: File output for managed processes
+[sinks.managed_files]
+type = "file"
+inputs = ["route_by_source.managed"]
+path = "/var/log/navigator/managed/{{ source }}.log"
+encoding.codec = "json"
+
+# Sink: File output for Navigator logs
+[sinks.navigator_file]
+type = "file"
+inputs = ["route_by_source.navigator"]
+path = "/var/log/navigator/navigator.log"
+encoding.codec = "json"
+
+# Optional: Send to external systems
+# [sinks.elasticsearch]
+# type = "elasticsearch"
+# inputs = ["parse_json"]
+# endpoint = "http://localhost:9200"
+# index = "navigator-logs-%F"
+
+# [sinks.nats]
+# type = "nats"
+# inputs = ["parse_json"]
+# url = "nats://localhost:4222"
+# subject = "logs.{{ source }}"
+
+# [sinks.s3]
+# type = "aws_s3"
+# inputs = ["parse_json"]
+# bucket = "my-log-bucket"
+# key_prefix = "navigator/{{ source }}/"
+# compression = "gzip"
+# batch.timeout_secs = 300

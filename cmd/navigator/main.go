@@ -79,6 +79,11 @@ type AuthPattern struct {
 type LogConfig struct {
 	Format string `yaml:"format"` // "text" or "json"
 	File   string `yaml:"file"`   // Optional file output path (supports {{app}} template)
+	Vector struct {
+		Enabled bool   `yaml:"enabled"` // Enable Vector integration
+		Socket  string `yaml:"socket"`  // Unix socket path for Vector
+		Config  string `yaml:"config"`  // Path to vector.toml configuration
+	} `yaml:"vector"`
 }
 
 // Config represents the parsed configuration
@@ -403,6 +408,58 @@ func createFileWriter(path string, appName string) (io.Writer, error) {
 	return file, nil
 }
 
+// VectorWriter writes logs to Vector via Unix socket
+type VectorWriter struct {
+	socket string
+	conn   net.Conn
+	mutex  sync.Mutex
+}
+
+// NewVectorWriter creates a new Vector writer
+func NewVectorWriter(socket string) *VectorWriter {
+	return &VectorWriter{socket: socket}
+}
+
+// Write implements io.Writer interface for Vector output
+func (v *VectorWriter) Write(p []byte) (n int, err error) {
+	v.mutex.Lock()
+	defer v.mutex.Unlock()
+	
+	// Lazy connection - connect on first write
+	if v.conn == nil {
+		v.conn, err = net.Dial("unix", v.socket)
+		if err != nil {
+			// Silently fail if Vector isn't running - graceful degradation
+			return len(p), nil
+		}
+	}
+	
+	// Try to write to Vector
+	n, err = v.conn.Write(p)
+	if err != nil {
+		// Connection failed, close and reset
+		v.conn.Close()
+		v.conn = nil
+		// Return success to avoid breaking the log pipeline
+		return len(p), nil
+	}
+	
+	return n, nil
+}
+
+// Close closes the Vector connection
+func (v *VectorWriter) Close() error {
+	v.mutex.Lock()
+	defer v.mutex.Unlock()
+	
+	if v.conn != nil {
+		err := v.conn.Close()
+		v.conn = nil
+		return err
+	}
+	return nil
+}
+
 // cleanupPidFile checks for and removes stale PID file
 func cleanupPidFile(pidfilePath string) error {
 	if pidfilePath == "" {
@@ -579,6 +636,13 @@ func (pm *ProcessManager) StartProcess(mp *ManagedProcess) error {
 				"process", mp.Name,
 				"error", err)
 		}
+	}
+	
+	// Add Vector output if configured (but not for Vector itself to avoid loop)
+	if pm.config != nil && pm.config.Logging.Vector.Enabled && 
+	   pm.config.Logging.Vector.Socket != "" && mp.Name != "vector" {
+		vectorWriter := NewVectorWriter(pm.config.Logging.Vector.Socket)
+		outputs = append(outputs, vectorWriter)
 	}
 	
 	// Create the appropriate output writer
@@ -1015,9 +1079,35 @@ func main() {
 
 	// Create and start process manager for managed processes
 	processManager := NewProcessManager(config)
-	if len(config.ManagedProcesses) > 0 {
-		slog.Info("Starting managed processes", "count", len(config.ManagedProcesses))
-		processManager.StartAll(config.ManagedProcesses)
+	
+	// Add Vector as a managed process if configured
+	managedProcs := make([]ManagedProcessConfig, 0, len(config.ManagedProcesses)+1)
+	
+	// If Vector is enabled, add it as the first managed process (highest priority)
+	if config.Logging.Vector.Enabled {
+		if config.Logging.Vector.Config == "" {
+			slog.Warn("Vector enabled but no config file specified")
+		} else {
+			vectorProc := ManagedProcessConfig{
+				Name:        "vector",
+				Command:     "vector",
+				Args:        []string{"--config", config.Logging.Vector.Config},
+				AutoRestart: true,
+				StartDelay:  0, // Start immediately
+			}
+			managedProcs = append(managedProcs, vectorProc)
+			slog.Info("Vector integration enabled", 
+				"socket", config.Logging.Vector.Socket,
+				"config", config.Logging.Vector.Config)
+		}
+	}
+	
+	// Add configured managed processes
+	managedProcs = append(managedProcs, config.ManagedProcesses...)
+	
+	if len(managedProcs) > 0 {
+		slog.Info("Starting managed processes", "count", len(managedProcs))
+		processManager.StartAll(managedProcs)
 	}
 
 	// Create a mutable handler wrapper for configuration reloading
@@ -1575,6 +1665,12 @@ func (m *AppManager) startApp(app *WebApp) {
 				"app", appName,
 				"error", err)
 		}
+	}
+	
+	// Add Vector output if configured
+	if m.config.Logging.Vector.Enabled && m.config.Logging.Vector.Socket != "" {
+		vectorWriter := NewVectorWriter(m.config.Logging.Vector.Socket)
+		outputs = append(outputs, vectorWriter)
 	}
 	
 	// Create the appropriate output writer

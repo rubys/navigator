@@ -360,7 +360,8 @@ Navigator provides comprehensive logging for both its own operations and all man
 **Output Destinations**:
 - **Default**: Console output only (stdout) - no configuration required
 - **File output**: Optional file logging with `{{app}}` template variable
-- **Multiple destinations**: Logs written to both console and files simultaneously
+- **Vector integration**: Professional log aggregation and processing
+- **Multiple destinations**: Logs written to console, files, and Vector simultaneously
 
 Configuration:
 ```yaml
@@ -379,11 +380,25 @@ logging:
 logging:
   format: json
   file: /var/log/navigator/{{app}}.log
+
+# Vector integration for enterprise logging
+logging:
+  format: json
+  vector:
+    enabled: true
+    socket: /tmp/navigator-vector.sock
+    config: /etc/vector/vector.toml
 ```
 
 **Template Variables**:
 - `{{app}}` is replaced with the application or process name
 - Creates separate log files per app: `redis.log`, `2025-boston.log`, etc.
+
+**Vector Integration**:
+- Vector automatically started as managed process when enabled
+- Logs sent to Vector via high-performance Unix socket
+- Supports all Vector sinks: Elasticsearch, S3, Kafka, NATS, etc.
+- Graceful degradation if Vector fails to start
 
 **Note**: Logging format is set at startup. To change the format, restart Navigator with the updated configuration. Configuration reload (SIGHUP) will apply the new format to newly started child processes, but Navigator's own logs will remain in their original format until restart.
 

@@ -1,0 +1,113 @@
+# Navigator Framework Inheritance Example
+# Shows how configuration cascades: defaults -> applications -> tenant
+
+# Option 1: Use built-in framework with global defaults
+defaults:
+  framework: django
+  startup_timeout: 20
+  env:
+    ENVIRONMENT: production
+
+server:
+  listen: 3000
+
+applications:
+  # These override the global defaults for all tenants
+  env:
+    DJANGO_SETTINGS_MODULE: myproject.settings
+    DATABASE_HOST: localhost
+  
+  tenants:
+    # Inherits everything from above
+    - name: production
+      path: /
+      env:
+        DATABASE_NAME: prod_db
+    
+    # Override just the database
+    - name: staging
+      path: /staging
+      env:
+        DATABASE_NAME: staging_db
+        DEBUG: "true"  # Override for staging
+    
+    # Different framework entirely
+    - name: api
+      path: /api
+      framework: fastapi  # Switch to FastAPI
+      command: uvicorn
+      args: [api:app, --host, "0.0.0.0", --port, "${PORT}", --workers, "2"]
+      env:
+        DATABASE_NAME: api_db
+
+---
+# Option 2: Define everything explicitly at application level
+
+server:
+  listen: 3000
+
+applications:
+  # No framework specified - must provide command
+  command: python
+  args: [manage.py, runserver, "0.0.0.0:${PORT}"]
+  static_dir: staticfiles
+  startup_delay: 3
+  env:
+    PYTHONPATH: /app
+    
+  tenants:
+    # All tenants inherit the Python setup above
+    - name: app1
+      path: /app1
+      working_dir: /apps/app1
+      env:
+        APP_NAME: app1
+        
+    - name: app2
+      path: /app2
+      working_dir: /apps/app2
+      env:
+        APP_NAME: app2
+
+---
+# Option 3: Mixed frameworks with custom definitions
+
+frameworks:
+  # Define a custom framework template
+  my-node-app:
+    command: yarn
+    args: [start]
+    env:
+      NODE_ENV: production
+      PORT: "${PORT}"
+    health_check:
+      path: /api/health
+      expected_status: 200
+
+server:
+  listen: 3000
+
+applications:
+  framework: rails  # Default is Rails
+  
+  tenants:
+    # Rails apps (using default)
+    - name: main
+      path: /
+      
+    - name: admin
+      path: /admin
+      
+    # Node.js app using custom framework
+    - name: frontend
+      path: /app
+      framework: my-node-app
+      working_dir: /apps/frontend
+      
+    # Generic app with inline configuration
+    - name: legacy
+      path: /legacy
+      framework: generic
+      command: ./start.sh
+      args: ["${PORT}"]
+      working_dir: /apps/legacy

@@ -360,7 +360,9 @@ Navigator uses Go's `slog` package for structured logging:
 - **Configuration**: Set via `logging:` section in YAML config:
   - `format`: text or json (defaults to text)
   - `file`: optional file path with `{{app}}` template support
-- **Current Status**: Phases 1-3 complete (basic capture + JSON output + multiple destinations). Phase 4+ available for Vector integration
+  - `vector`: Vector integration configuration (enabled, socket, config)
+- **Vector Integration**: Professional log aggregation with automatic Vector process management
+- **Current Status**: Phases 1-4 complete (basic capture + JSON output + multiple destinations + Vector integration). Phase 5+ available for advanced features
 - **Implementation Plan**: See `docs/logging-implementation-plan.md` for complete phased approach and current capabilities
 
 ## Deployment Considerations

@@ -1,0 +1,136 @@
+# Navigator Multi-Framework Configuration Example
+# This shows how to run multiple applications using different frameworks
+
+# Define custom framework configurations (optional - can use built-ins)
+frameworks:
+  # Custom Python setup using Poetry
+  python-poetry:
+    command: poetry
+    args: [run, python, app.py, --port, "${PORT}"]
+    static_dir: static
+    startup_delay: 3
+    startup_timeout: 20
+    env:
+      PYTHONUNBUFFERED: "1"
+
+# Global defaults for all applications (unless overridden)
+defaults:
+  framework: rails  # Most of our apps are Rails
+  startup_timeout: 30
+  health_check:
+    enabled: true
+    path: /health
+    expected_status: 200
+    initial_delay: 2
+    interval: 1
+    timeout: 30
+
+server:
+  listen: 3000
+  public_dir: /app/public
+
+pools:
+  max_size: 20
+  idle_timeout: 600
+  start_port: 4000
+
+applications:
+  # Application-level defaults (override global defaults)
+  framework: rails  # Default framework for all tenants
+  env:
+    LOG_LEVEL: info
+    RAILS_ENV: production
+  
+  tenants:
+    # Rails application (uses defaults)
+    - name: main-app
+      path: /
+      env:
+        DATABASE_URL: "${MAIN_DB_URL}"
+        SECRET_KEY_BASE: "${MAIN_SECRET}"
+    
+    # Another Rails app with custom command
+    - name: admin
+      path: /admin
+      command: bundle
+      args: [exec, puma, -p, "${PORT}", -C, config/puma.rb]
+      env:
+        DATABASE_URL: "${ADMIN_DB_URL}"
+        SECRET_KEY_BASE: "${ADMIN_SECRET}"
+    
+    # Django application
+    - name: api
+      path: /api
+      framework: django
+      working_dir: /apps/django-api
+      env:
+        DJANGO_SETTINGS_MODULE: api.settings.production
+        DATABASE_URL: "${API_DB_URL}"
+        SECRET_KEY: "${API_SECRET}"
+    
+    # Node.js Express API
+    - name: webhooks
+      path: /webhooks
+      framework: express
+      working_dir: /apps/webhook-service
+      env:
+        NODE_ENV: production
+        WEBHOOK_SECRET: "${WEBHOOK_SECRET}"
+    
+    # FastAPI microservice
+    - name: ml-service
+      path: /ml
+      framework: fastapi
+      working_dir: /apps/ml-service
+      env:
+        MODEL_PATH: /models/latest
+        CUDA_VISIBLE_DEVICES: "0"
+    
+    # Custom Python app with Poetry
+    - name: data-processor
+      path: /process
+      framework: python-poetry
+      working_dir: /apps/data-processor
+      env:
+        REDIS_URL: "${REDIS_URL}"
+        PROCESS_WORKERS: "4"
+    
+    # Go microservice
+    - name: auth-service
+      path: /auth
+      framework: go
+      working_dir: /apps/auth-service
+      command: ./auth-server
+      args: [--port, "${PORT}", --config, /etc/auth/config.yml]
+      health_check:
+        path: /health/ready
+        expected_status: 200
+      env:
+        JWT_SECRET: "${JWT_SECRET}"
+    
+    # Static Next.js app (pre-built)
+    - name: marketing
+      path: /marketing
+      framework: generic
+      command: npx
+      args: [serve, out, -p, "${PORT}"]
+      working_dir: /apps/marketing-site
+      static_dir: out
+      startup_delay: 2
+
+# Managed processes (supporting services)
+managed_processes:
+  - name: redis
+    command: redis-server
+    args: [--port, "6379", --bind, "127.0.0.1"]
+    auto_restart: true
+    
+  - name: sidekiq
+    command: bundle
+    args: [exec, sidekiq, -C, config/sidekiq.yml]
+    working_dir: /app
+    env:
+      RAILS_ENV: production
+      REDIS_URL: redis://localhost:6379
+    auto_restart: true
+    start_delay: 5

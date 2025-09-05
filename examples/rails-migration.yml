@@ -1,0 +1,91 @@
+# Navigator Rails Migration Example
+# Shows how existing Rails configs continue to work and can be enhanced
+
+# BEFORE: Traditional Rails-only configuration
+# This configuration still works exactly as before
+server:
+  listen: 3000
+  public_dir: /app/public
+
+applications:
+  env:
+    RAILS_ENV: production
+    DATABASE_URL: "${DATABASE_URL}"
+  
+  tenants:
+    - name: boston
+      path: /boston
+      env:
+        RAILS_APP_DB: boston_production
+        
+    - name: atlanta
+      path: /atlanta
+      env:
+        RAILS_APP_DB: atlanta_production
+
+---
+# AFTER: Same config with explicit framework (optional)
+# Makes it clear this is a Rails app and allows mixing frameworks
+
+server:
+  listen: 3000
+  public_dir: /app/public
+
+applications:
+  framework: rails  # Explicitly specify Rails (optional, this is the default)
+  env:
+    RAILS_ENV: production
+    DATABASE_URL: "${DATABASE_URL}"
+  
+  tenants:
+    - name: boston
+      path: /boston
+      env:
+        RAILS_APP_DB: boston_production
+        
+    - name: atlanta
+      path: /atlanta
+      env:
+        RAILS_APP_DB: atlanta_production
+    
+    # Now you can easily add a non-Rails service
+    - name: search
+      path: /search
+      framework: node
+      command: node
+      args: [search-server.js]
+      working_dir: /apps/search
+      env:
+        ELASTICSEARCH_URL: http://localhost:9200
+        PORT: "${PORT}"
+
+---
+# ADVANCED: Using custom Rails configurations
+# Override default Rails behavior for specific needs
+
+server:
+  listen: 3000
+
+applications:
+  framework: rails
+  # Override default Rails command to use Puma directly
+  command: bundle
+  args: [exec, puma, -p, "${PORT}", -C, config/puma.rb]
+  
+  tenants:
+    - name: high-performance
+      path: /hp
+      # This tenant uses the Puma command from above
+      env:
+        WEB_CONCURRENCY: "4"
+        RAILS_MAX_THREADS: "5"
+    
+    - name: development
+      path: /dev
+      # Override for this tenant to use standard Rails server
+      command: bin/rails
+      args: [server, -p, "${PORT}"]
+      startup_delay: 10  # Give more time for development mode
+      env:
+        RAILS_ENV: development
+        RAILS_LOG_LEVEL: debug
