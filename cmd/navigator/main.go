@@ -78,6 +78,7 @@ type AuthPattern struct {
 // LogConfig represents logging configuration
 type LogConfig struct {
 	Format string `yaml:"format"` // "text" or "json"
+	File   string `yaml:"file"`   // Optional file output path (supports {{app}} template)
 }
 
 // Config represents the parsed configuration
@@ -368,6 +369,40 @@ func (w *JSONLogWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+// MultiLogWriter writes to multiple outputs simultaneously
+type MultiLogWriter struct {
+	outputs []io.Writer
+}
+
+// Write implements io.Writer interface, writing to all configured outputs
+func (m *MultiLogWriter) Write(p []byte) (n int, err error) {
+	for _, output := range m.outputs {
+		output.Write(p)
+	}
+	return len(p), nil
+}
+
+// createFileWriter creates a file writer with the specified path
+// The path can contain {{app}} which will be replaced with the app name
+func createFileWriter(path string, appName string) (io.Writer, error) {
+	// Replace {{app}} template with actual app name
+	logPath := strings.ReplaceAll(path, "{{app}}", appName)
+	
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(logPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create log directory %s: %w", dir, err)
+	}
+	
+	// Open file for append (create if doesn't exist)
+	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file %s: %w", logPath, err)
+	}
+	
+	return file, nil
+}
+
 // cleanupPidFile checks for and removes stale PID file
 func cleanupPidFile(pidfilePath string) error {
 	if pidfilePath == "" {
@@ -531,13 +566,36 @@ func (pm *ProcessManager) StartProcess(mp *ManagedProcess) error {
 	}
 	cmd.Env = env
 
+	// Set up output destinations
+	outputs := []io.Writer{os.Stdout}
+	
+	// Add file output if configured
+	if pm.config != nil && pm.config.Logging.File != "" {
+		if fileWriter, err := createFileWriter(pm.config.Logging.File, mp.Name); err == nil {
+			outputs = append(outputs, fileWriter)
+			// Note: File will be closed when process exits
+		} else {
+			slog.Warn("Failed to create log file for managed process",
+				"process", mp.Name,
+				"error", err)
+		}
+	}
+	
+	// Create the appropriate output writer
+	var outputWriter io.Writer
+	if len(outputs) > 1 {
+		outputWriter = &MultiLogWriter{outputs: outputs}
+	} else {
+		outputWriter = outputs[0]
+	}
+	
 	// Set up output with source identification
 	if pm.config != nil && pm.config.Logging.Format == "json" {
-		cmd.Stdout = &JSONLogWriter{source: mp.Name, stream: "stdout", output: os.Stdout}
-		cmd.Stderr = &JSONLogWriter{source: mp.Name, stream: "stderr", output: os.Stderr}
+		cmd.Stdout = &JSONLogWriter{source: mp.Name, stream: "stdout", output: outputWriter}
+		cmd.Stderr = &JSONLogWriter{source: mp.Name, stream: "stderr", output: outputWriter}
 	} else {
-		cmd.Stdout = &LogWriter{source: mp.Name, stream: "stdout", output: os.Stdout}
-		cmd.Stderr = &LogWriter{source: mp.Name, stream: "stderr", output: os.Stderr}
+		cmd.Stdout = &LogWriter{source: mp.Name, stream: "stdout", output: outputWriter}
+		cmd.Stderr = &LogWriter{source: mp.Name, stream: "stderr", output: outputWriter}
 	}
 
 	mp.Process = cmd
@@ -1504,13 +1562,36 @@ func (m *AppManager) startApp(app *WebApp) {
 		}
 	}
 	
+	// Set up output destinations
+	outputs := []io.Writer{os.Stdout}
+	
+	// Add file output if configured
+	if m.config.Logging.File != "" {
+		if fileWriter, err := createFileWriter(m.config.Logging.File, appName); err == nil {
+			outputs = append(outputs, fileWriter)
+			// Note: File will be closed when process exits
+		} else {
+			slog.Warn("Failed to create log file for web app",
+				"app", appName,
+				"error", err)
+		}
+	}
+	
+	// Create the appropriate output writer
+	var outputWriter io.Writer
+	if len(outputs) > 1 {
+		outputWriter = &MultiLogWriter{outputs: outputs}
+	} else {
+		outputWriter = outputs[0]
+	}
+	
 	// Set up output with appropriate format
 	if m.config.Logging.Format == "json" {
-		cmd.Stdout = &JSONLogWriter{source: appName, stream: "stdout", tenant: tenant, output: os.Stdout}
-		cmd.Stderr = &JSONLogWriter{source: appName, stream: "stderr", tenant: tenant, output: os.Stderr}
+		cmd.Stdout = &JSONLogWriter{source: appName, stream: "stdout", tenant: tenant, output: outputWriter}
+		cmd.Stderr = &JSONLogWriter{source: appName, stream: "stderr", tenant: tenant, output: outputWriter}
 	} else {
-		cmd.Stdout = &LogWriter{source: appName, stream: "stdout", output: os.Stdout}
-		cmd.Stderr = &LogWriter{source: appName, stream: "stderr", output: os.Stderr}
+		cmd.Stdout = &LogWriter{source: appName, stream: "stdout", output: outputWriter}
+		cmd.Stderr = &LogWriter{source: appName, stream: "stderr", output: outputWriter}
 	}
 
 	app.mutex.Lock()

@@ -357,15 +357,33 @@ Navigator provides comprehensive logging for both its own operations and all man
 - **Text Format** (default): Output prefixed with `[source.stream]` (e.g., `[2025/boston.stdout]`)
 - **JSON Format**: Structured logs with timestamp, source, stream, message, and tenant fields
 
+**Output Destinations**:
+- **Default**: Console output only (stdout) - no configuration required
+- **File output**: Optional file logging with `{{app}}` template variable
+- **Multiple destinations**: Logs written to both console and files simultaneously
+
 Configuration:
 ```yaml
-# Default (text format)
+# Default: text format to console only
 # No configuration needed
 
-# Enable JSON format for all logs
+# JSON format to console
 logging:
-  format: json  # Both Navigator and child process logs use JSON
+  format: json
+
+# Text format to both console and file
+logging:
+  file: /var/log/navigator/{{app}}.log
+
+# JSON format to both console and file  
+logging:
+  format: json
+  file: /var/log/navigator/{{app}}.log
 ```
+
+**Template Variables**:
+- `{{app}}` is replaced with the application or process name
+- Creates separate log files per app: `redis.log`, `2025-boston.log`, etc.
 
 **Note**: Logging format is set at startup. To change the format, restart Navigator with the updated configuration. Configuration reload (SIGHUP) will apply the new format to newly started child processes, but Navigator's own logs will remain in their original format until restart.
 

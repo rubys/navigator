@@ -355,8 +355,12 @@ Navigator uses Go's `slog` package for structured logging:
 - **Output Formats**: 
   - Text mode (default): Prefixed with `[source.stream]` format (e.g., `[2025/boston.stdout]`, `[redis.stderr]`)
   - JSON mode: Structured JSON with timestamp, source, stream, message, and optional tenant fields
-- **Configuration**: Set via `logging: format: json` in YAML config (defaults to text)
-- **Current Status**: Phases 1-2 complete (basic capture + JSON output). Phase 3+ available for multiple destinations and Vector integration
+- **Multiple Destinations**: Logs can be written to console and files simultaneously (Phase 3)
+- **File Output**: Configurable file paths with `{{app}}` template variable support
+- **Configuration**: Set via `logging:` section in YAML config:
+  - `format`: text or json (defaults to text)
+  - `file`: optional file path with `{{app}}` template support
+- **Current Status**: Phases 1-3 complete (basic capture + JSON output + multiple destinations). Phase 4+ available for Vector integration
 - **Implementation Plan**: See `docs/logging-implementation-plan.md` for complete phased approach and current capabilities
 
 ## Deployment Considerations

@@ -8,13 +8,13 @@ This document outlines an incremental approach to add structured logging capabil
 
 - ✅ **Phase 1: Basic Structured Log Capture** - Completed in commit 906cad2
 - ✅ **Phase 2: JSON Output Mode** - Completed in commit 2e2e73a  
-- ⏳ **Phase 3: Multiple Output Destinations** - Not implemented
+- ✅ **Phase 3: Multiple Output Destinations** - Completed
 - ⏳ **Phase 4: Vector Integration** - Not implemented
 - ⏳ **Phase 5: Future Enhancements** - Not implemented
 
-## Current Capabilities (Phases 1-2)
+## Current Capabilities (Phases 1-3)
 
-Navigator now provides comprehensive logging for all processes:
+Navigator now provides comprehensive logging for all processes with multiple output destinations:
 
 ### Text Format (Default)
 ```yaml
@@ -39,11 +39,33 @@ Output example:
 {"time":"2025-09-05T00:03:07.492Z","level":"INFO","msg":"Serving static file","path":"/assets/app.js"}
 ```
 
+### File Output (Phase 3 - NEW)
+```yaml
+logging:
+  format: json  # or text
+  file: /var/log/navigator/{{app}}.log
+```
+- Logs written to both console AND file simultaneously
+- Template support: `{{app}}` replaced with application/process name
+- Automatic directory creation
+- File opened in append mode for persistence across restarts
+
+Output example (file):
+```
+# /var/log/navigator/redis.log
+[redis.stdout] Ready to accept connections
+
+# /var/log/navigator/2025-boston.log  
+[2025/boston.stderr] Error: Connection refused
+```
+
 ### Key Features
 - **Source Identification**: All child process output tagged with application/process name
 - **Stream Separation**: Stdout and stderr clearly identified
 - **Tenant Context**: Multi-tenant applications include tenant information in JSON logs
 - **Consistent Format**: Navigator's own logs and child process logs use same format when JSON is enabled
+- **Multiple Destinations**: Write to console and files simultaneously (Phase 3)
+- **Template Support**: Dynamic file paths using `{{app}}` variable (Phase 3)
 - **Zero Application Changes**: Works with any framework (Rails, Django, Node.js, etc.)
 
 ## Phase 1: Basic Structured Log Capture ✅ COMPLETED
@@ -178,9 +200,11 @@ logging:
 - Backward compatible (text mode is default)
 - Tenant identification in logs
 
-## Phase 3: Multiple Output Destinations
+## Phase 3: Multiple Output Destinations ✅ COMPLETED
 
 **Goal:** Enable writing logs to multiple destinations simultaneously.
+
+**Status:** Completed - logs can now be written to both console and files simultaneously
 
 **Implementation:**
 
