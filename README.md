@@ -345,11 +345,35 @@ mkdocs serve
 - `mkdocs.yml` - Documentation configuration
 
 ### Logging
-Navigator uses Go's `slog` package for structured logging:
+Navigator provides comprehensive logging for both its own operations and all managed processes:
+
+**Navigator Logs** (via Go's `slog`):
 - **Log Level**: Set via `LOG_LEVEL` environment variable (debug, info, warn, error)
 - **Default Level**: Info level if not specified
 - **Debug Output**: Includes detailed request routing, auth checks, and file serving attempts
-- **Structured Format**: Text handler with consistent key-value pairs
+
+**Process Output Capture**:
+- All stdout/stderr from web apps and managed processes is captured with source identification
+- **Text Format** (default): Output prefixed with `[source.stream]` (e.g., `[2025/boston.stdout]`)
+- **JSON Format**: Structured logs with timestamp, source, stream, message, and tenant fields
+
+Configuration:
+```yaml
+# Default (text format)
+# No configuration needed
+
+# Enable JSON format for all logs
+logging:
+  format: json  # Both Navigator and child process logs use JSON
+```
+
+**Note**: Logging format is set at startup. To change the format, restart Navigator with the updated configuration. Configuration reload (SIGHUP) will apply the new format to newly started child processes, but Navigator's own logs will remain in their original format until restart.
+
+Example JSON output:
+```json
+{"@timestamp":"2025-01-04T19:49:46-04:00","source":"redis","stream":"stdout","message":"Ready to accept connections"}
+{"@timestamp":"2025-01-04T19:49:47-04:00","source":"2025/boston","stream":"stderr","message":"Error: Connection refused","tenant":"boston"}
+```
 
 ### Building
 ```bash

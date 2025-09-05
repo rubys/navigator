@@ -352,7 +352,10 @@ Navigator uses Go's `slog` package for structured logging:
 - **Debug Output**: Includes detailed request routing, auth checks, and file serving attempts
 - **Structured Format**: Text handler with consistent key-value pairs
 - **Process Output Capture**: All stdout/stderr from managed processes and web apps is captured with source identification
-- **Log Prefixing**: Output from child processes is prefixed with `[source.stream]` format (e.g., `[2025/boston.stdout]`, `[redis.stderr]`)
+- **Output Formats**: 
+  - Text mode (default): Prefixed with `[source.stream]` format (e.g., `[2025/boston.stdout]`, `[redis.stderr]`)
+  - JSON mode: Structured JSON with timestamp, source, stream, message, and optional tenant fields
+- **Configuration**: Set via `logging: format: json` in YAML config (defaults to text)
 - **Incremental Implementation**: See `docs/logging-implementation-plan.md` for the phased approach to enhanced logging capabilities
 
 ## Deployment Considerations
