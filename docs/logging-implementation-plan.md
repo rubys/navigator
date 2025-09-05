@@ -4,9 +4,53 @@
 
 This document outlines an incremental approach to add structured logging capabilities to Navigator. The implementation is designed to be rolled out in phases, with each phase providing immediate value while maintaining backward compatibility.
 
-## Phase 1: Basic Structured Log Capture (Minimal Change)
+## Implementation Status
+
+- ✅ **Phase 1: Basic Structured Log Capture** - Completed in commit 906cad2
+- ✅ **Phase 2: JSON Output Mode** - Completed in commit 2e2e73a  
+- ⏳ **Phase 3: Multiple Output Destinations** - Not implemented
+- ⏳ **Phase 4: Vector Integration** - Not implemented
+- ⏳ **Phase 5: Future Enhancements** - Not implemented
+
+## Current Capabilities (Phases 1-2)
+
+Navigator now provides comprehensive logging for all processes:
+
+### Text Format (Default)
+```yaml
+# No configuration needed
+```
+Output example:
+```
+[redis.stdout] Ready to accept connections
+[2025/boston.stderr] Error: Connection refused
+time=2025-09-05T00:03:07.492Z level=INFO msg="Serving static file" path=/assets/app.js
+```
+
+### JSON Format
+```yaml
+logging:
+  format: json
+```
+Output example:
+```json
+{"@timestamp":"2025-09-05T00:03:07Z","source":"redis","stream":"stdout","message":"Ready to accept connections"}
+{"@timestamp":"2025-09-05T00:03:07Z","source":"2025/boston","stream":"stderr","message":"Error: Connection refused","tenant":"boston"}
+{"time":"2025-09-05T00:03:07.492Z","level":"INFO","msg":"Serving static file","path":"/assets/app.js"}
+```
+
+### Key Features
+- **Source Identification**: All child process output tagged with application/process name
+- **Stream Separation**: Stdout and stderr clearly identified
+- **Tenant Context**: Multi-tenant applications include tenant information in JSON logs
+- **Consistent Format**: Navigator's own logs and child process logs use same format when JSON is enabled
+- **Zero Application Changes**: Works with any framework (Rails, Django, Node.js, etc.)
+
+## Phase 1: Basic Structured Log Capture ✅ COMPLETED
 
 **Goal:** Capture and tag output from child processes with metadata.
+
+**Status:** Completed in commit 906cad2
 
 **Implementation:**
 
@@ -50,11 +94,23 @@ cmd.Stderr = &LogWriter{source: appName, stream: "stderr", output: os.Stderr}
 - Maintains backward compatibility
 - No configuration required
 
-## Phase 2: JSON Output Mode
+## Phase 2: JSON Output Mode ✅ COMPLETED
 
 **Goal:** Add structured JSON output as a configuration option.
 
-**Implementation:**
+**Status:** Completed in commit 2e2e73a
+
+**Key Changes Made:**
+- Added `LogConfig` struct with `format` field
+- Created `JSONLogWriter` and `LogEntry` for structured output
+- Updated YAML parser to support `logging:` configuration section
+- Navigator's slog switches to JSON format after config load
+- Both managed processes and web apps use appropriate format based on config
+- Added tenant extraction from environment variables
+
+**Key Learning:** Logging format is set at startup for Navigator's own logs. Changing the format requires a restart, not just config reload, because the HTTP server and other components continue using their initial logger format.
+
+**Original Implementation Plan:**
 
 ```go
 type LogEntry struct {

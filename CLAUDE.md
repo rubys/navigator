@@ -23,7 +23,7 @@ Navigator is a Go-based web server for multi-tenant web applications. It provide
 ✅ **WebSocket Support**: Full WebSocket connection support with standalone servers
 ✅ **High Reliability**: Automatic retry with exponential backoff for proxy failures
 ✅ **Simple Configuration**: Flexible variable substitution system for multi-tenant apps
-✅ **Structured Logging**: Source-identified output from all managed processes and web apps
+✅ **Structured Logging**: Source-identified output with configurable JSON format for all processes
 ✅ **Comprehensive Documentation**: Complete documentation site at https://rubys.github.io/navigator/
 
 ## Architecture
@@ -356,7 +356,8 @@ Navigator uses Go's `slog` package for structured logging:
   - Text mode (default): Prefixed with `[source.stream]` format (e.g., `[2025/boston.stdout]`, `[redis.stderr]`)
   - JSON mode: Structured JSON with timestamp, source, stream, message, and optional tenant fields
 - **Configuration**: Set via `logging: format: json` in YAML config (defaults to text)
-- **Incremental Implementation**: See `docs/logging-implementation-plan.md` for the phased approach to enhanced logging capabilities
+- **Current Status**: Phases 1-2 complete (basic capture + JSON output). Phase 3+ available for multiple destinations and Vector integration
+- **Implementation Plan**: See `docs/logging-implementation-plan.md` for complete phased approach and current capabilities
 
 ## Deployment Considerations
 
