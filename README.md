@@ -99,10 +99,8 @@ applications:
     timeout: 5m        # App process idle timeout (duration format)
     start_port: 4000
   framework:
-    runtime_executable: ruby
-    server_executable: bin/rails
-    server_command: server
-    server_args: ["-p", "${port}"]
+    command: ruby                               # Command to execute
+    args: ["bin/rails", "server", "-p", "${port}"]  # Arguments array
     app_directory: /rails
     port_env_var: PORT
     startup_delay: 5
