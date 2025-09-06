@@ -155,7 +155,6 @@ static:
   try_files:
     enabled: true
     suffixes: ["index.html", ".html", ".htm", ".txt", ".xml", ".json"]
-    fallback: rails
 
 managed_processes:
   - name: redis

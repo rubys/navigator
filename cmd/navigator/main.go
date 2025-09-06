@@ -264,7 +264,6 @@ type YAMLConfig struct {
 		TryFiles   struct {
 			Enabled  bool     `yaml:"enabled"`
 			Suffixes []string `yaml:"suffixes"`
-			Fallback string   `yaml:"fallback"`
 		} `yaml:"try_files"`
 	} `yaml:"static"`
 
