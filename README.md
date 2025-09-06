@@ -13,7 +13,7 @@ Navigator uses YAML configuration format for:
 - **Authentication**: Full htpasswd support (APR1, bcrypt, SHA, etc.) with pattern-based exclusions
 - **URL rewriting**: Rewrite rules with redirect, last, and fly-replay flags for region-specific routing
 - **Reverse proxy**: Forwards dynamic requests to web applications with method-based exclusions and custom headers
-- **Machine suspension**: Auto-suspend Fly.io machines after idle timeout with automatic wake on requests
+- **Machine idle management**: Auto-suspend or stop Fly.io machines after idle timeout with automatic wake on requests
 - **Configuration reload**: Live configuration reload with SIGHUP signal (no restart needed)
 - **WebSocket support**: Full support for WebSocket connections and standalone servers
 - **Intelligent routing**: Smart Fly-Replay with automatic fallback to reverse proxy for large requests
@@ -79,11 +79,9 @@ server:
   hostname: localhost
   root_path: /showcase
   public_dir: /path/to/public
-
-pools:
-  max_size: 22
-  idle_timeout: 300
-  start_port: 4000
+  idle:  # Machine idle management (Fly.io)
+    action: suspend    # "suspend" or "stop"
+    timeout: 20m       # Duration format: "30s", "5m", "1h30m"
 
 auth:
   enabled: true
@@ -95,18 +93,11 @@ auth:
     - "*.css"
     - "*.js"
 
-static:
-  directories:
-    - path: /showcase/assets/
-      root: assets/
-      cache: 86400
-  extensions: [html, htm, css, js, png, jpg, gif]
-  try_files:
-    enabled: true
-    suffixes: ["index.html", ".html", ".htm", ".txt", ".xml", ".json"]
-    fallback: rails
-
 applications:
+  pools:
+    max_size: 22
+    timeout: 5m        # App process idle timeout (duration format)
+    start_port: 4000
   framework:
     runtime_executable: ruby
     server_executable: bin/rails
@@ -155,6 +146,17 @@ applications:
     - path: /external/
       standalone_server: "localhost:28080"  # Proxy to standalone server instead of app
 
+static:
+  directories:
+    - path: /showcase/assets/
+      root: assets/
+      cache: 86400
+  extensions: [html, htm, css, js, png, jpg, gif]
+  try_files:
+    enabled: true
+    suffixes: ["index.html", ".html", ".htm", ".txt", ".xml", ".json"]
+    fallback: rails
+
 managed_processes:
   - name: redis
     command: redis-server
@@ -193,11 +195,6 @@ hooks:
       - command: echo
         args: ["Tenant stopping"]
 
-# Machine suspension (Fly.io specific)
-suspend:
-  enabled: false
-  idle_timeout: 600  # Seconds of inactivity before suspending machine
-
 # Routing enhancements
 routes:
   # Fly-replay support for multi-target routing
@@ -234,11 +231,12 @@ maintenance:
 
 ## Key Features
 
-### Machine Suspension Support
-- **Fly.io Integration**: Auto-suspend machines after configurable idle timeout
+### Machine Idle Management
+- **Fly.io Integration**: Auto-suspend or stop machines after configurable idle timeout
+- **Flexible Actions**: Choose between "suspend" (faster wake) or "stop" (releases resources)
 - **Request Tracking**: Monitors active requests to determine idle state
 - **Automatic Wake**: Machines wake automatically on incoming requests
-- **Configurable Timeout**: Set idle timeout duration in YAML configuration
+- **Duration Format**: Set timeout using flexible duration strings (e.g., "20m", "1h30m")
 
 ### Configuration Reload
 - **Live Reload**: Reload configuration without restart using SIGHUP signal
@@ -296,7 +294,7 @@ Common use cases:
 ### Process Management
 - **On-demand startup**: Rails apps start when first requested
 - **Idle timeout**: Apps automatically shut down after 5 minutes of inactivity (configurable)
-- **Dynamic port allocation**: Finds available ports in range 4000-4099 instead of sequential assignment
+- **Dynamic port allocation**: Automatically finds available ports in range 4000-4099
 - **PID file management**: Automatic cleanup of stale PID files before starting and after stopping apps
 - **Graceful shutdown**: Handles SIGINT/SIGTERM signals to cleanly stop all Rails apps and managed processes
 - **Environment inheritance**: Rails apps inherit parent process environment variables

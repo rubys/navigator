@@ -18,7 +18,7 @@ Navigator is a Go-based web server for multi-tenant web applications. It provide
 ✅ **Static File Serving**: Direct filesystem serving with try_files behavior
 ✅ **Authentication**: htpasswd support with multiple hash formats
 ✅ **Configuration Reload**: Live reload via SIGHUP signal without restart
-✅ **Machine Suspension**: Fly.io machine auto-suspend after idle timeout
+✅ **Machine Idle Management**: Fly.io machine auto-suspend/stop after idle timeout
 ✅ **Intelligent Fly-Replay**: Smart routing with automatic fallback for large requests
 ✅ **WebSocket Support**: Full WebSocket connection support with standalone servers
 ✅ **High Reliability**: Automatic retry with exponential backoff for proxy failures
@@ -67,9 +67,9 @@ The entire Navigator implementation is contained in `cmd/navigator/main.go`. Thi
    - **Content Types**: Automatic MIME type detection
    - **Caching**: Configurable cache headers
 
-5. **Suspend Manager** (`NewSuspendManager`)
+5. **Idle Manager** (`NewIdleManager`)
    - **Idle Detection**: Monitors request activity
-   - **Auto-Suspend**: Suspends Fly.io machines after idle timeout
+   - **Auto-Suspend/Stop**: Suspends or stops Fly.io machines after idle timeout
    - **Auto-Wake**: Machines wake automatically on incoming requests
 
 6. **Lifecycle Hooks** (`executeHooks`, `executeServerHooks`, `executeTenantHooks`)
@@ -107,6 +107,27 @@ kill -HUP $(cat /tmp/navigator.pid)
 3. **Framework configuration**: Runtime executable and server settings applied
 4. **Environment variables**: Flexible variable substitution for each tenant
 5. **Process startup**: Web apps and managed processes started as needed
+
+### Configuration Structure
+
+```yaml
+server:
+  listen: 3000
+  hostname: localhost
+  public_dir: public
+  idle:
+    action: suspend    # "suspend" or "stop" for Fly.io machines
+    timeout: 20m       # Duration format: "30s", "5m", "1h30m"
+
+applications:
+  pools:
+    max_size: 10
+    timeout: 5m        # App process idle timeout (duration format)
+    start_port: 4000
+  tenants:
+    - name: tenant1
+      root: /path/to/app
+```
 
 ## Development Commands
 
@@ -181,12 +202,13 @@ Features:
 - **Content-Type detection**: Automatic MIME type setting
 - **Public routes**: Serves studios, regions, docs without authentication
 
-### 4. Machine Suspension (Fly.io)
+### 4. Machine Idle Management (Fly.io)
 
-- **Idle timeout**: Configurable inactivity period before suspension
+- **Idle actions**: Supports both "suspend" and "stop" actions
+- **Idle timeout**: Configurable inactivity period using duration format (e.g., "20m", "1h30m")
 - **Request tracking**: Monitors active requests
 - **Automatic wake**: Machines resume on incoming requests
-- **Zero-downtime**: Seamless suspend/resume cycles
+- **Zero-downtime**: Seamless suspend/resume or stop/start cycles
 
 ### 5. Intelligent Region Routing (Fly-Replay)
 
