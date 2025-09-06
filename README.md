@@ -18,6 +18,7 @@ Navigator uses YAML configuration format for:
 - **WebSocket support**: Full support for WebSocket connections and standalone servers
 - **Intelligent routing**: Smart Fly-Replay with automatic fallback to reverse proxy for large requests
 - **High reliability**: Automatic retry with exponential backoff for proxy failures
+- **Lifecycle hooks**: Server and tenant hooks for custom integration at key lifecycle events
 
 ## Installation
 
@@ -133,6 +134,12 @@ applications:
         scope: "2025/boston"
       env:
         SHOWCASE_LOGO: "boston-logo.png"
+      # Tenant-specific hooks (optional)
+      hooks:
+        start:
+          - command: /usr/local/bin/cache-warm.sh
+            args: ["2025-boston"]
+            timeout: 10
     
     # Special tenants that don't use variable substitution
     - path: /cable
@@ -166,6 +173,25 @@ managed_processes:
       RAILS_ENV: production
     auto_restart: true
     start_delay: 2
+
+# Lifecycle hooks
+hooks:
+  server:
+    start:  # Before accepting requests
+      - command: /usr/local/bin/prepare-server.sh
+        timeout: 30
+    ready:  # After server is listening
+      - command: curl
+        args: ["-X", "POST", "http://monitoring.example.com/ready"]
+    idle:   # Before machine suspension (Fly.io)
+      - command: /usr/local/bin/cleanup.sh
+  tenant:   # Default hooks for all tenants
+    start:
+      - command: echo
+        args: ["Tenant started"]
+    stop:
+      - command: echo
+        args: ["Tenant stopping"]
 
 # Machine suspension (Fly.io specific)
 suspend:
@@ -281,6 +307,13 @@ Common use cases:
 - **Pattern-based exclusions**: Simple glob patterns and regex patterns for public paths
 - **Basic Auth**: Standard HTTP Basic Authentication
 - **Public paths**: Configure paths that bypass authentication entirely
+
+### Lifecycle Hooks
+- **Server hooks**: Execute commands at Navigator lifecycle events (start, ready, idle)
+- **Tenant hooks**: Execute commands when tenants start or stop
+- **Environment propagation**: Tenant hooks receive the same environment variables as the tenant app
+- **Default and specific**: Default hooks apply to all tenants, with per-tenant overrides
+- **Use cases**: Database migrations, cache warming, monitoring, cleanup tasks
 
 ## Testing
 

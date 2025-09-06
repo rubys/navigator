@@ -24,6 +24,7 @@ Navigator is a Go-based web server for multi-tenant web applications. It provide
 ✅ **High Reliability**: Automatic retry with exponential backoff for proxy failures
 ✅ **Simple Configuration**: Flexible variable substitution system for multi-tenant apps
 ✅ **Structured Logging**: Source-identified output with configurable JSON format for all processes
+✅ **Lifecycle Hooks**: Server and tenant hooks for custom integration and automation
 ✅ **Comprehensive Documentation**: Complete documentation site at https://rubys.github.io/navigator/
 
 ## Architecture
@@ -70,6 +71,12 @@ The entire Navigator implementation is contained in `cmd/navigator/main.go`. Thi
    - **Idle Detection**: Monitors request activity
    - **Auto-Suspend**: Suspends Fly.io machines after idle timeout
    - **Auto-Wake**: Machines wake automatically on incoming requests
+
+6. **Lifecycle Hooks** (`executeHooks`, `executeServerHooks`, `executeTenantHooks`)
+   - **Server Hooks**: Execute at Navigator lifecycle events (start, ready, idle)
+   - **Tenant Hooks**: Execute at tenant lifecycle events (start, stop)
+   - **Environment Propagation**: Tenant hooks receive full tenant environment
+   - **Sequential Execution**: Hooks run in order with configurable timeouts
 
 ## Configuration
 
@@ -196,7 +203,43 @@ Features:
 - **Deployment stamps**: Support for distributed deployment patterns
 - **Automatic Fallback**: Constructs internal URLs for direct proxy when needed
 
-### 6. Configuration Template System
+### 6. Lifecycle Hooks
+
+Navigator supports hooks for custom integration at key lifecycle events:
+
+**Server Hooks**:
+- **start**: Executes before Navigator starts accepting requests
+- **ready**: Executes after Navigator is ready and listening
+- **idle**: Executes before machine suspension (Fly.io)
+
+**Tenant Hooks**:
+- **start**: Executes after a tenant web app starts
+- **stop**: Executes before a tenant web app stops
+- **Environment**: Tenant hooks receive the same environment variables as the tenant app
+
+Configuration example:
+```yaml
+hooks:
+  server:
+    start:
+      - command: /usr/local/bin/prepare-server.sh
+        timeout: 30
+    ready:
+      - command: curl
+        args: ["-X", "POST", "http://monitoring.example.com/ready"]
+  tenant:  # Default hooks for all tenants
+    start:
+      - command: /usr/local/bin/notify-tenant-start.sh
+
+applications:
+  tenants:
+    - name: "2025/boston"
+      hooks:  # Tenant-specific hooks
+        start:
+          - command: /usr/local/bin/boston-setup.sh
+```
+
+### 7. Configuration Template System
 
 YAML supports flexible variable substitution for tenant configuration:
 

@@ -1,0 +1,134 @@
+# Navigator configuration with hooks example
+
+server:
+  listen: 3000
+  hostname: localhost
+
+pools:
+  max_size: 5
+  idle_timeout: 300  # 5 minutes
+  start_port: 4000
+
+auth:
+  enabled: false
+
+# Hooks configuration
+hooks:
+  # Server lifecycle hooks
+  server:
+    # Executed before Navigator starts accepting requests
+    start:
+      - command: echo
+        args: ["Navigator is starting up"]
+      - command: /usr/local/bin/prepare-server.sh
+        timeout: 30  # 30 second timeout
+    
+    # Executed after Navigator is ready to accept requests
+    ready:
+      - command: echo
+        args: ["Navigator is ready and accepting requests"]
+      - command: curl
+        args: ["-X", "POST", "http://monitoring.example.com/server-ready"]
+        timeout: 5
+    
+    # Executed before machine suspension (Fly.io)
+    idle:
+      - command: echo
+        args: ["Machine is about to suspend"]
+      - command: /usr/local/bin/cleanup-before-suspend.sh
+        timeout: 10
+  
+  # Default tenant hooks that apply to all tenants
+  tenant:
+    # Executed after a tenant app starts
+    start:
+      - command: echo
+        args: ["Tenant app started"]
+      - command: /usr/local/bin/notify-tenant-start.sh
+        timeout: 5
+    
+    # Executed before a tenant app stops
+    stop:
+      - command: echo
+        args: ["Tenant app stopping"]
+      - command: /usr/local/bin/notify-tenant-stop.sh
+        timeout: 5
+
+# Application configuration
+applications:
+  framework:
+    type: rails
+    runtime: /usr/bin/ruby
+    server_command: rails
+    server_args: ["server", "-b", "0.0.0.0"]
+    port_env_var: PORT
+    app_directory: /app
+    startup_delay: 5
+  
+  env:
+    RAILS_ENV: production
+    RAILS_LOG_TO_STDOUT: "true"
+  
+  tenants:
+    - name: "2025/boston"
+      var:
+        database: "2025_boston"
+        owner: "Boston Dance Studio"
+      # Tenant-specific hooks (in addition to default hooks)
+      hooks:
+        start:
+          - command: echo
+            args: ["Boston tenant starting with special configuration"]
+          - command: /usr/local/bin/boston-specific-setup.sh
+            timeout: 10
+        stop:
+          - command: /usr/local/bin/boston-specific-cleanup.sh
+            timeout: 10
+    
+    - name: "2025/raleigh"
+      var:
+        database: "2025_raleigh"
+        owner: "Raleigh Dance Academy"
+      # Tenant-specific hooks
+      hooks:
+        start:
+          - command: echo
+            args: ["Raleigh tenant starting"]
+        # No stop hooks for Raleigh, will use only default tenant hooks
+
+# Notes about hooks:
+# 
+# 1. Server hooks run at specific points in Navigator's lifecycle:
+#    - start: Before Navigator begins accepting HTTP requests
+#    - ready: After Navigator is listening and ready for requests
+#    - idle: Before machine suspension (Fly.io specific)
+#
+# 2. Tenant hooks run with the same environment variables as the tenant app:
+#    - start: After the tenant web app process has started
+#    - stop: Before the tenant web app process is terminated
+#
+# 3. Hook execution:
+#    - Hooks run sequentially in the order defined
+#    - If a hook fails, an error is logged but processing continues
+#    - Timeouts are optional (in seconds), default is no timeout
+#
+# 4. Environment variables:
+#    - Server hooks inherit Navigator's environment
+#    - Tenant hooks receive the tenant's full environment including:
+#      - Global environment variables
+#      - Tenant-specific variables
+#      - PORT variable
+#      - Any variables from the tenant configuration
+#
+# 5. Default vs specific tenant hooks:
+#    - Default tenant hooks (under 'hooks.tenant:') apply to ALL tenants
+#    - Tenant-specific hooks (in tenant definition under 'applications.tenants[].hooks:')
+#    - Both default and specific hooks run (default first, then specific)
+#
+# 6. Use cases:
+#    - Monitoring and alerting when apps start/stop
+#    - Database migrations or setup before app starts
+#    - Cache warming after app starts
+#    - Cleanup tasks before suspension
+#    - Integration with external systems
+#    - Custom logging or metrics collection
