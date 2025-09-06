@@ -103,7 +103,7 @@ applications:
     args: ["bin/rails", "server", "-p", "${port}"]  # Arguments array
     app_directory: /rails
     port_env_var: PORT
-    startup_delay: 5
+    start_delay: 5s                            # Duration format
   
   # Environment variables with template substitution  
   env:
@@ -148,7 +148,7 @@ static:
   directories:
     - path: /showcase/assets/
       root: assets/
-      cache: 86400
+      cache: 24h                              # Duration format (86400 seconds = 24h)
   extensions: [html, htm, css, js, png, jpg, gif]
   try_files:
     enabled: true
@@ -162,7 +162,7 @@ managed_processes:
     env:
       REDIS_PORT: "6379"
     auto_restart: true
-    start_delay: 0
+    start_delay: 0s                           # Duration format (no delay)
     
   - name: sidekiq
     command: bundle
@@ -178,7 +178,7 @@ hooks:
   server:
     start:  # Before accepting requests
       - command: /usr/local/bin/prepare-server.sh
-        timeout: 30
+        timeout: 30s                          # Duration format
     ready:  # After server is listening
       - command: curl
         args: ["-X", "POST", "http://monitoring.example.com/ready"]
