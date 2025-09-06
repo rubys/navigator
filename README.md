@@ -74,15 +74,17 @@ The navigator will:
 Create a YAML configuration file with your application settings:
 
 ```yaml
+# Server configuration
 server:
   listen: 3000
   hostname: localhost
   root_path: /showcase
   public_dir: /path/to/public
-  idle:  # Machine idle management (Fly.io)
-    action: suspend    # "suspend" or "stop"
+  idle:
+    action: suspend    # "suspend", "stop", or omit
     timeout: 20m       # Duration format: "30s", "5m", "1h30m"
 
+# Authentication & security
 auth:
   enabled: true
   realm: Showcase
@@ -93,17 +95,30 @@ auth:
     - "*.css"
     - "*.js"
 
+# Static file serving
+static:
+  directories:
+    - path: /showcase/assets/
+      root: assets/
+      cache: 24h        # Duration format: "24h", "1h"
+  extensions: [html, htm, css, js, png, jpg, gif, svg]
+  try_files:
+    enabled: true
+    suffixes: [index.html, .html, .htm, .txt, .xml, .json]
+
+# Application management
 applications:
-  pools:
-    max_size: 22
-    timeout: 5m        # App process idle timeout (duration format)
-    start_port: 4000
   framework:
     command: ruby                               # Command to execute
-    args: ["bin/rails", "server", "-p", "${port}"]  # Arguments array
+    args: [bin/rails, server, -p, "${port}"]  # Arguments array
     app_directory: /rails
     port_env_var: PORT
-    start_delay: 5s                            # Duration format
+    start_delay: 5s                           # Duration format
+  
+  pools:
+    max_size: 22
+    timeout: 5m        # Duration format - app process idle timeout
+    start_port: 4000
   
   # Environment variables with template substitution  
   env:
@@ -128,7 +143,7 @@ applications:
         start:
           - command: /usr/local/bin/cache-warm.sh
             args: ["2025-boston"]
-            timeout: 10
+            timeout: 10s
     
     # Special tenants that don't use variable substitution
     - path: /cable
@@ -144,16 +159,7 @@ applications:
     - path: /external/
       standalone_server: "localhost:28080"  # Proxy to standalone server instead of app
 
-static:
-  directories:
-    - path: /showcase/assets/
-      root: assets/
-      cache: 24h                              # Duration format (86400 seconds = 24h)
-  extensions: [html, htm, css, js, png, jpg, gif]
-  try_files:
-    enabled: true
-    suffixes: ["index.html", ".html", ".htm", ".txt", ".xml", ".json"]
-
+# External process management
 managed_processes:
   - name: redis
     command: redis-server
@@ -162,7 +168,7 @@ managed_processes:
     env:
       REDIS_PORT: "6379"
     auto_restart: true
-    start_delay: 0s                           # Duration format (no delay)
+    start_delay: 2s     # Duration format
     
   - name: sidekiq
     command: bundle
@@ -171,28 +177,9 @@ managed_processes:
     env:
       RAILS_ENV: production
     auto_restart: true
-    start_delay: 2
+    start_delay: 2s
 
-# Lifecycle hooks
-hooks:
-  server:
-    start:  # Before accepting requests
-      - command: /usr/local/bin/prepare-server.sh
-        timeout: 30s                          # Duration format
-    ready:  # After server is listening
-      - command: curl
-        args: ["-X", "POST", "http://monitoring.example.com/ready"]
-    idle:   # Before machine suspension (Fly.io)
-      - command: /usr/local/bin/cleanup.sh
-  tenant:   # Default hooks for all tenants
-    start:
-      - command: echo
-        args: ["Tenant started"]
-    stop:
-      - command: echo
-        args: ["Tenant stopping"]
-
-# Routing enhancements
+# Request routing
 routes:
   # Fly-replay support for multi-target routing
   fly_replay:
@@ -221,9 +208,42 @@ routes:
         X-API-Key: "secret"
       exclude_methods: [POST, DELETE]  # Don't proxy these methods
 
-# Maintenance page configuration (optional)
+# Lifecycle hooks
+hooks:
+  server:
+    start:    # Before accepting requests
+      - command: /usr/local/bin/prepare-server.sh
+        timeout: 30s    # Duration format
+    ready:    # After server is listening
+      - command: curl
+        args: [-X, POST, "http://monitoring.example.com/ready"]
+        timeout: 10s
+    idle:     # Before machine suspension (Fly.io)
+      - command: /usr/local/bin/cleanup.sh
+        timeout: 15s
+  
+  tenant:     # Default hooks for all tenants
+    start:
+      - command: echo
+        args: ["Tenant started"]
+        timeout: 5s
+    stop:
+      - command: echo
+        args: ["Tenant stopping"]
+        timeout: 5s
+
+# Logging configuration
+logging:
+  format: json        # "text" or "json"
+  file: /var/log/navigator/{{app}}.log
+  vector:
+    enabled: true
+    socket: /tmp/navigator-vector.sock
+    config: /etc/vector/vector.toml
+
+# Optional maintenance page
 maintenance:
-  page: "/503.html"  # Path to custom maintenance page served during retry failures
+  page: /503.html     # Path to custom maintenance page served during retry failures
 ```
 
 ## Key Features
