@@ -229,7 +229,7 @@ routes:
 
 # Maintenance page configuration (optional)
 maintenance:
-  page: "/503.html"  # Path to custom maintenance page (currently unused)
+  page: "/503.html"  # Path to custom maintenance page served during retry failures
 ```
 
 ## Key Features
