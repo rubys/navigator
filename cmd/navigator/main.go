@@ -275,11 +275,6 @@ type YAMLConfig struct {
 			From string `yaml:"from"`
 			To   string `yaml:"to"`
 		} `yaml:"rewrites"`
-		Proxies []struct {
-			Path    string            `yaml:"path"`
-			Target  string            `yaml:"target"`
-			Headers map[string]string `yaml:"headers"`
-		} `yaml:"proxies"`
 		FlyReplay []struct {
 			Path    string   `yaml:"path"`
 			Region  string   `yaml:"region"`
@@ -1472,15 +1467,6 @@ func ParseYAML(content []byte) (*Config, error) {
 				Replacement: rewrite.To,
 				Flag:        "last",
 			})
-		}
-	}
-
-	// Convert proxy routes
-	for _, proxy := range yamlConfig.Routes.Proxies {
-		config.ProxyRoutes[proxy.Path] = &ProxyRoute{
-			Pattern:    proxy.Path,
-			ProxyPass:  proxy.Target,
-			SetHeaders: proxy.Headers,
 		}
 	}
 
