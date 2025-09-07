@@ -19,6 +19,7 @@ Navigator uses YAML configuration format for:
 - **Intelligent routing**: Smart Fly-Replay with automatic fallback to reverse proxy for large requests
 - **High reliability**: Automatic retry with exponential backoff for proxy failures
 - **Lifecycle hooks**: Server and tenant hooks for custom integration at key lifecycle events
+- **Sticky sessions**: Machine-based session affinity for Fly.io deployments with cross-region support
 
 ## Installation
 
@@ -179,6 +180,19 @@ managed_processes:
     auto_restart: true
     start_delay: 2s
 
+# Sticky sessions configuration (Fly.io only)
+sticky_sessions:
+  enabled: true
+  cookie_name: "_navigator_machine"
+  cookie_max_age: "1h"               # Duration format: "30m", "1h", "24h"
+  cookie_path: "/"
+  cookie_secure: true                # Use HTTPS only
+  cookie_httponly: true              # Prevent JavaScript access
+  cookie_samesite: "lax"             # CSRF protection
+  paths:                             # Optional: specific paths only
+    - "/app/*"
+    - "/dashboard/*"
+
 # Request routing
 routes:
   # Fly-replay support for multi-target routing
@@ -278,6 +292,15 @@ maintenance:
 - **Custom Headers**: Add headers to proxied requests
 - **Multiple Targets**: Support for multiple proxy configurations
 - **High Reliability**: Graceful handling of backend failures with automatic recovery
+
+### Sticky Sessions (Fly.io)
+- **Machine Affinity**: Routes requests from the same client to the same Fly.io machine
+- **Cross-Region Support**: Works across all Fly.io regions globally
+- **Cookie-Based**: Uses secure HTTP cookies to maintain session affinity
+- **Automatic Failover**: Serves maintenance page when target machine is unavailable
+- **Large Request Support**: Falls back to reverse proxy for requests >1MB
+- **Path-Specific**: Optional configuration to apply sticky sessions only to specific paths
+- **Configurable Duration**: Session duration using Go's duration format (e.g., "1h", "30m")
 
 ### Standalone Server Support
 - **External Services**: Proxy to standalone servers (e.g., Action Cable)

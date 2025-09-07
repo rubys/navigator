@@ -26,6 +26,7 @@ Navigator is a Go-based web server for multi-tenant web applications. It provide
 ✅ **Structured Logging**: Source-identified output with configurable JSON format for all processes
 ✅ **Lifecycle Hooks**: Server and tenant hooks for custom integration and automation
 ✅ **Comprehensive Documentation**: Complete documentation site at https://rubys.github.io/navigator/
+✅ **Sticky Sessions**: Machine-based session affinity for Fly.io with cross-region support
 
 ## Architecture
 
@@ -51,7 +52,8 @@ The entire Navigator implementation is contained in `cmd/navigator/main.go`. Thi
    - **PID File Handling**: Automatic cleanup of stale processes
    - **Graceful Shutdown**: Clean termination of all processes
 
-3. **HTTP Handler** (`CreateHandler`)
+3. **HTTP Handler** (`CreateHandler`, `handleStickySession`)
+   - **Sticky Sessions**: Cookie-based machine affinity for Fly.io deployments
    - **Rewrite Rules**: URL rewriting with redirect, last, and fly-replay flags
    - **Authentication**: Pattern-based auth exclusions with htpasswd
    - **Static Files**: Direct filesystem serving with caching
@@ -225,7 +227,32 @@ Features:
 - **Deployment stamps**: Support for distributed deployment patterns
 - **Automatic Fallback**: Constructs internal URLs for direct proxy when needed
 
-### 6. Lifecycle Hooks
+### 6. Sticky Sessions (Fly.io)
+
+Navigator provides machine-based session affinity for Fly.io deployments:
+
+- **Cookie-Based Affinity**: Uses HTTP cookies to maintain session state
+- **Cross-Region Support**: Works across all Fly.io regions globally
+- **Automatic Failover**: Serves maintenance page when target machine unavailable
+- **Large Request Handling**: Falls back to reverse proxy for requests >1MB
+- **Path-Specific Sessions**: Optional configuration for specific URL paths
+- **Configurable Duration**: Session lifetime using Go duration format (e.g., "1h", "30m")
+- **Security Options**: Full cookie security with HTTPOnly, Secure, and SameSite flags
+
+Configuration example:
+```yaml
+sticky_sessions:
+  enabled: true
+  cookie_name: "_navigator_machine"
+  cookie_max_age: "2h"
+  cookie_secure: true
+  cookie_httponly: true
+  paths:
+    - "/app/*"
+    - "/dashboard/*"
+```
+
+### 7. Lifecycle Hooks
 
 Navigator supports hooks for custom integration at key lifecycle events:
 
@@ -261,7 +288,7 @@ applications:
           - command: /usr/local/bin/boston-setup.sh
 ```
 
-### 7. Configuration Template System
+### 8. Configuration Template System
 
 YAML supports flexible variable substitution for tenant configuration:
 
