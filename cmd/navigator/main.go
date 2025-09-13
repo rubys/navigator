@@ -417,24 +417,20 @@ func (w *JSONLogWriter) Write(p []byte) (n int, err error) {
 		}
 
 		// Check if the line is already valid JSON from the Rails app
-		// Rails JSON logs should have @timestamp, severity, message, source, tenant fields
-		var existingEntry map[string]interface{}
-		if err := json.Unmarshal(line, &existingEntry); err == nil {
-			// It's valid JSON - check if it looks like our Rails JSON format
-			if _, hasTimestamp := existingEntry["@timestamp"]; hasTimestamp {
-				if _, hasSeverity := existingEntry["severity"]; hasSeverity {
-					// This looks like Rails JSON output - pass it through directly
-					// Just ensure it has proper newline
-					w.output.Write(line)
-					w.output.Write([]byte("\n"))
-					continue
-				}
+		// Rails JSON logs should have @timestamp and severity fields
+		if json.Valid(line) {
+			// Check if it contains Rails JSON log markers
+			if bytes.Contains(line, []byte(`"@timestamp"`)) && bytes.Contains(line, []byte(`"severity"`)) {
+				// This looks like Rails JSON output - pass it through directly
+				w.output.Write(line)
+				w.output.Write([]byte("\n"))
+				continue
 			}
 		}
 
 		// Not JSON or not Rails JSON format - wrap it in our JSON structure
 		entry := LogEntry{
-			Timestamp: time.Now().Format(time.RFC3339),
+			Timestamp: time.Now().Format("2006-01-02T15:04:05.000Z07:00"),
 			Source:    w.source,
 			Stream:    w.stream,
 			Message:   string(line),
@@ -557,7 +553,7 @@ func logTenantRequest(r *http.Request, recorder *responseRecorder, tenantName st
 	}
 
 	entry := AccessLogEntry{
-		Timestamp:     time.Now().Format(time.RFC3339),
+		Timestamp:     time.Now().Format("2006-01-02T15:04:05.000Z07:00"),
 		ClientIP:      clientIP,
 		RemoteUser:    remoteUser,
 		Method:        r.Method,
