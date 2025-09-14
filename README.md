@@ -349,10 +349,11 @@ Common use cases:
 - **Public paths**: Configure paths that bypass authentication entirely
 
 ### Lifecycle Hooks
-- **Server hooks**: Execute commands at Navigator lifecycle events (start, ready, idle)
+- **Server hooks**: Execute commands at Navigator lifecycle events (start, ready, resume, idle)
 - **Tenant hooks**: Execute commands when tenants start or stop
 - **Environment propagation**: Tenant hooks receive the same environment variables as the tenant app
 - **Default and specific**: Default hooks apply to all tenants, with per-tenant overrides
+- **Resume hooks**: Run exactly once on first request after machine suspension, with all concurrent requests waiting for completion
 - **Use cases**: Database migrations, cache warming, monitoring, cleanup tasks
 
 ## Testing

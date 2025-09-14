@@ -259,6 +259,7 @@ Navigator supports hooks for custom integration at key lifecycle events:
 **Server Hooks**:
 - **start**: Executes before Navigator starts accepting requests
 - **ready**: Executes after Navigator is ready and listening
+- **resume**: Executes once on first request after machine suspension (Fly.io)
 - **idle**: Executes before machine suspension (Fly.io)
 
 **Tenant Hooks**:
@@ -276,6 +277,11 @@ hooks:
     ready:
       - command: curl
         args: ["-X", "POST", "http://monitoring.example.com/ready"]
+    resume:
+      - command: /usr/local/bin/notify-resume.sh
+        args: ["Machine resumed from suspend"]
+    idle:
+      - command: /usr/local/bin/prepare-suspend.sh
   tenant:  # Default hooks for all tenants
     start:
       - command: /usr/local/bin/notify-tenant-start.sh
