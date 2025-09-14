@@ -2335,18 +2335,6 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 		needsAuth := auth != nil && auth.Realm != "off" && !isPublicPath
 		slog.Debug("Auth check", "needed", needsAuth, "isPublic", isPublicPath)
 
-		// Apply basic auth if needed
-		if needsAuth && !checkAuth(r, auth) {
-			w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s"`, auth.Realm))
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		// Try to serve static files first (assets, images, etc.)
-		if serveStaticFile(w, r, config) {
-			return
-		}
-
 		// Find matching location early to determine if this is a web app
 		var bestMatch *Location
 		bestMatchLen := 0
@@ -2371,10 +2359,22 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 			}
 		}
 
+		// Apply basic auth if needed
+		if needsAuth && !checkAuth(r, auth) {
+			w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s"`, auth.Realm))
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		// Try to serve static files first (assets, images, etc.)
+		if serveStaticFile(w, r, config, bestMatch) {
+			return
+		}
+
 		// Try tryFiles for public paths (those that would be excluded from auth)
 		// This ensures static content is served for public paths like /showcase/regions/
 		// while web apps (which would require auth if enabled) are always proxied
-		if isPublicPath && tryFiles(w, r, config) {
+		if isPublicPath && tryFiles(w, r, config, bestMatch) {
 			return
 		}
 
@@ -2975,7 +2975,7 @@ func shouldExcludeFromAuth(path string, config *Config) bool {
 }
 
 // serveStaticFile attempts to serve static files directly from the filesystem
-func serveStaticFile(w http.ResponseWriter, r *http.Request, config *Config) bool {
+func serveStaticFile(w http.ResponseWriter, r *http.Request, config *Config, bestMatch *Location) bool {
 	// Check if this is a request for static assets
 	path := r.URL.Path
 
@@ -3040,17 +3040,7 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, config *Config) boo
 		return false
 	}
 
-	// Find the best matching location for this path
-	var bestMatch *Location
-	bestMatchLen := 0
-
-	for locPath, location := range config.Locations {
-		if strings.HasPrefix(path, locPath) && len(locPath) > bestMatchLen {
-			bestMatch = location
-			bestMatchLen = len(locPath)
-		}
-	}
-
+	// Use the pre-computed best match if we don't have a location with root
 	if bestMatch == nil || bestMatch.Root == "" {
 		return false
 	}
@@ -3084,7 +3074,7 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, config *Config) boo
 
 // tryFiles implements try_files behavior for non-authenticated routes
 // Attempts to serve static files with common extensions before falling back to web app
-func tryFiles(w http.ResponseWriter, r *http.Request, config *Config) bool {
+func tryFiles(w http.ResponseWriter, r *http.Request, config *Config, bestMatch *Location) bool {
 	path := r.URL.Path
 
 	slog.Debug("tryFiles checking", "path", path)
@@ -3136,17 +3126,7 @@ func tryFiles(w http.ResponseWriter, r *http.Request, config *Config) bool {
 		}
 	}
 
-	// Fall back to checking locations (for backward compatibility)
-	var bestMatch *Location
-	bestMatchLen := 0
-
-	for locPath, location := range config.Locations {
-		if strings.HasPrefix(path, locPath) && len(locPath) > bestMatchLen {
-			bestMatch = location
-			bestMatchLen = len(locPath)
-		}
-	}
-
+	// Use the pre-computed best match for locations (for backward compatibility)
 	if bestMatch == nil || bestMatch.Root == "" {
 		return false
 	}
