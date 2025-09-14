@@ -121,7 +121,7 @@ applications:
     timeout: 5m        # Duration format - app process idle timeout
     start_port: 4000
   
-  # Environment variables with template substitution  
+  # Environment variables with template substitution
   env:
     RAILS_RELATIVE_URL_ROOT: /showcase
     RAILS_APP_DB: "${database}"
@@ -129,6 +129,12 @@ applications:
     RAILS_STORAGE: "${storage}"
     RAILS_APP_SCOPE: "${scope}"
     PIDFILE: "/path/to/pids/${database}.pid"
+
+  # Template variable substitution:
+  # - Variables in ${var} format are substituted using values from tenant's var: section
+  # - Tenant env: variables can override application env: variables
+  # - Set tenant env value to null to unset an environment variable completely
+  # - Set tenant env value to "" (empty string) to set variable to empty value
   
   tenants:
     - path: /showcase/2025/boston/
@@ -139,22 +145,18 @@ applications:
         scope: "2025/boston"
       env:
         SHOWCASE_LOGO: "boston-logo.png"
+        RAILS_APP_SCOPE: null  # Unset this environment variable
       # Tenant-specific hooks (optional)
       hooks:
         start:
           - command: /usr/local/bin/cache-warm.sh
             args: ["2025-boston"]
             timeout: 10s
-    
-    # Special tenants that don't use variable substitution
-    - path: /cable
-      special: true
-      force_max_concurrent_requests: 0
-    
+
     # Tenants with pattern matching for WebSocket support
     - path: /cable-specific
       match_pattern: "*/cable"  # Matches any path ending with /cable
-      special: true
+      force_max_concurrent_requests: 0
     
     # Tenants with standalone servers (e.g., Action Cable)
     - path: /external/

@@ -203,10 +203,9 @@ type FrameworkConfig struct {
 type Tenant struct {
 	Path                       string            `yaml:"path"`
 	Root                       string            `yaml:"root"`
-	Special                    bool              `yaml:"special"`
 	MatchPattern               string            `yaml:"match_pattern"`
 	StandaloneServer           string            `yaml:"standalone_server"`
-	Env                        map[string]string `yaml:"env"`
+	Env                        map[string]interface{} `yaml:"env"`
 	Var                        map[string]string `yaml:"var"`
 	ForceMaxConcurrentRequests int               `yaml:"force_max_concurrent_requests"`
 	Hooks                      TenantHooks       `yaml:"hooks"` // Tenant-specific hooks
@@ -1678,20 +1677,22 @@ func ParseYAML(content []byte) (*Config, error) {
 			Hooks:            tenant.Hooks, // Copy tenant-specific hooks
 		}
 
-		// Add variables from applications.env that need substitution (unless it's a special tenant)
-		if !tenant.Special {
-			for varName, template := range yamlConfig.Applications.Env {
-				// Only process templates that contain variables
-				if strings.Contains(template, "${") {
-					value := substituteVars(template, &tenant)
-					location.EnvVars[varName] = value
-				}
+		// Add variables from applications.env that need substitution
+		for varName, template := range yamlConfig.Applications.Env {
+			// Only process templates that contain variables
+			if strings.Contains(template, "${") {
+				value := substituteVars(template, &tenant)
+				location.EnvVars[varName] = value
 			}
 		}
 
 		// Copy tenant environment variables (these should override application env)
 		for k, v := range tenant.Env {
-			location.EnvVars[k] = v
+			if v == nil {
+				delete(location.EnvVars, k) // Remove if null
+			} else {
+				location.EnvVars[k] = fmt.Sprintf("%v", v) // Convert to string
+			}
 		}
 
 		if tenant.Root != "" {
