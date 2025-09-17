@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -506,6 +507,14 @@ func (r *responseRecorder) Write(data []byte) (int, error) {
 	return n, err
 }
 
+// Hijack implements the http.Hijacker interface for WebSocket support
+func (r *responseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hijacker, ok := r.ResponseWriter.(http.Hijacker); ok {
+		return hijacker.Hijack()
+	}
+	return nil, nil, fmt.Errorf("ResponseWriter does not support hijacking")
+}
+
 // AccessLogEntry represents a structured access log entry matching nginx format
 type AccessLogEntry struct {
 	Timestamp       string `json:"@timestamp"`
@@ -564,6 +573,62 @@ func logTenantRequest(r *http.Request, recorder *responseRecorder, tenantName st
 		Protocol:      r.Proto,
 		Status:        recorder.statusCode,
 		BodyBytesSent: recorder.size,
+		RequestID:     r.Header.Get("X-Request-Id"),
+		RequestTime:   requestTime,
+		Referer:       referer,
+		UserAgent:     userAgent,
+		FlyRequestID:  r.Header.Get("Fly-Request-Id"),
+		Tenant:        tenantName,
+	}
+
+	data, _ := json.Marshal(entry)
+	fmt.Fprintln(os.Stdout, string(data))
+}
+
+// logFlyReplayRequest logs a fly-replay request in JSON format matching nginx log format
+// This is used when a fly-replay response is sent and the request returns early
+func logFlyReplayRequest(r *http.Request, recorder *responseRecorder, statusCode int, bodySize int) {
+	// Extract tenant name from path
+	tenantName := extractTenantName(r.URL.Path)
+
+	// Get client IP (prefer X-Forwarded-For if available)
+	clientIP := r.Header.Get("X-Forwarded-For")
+	if clientIP == "" {
+		clientIP = r.RemoteAddr
+		// Remove port if present
+		if host, _, err := net.SplitHostPort(clientIP); err == nil {
+			clientIP = host
+		}
+	}
+
+	// Get remote user from basic auth if available
+	remoteUser := "-"
+	if username, _, ok := r.BasicAuth(); ok {
+		remoteUser = username
+	}
+
+	// Calculate request duration
+	requestTime := fmt.Sprintf("%.3f", time.Since(recorder.startTime).Seconds())
+
+	// Get headers with fallbacks
+	referer := r.Header.Get("Referer")
+	if referer == "" {
+		referer = "-"
+	}
+	userAgent := r.Header.Get("User-Agent")
+	if userAgent == "" {
+		userAgent = "-"
+	}
+
+	entry := AccessLogEntry{
+		Timestamp:     time.Now().Format("2006-01-02T15:04:05.000Z07:00"),
+		ClientIP:      clientIP,
+		RemoteUser:    remoteUser,
+		Method:        r.Method,
+		URI:           r.RequestURI,
+		Protocol:      r.Proto,
+		Status:        statusCode,
+		BodyBytesSent: bodySize,
 		RequestID:     r.Header.Get("X-Request-Id"),
 		RequestTime:   requestTime,
 		Referer:       referer,
@@ -2606,13 +2671,6 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 								if len(parts) == 2 {
 									machineID := parts[0]
 									appName := parts[1]
-									slog.Info("Sending fly-replay response",
-										"path", path,
-										"machine", machineID,
-										"app", appName,
-										"status", statusCode,
-										"method", r.Method,
-										"contentLength", r.ContentLength)
 
 									responseMap = map[string]interface{}{
 										"app":             appName,
@@ -2627,12 +2685,6 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 							} else if strings.HasPrefix(target, "app=") {
 								// App-based fly-replay
 								appName := strings.TrimPrefix(target, "app=")
-								slog.Info("Sending fly-replay response",
-									"path", path,
-									"app", appName,
-									"status", statusCode,
-									"method", r.Method,
-									"contentLength", r.ContentLength)
 
 								responseMap = map[string]interface{}{
 									"app": appName,
@@ -2644,13 +2696,6 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 								}
 							} else {
 								// Region-based fly-replay
-								slog.Info("Sending fly-replay response",
-									"path", path,
-									"region", target,
-									"status", statusCode,
-									"method", r.Method,
-									"contentLength", r.ContentLength)
-
 								responseMap = map[string]interface{}{
 									"region": target + ",any",
 									"transform": map[string]interface{}{
@@ -2670,6 +2715,12 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 							}
 							slog.Debug("Fly replay response body", "body", string(responseBodyBytes))
 							w.Write(responseBodyBytes)
+
+							// Log the fly-replay response with consistent format
+							if recorder, ok := w.(*responseRecorder); ok {
+								logFlyReplayRequest(r, recorder, statusCode, len(responseBodyBytes))
+							}
+
 							return true
 						} else {
 							// Automatically reverse proxy instead of fly-replay
@@ -2783,13 +2834,14 @@ func handleStickySession(w http.ResponseWriter, r *http.Request, config *Config)
 				"path":    r.URL.Path,
 			}
 			
-			json.NewEncoder(w).Encode(response)
-			
-			slog.Info("Sticky session fly-replay",
-				"target_machine", targetMachine,
-				"current_machine", currentMachineID,
-				"path", r.URL.Path)
-			
+			responseBytes, _ := json.Marshal(response)
+			w.Write(responseBytes)
+
+			// Log the sticky session fly-replay with consistent format
+			if recorder, ok := w.(*responseRecorder); ok {
+				logFlyReplayRequest(r, recorder, statusCode, len(responseBytes))
+			}
+
 			return true
 		} else {
 			// Large request, use reverse proxy
@@ -3301,8 +3353,27 @@ func (w *retryResponseWriter) WriteResponse() {
 	}
 }
 
+// Hijack implements the http.Hijacker interface for WebSocket support
+func (w *retryResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hijacker, ok := w.ResponseWriter.(http.Hijacker); ok {
+		return hijacker.Hijack()
+	}
+	return nil, nil, fmt.Errorf("ResponseWriter does not support hijacking")
+}
+
 // proxyWithRetry handles proxying with automatic retry on 502 errors
 func proxyWithRetry(w http.ResponseWriter, r *http.Request, target *url.URL, maxRetryDuration time.Duration) {
+	// Check if this is a WebSocket upgrade request
+	isWebSocket := strings.ToLower(r.Header.Get("Upgrade")) == "websocket" &&
+		strings.Contains(strings.ToLower(r.Header.Get("Connection")), "upgrade")
+
+	// For WebSocket requests, proxy directly without retry logic
+	if isWebSocket {
+		proxy := httputil.NewSingleHostReverseProxy(target)
+		proxy.ServeHTTP(w, r)
+		return
+	}
+
 	startTime := time.Now()
 	retryCount := 0
 	sleepDuration := 100 * time.Millisecond // Start with 100ms
