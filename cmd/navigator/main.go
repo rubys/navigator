@@ -496,6 +496,7 @@ type responseRecorder struct {
 	statusCode int
 	size       int
 	startTime  time.Time
+	metadata   map[string]interface{} // Metadata for logging
 }
 
 func (r *responseRecorder) WriteHeader(code int) {
@@ -515,6 +516,14 @@ func (r *responseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return hijacker.Hijack()
 	}
 	return nil, nil, fmt.Errorf("ResponseWriter does not support hijacking")
+}
+
+// SetMetadata sets a metadata key-value pair for logging
+func (r *responseRecorder) SetMetadata(key string, value interface{}) {
+	if r.metadata == nil {
+		r.metadata = make(map[string]interface{})
+	}
+	r.metadata[key] = value
 }
 
 // AccessLogEntry represents a structured access log entry matching nginx format
@@ -620,38 +629,6 @@ func logNavigatorRequest(r *http.Request, recorder *responseRecorder, metadata m
 		"tenant", entry.Tenant)
 }
 
-// logTenantRequest logs a tenant request (wrapper for backward compatibility)
-func logTenantRequest(r *http.Request, recorder *responseRecorder, tenantName string) {
-	metadata := map[string]interface{}{
-		"tenant":        tenantName,
-		"response_type": "proxy",
-		"proxy_backend": fmt.Sprintf("tenant:%s", tenantName),
-	}
-	logNavigatorRequest(r, recorder, metadata)
-}
-
-// logFlyReplayRequest logs a fly-replay request (wrapper for backward compatibility)
-// The destination parameter should be passed from the caller who knows the target
-func logFlyReplayRequest(r *http.Request, recorder *responseRecorder, statusCode int, bodySize int, destination string) {
-	// Extract tenant name from path
-	tenantName := extractTenantName(r.URL.Path)
-
-	metadata := map[string]interface{}{
-		"tenant":        tenantName,
-		"response_type": "fly-replay",
-		"destination":   destination,
-	}
-
-	// Update recorder with actual values if different
-	if statusCode != 0 {
-		recorder.statusCode = statusCode
-	}
-	if bodySize != 0 {
-		recorder.size = bodySize
-	}
-
-	logNavigatorRequest(r, recorder, metadata)
-}
 
 // extractTenantName extracts the tenant name from a URL path
 // Examples: "/showcase/2025/livermore/district-showcase/" -> "livermore-district-showcase"
@@ -2419,23 +2396,14 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 
 	// Health check
 	mux.HandleFunc("/up", func(w http.ResponseWriter, r *http.Request) {
-		// Create recorder for health check logging
-		recorder := &responseRecorder{
-			ResponseWriter: w,
-			statusCode:     200,
-			startTime:      time.Now(),
-			size:           2, // "OK"
+		// Set metadata if recorder is available
+		if recorder, ok := w.(*responseRecorder); ok {
+			recorder.SetMetadata("response_type", "health-check")
 		}
 
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
-
-		// Log health check with consistent format
-		metadata := map[string]interface{}{
-			"response_type": "health-check",
-		}
-		logNavigatorRequest(r, recorder, metadata)
 	})
 
 	// Main handler
@@ -2456,10 +2424,23 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 			ResponseWriter: w,
 			statusCode:     200, // default status code
 			startTime:      time.Now(),
+			metadata:       make(map[string]interface{}),
 		}
 
 		// Use recorder for the rest of the request processing
 		w = recorder
+
+		// Defer logging until request completes
+		defer func() {
+			// Extract tenant name if not already set
+			if _, ok := recorder.metadata["tenant"]; !ok {
+				if tenantName := extractTenantName(r.URL.Path); tenantName != "" {
+					recorder.metadata["tenant"] = tenantName
+				}
+			}
+			// Log the completed request with all metadata
+			logNavigatorRequest(r, recorder, recorder.metadata)
+		}()
 
 		slog.Debug("Request received", "method", r.Method, "path", r.URL.Path, "request_id", requestID)
 		
@@ -2505,16 +2486,13 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 
 		// Apply basic auth if needed
 		if needsAuth && !checkAuth(r, auth) {
+			// Set metadata for authentication failure
+			if recorder, ok := w.(*responseRecorder); ok {
+				recorder.SetMetadata("response_type", "auth-failure")
+				recorder.SetMetadata("error_message", "Authentication required")
+			}
 			w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s"`, auth.Realm))
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			// Log authentication failure
-			if recorder, ok := w.(*responseRecorder); ok {
-				metadata := map[string]interface{}{
-					"response_type": "auth-failure",
-					"error_message": "Authentication required",
-				}
-				logNavigatorRequest(r, recorder, metadata)
-			}
 			return
 		}
 
@@ -2583,15 +2561,12 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 		if bestMatch.StandaloneServer != "" {
 			target, err := url.Parse(fmt.Sprintf("http://%s", bestMatch.StandaloneServer))
 			if err != nil {
-				http.Error(w, "Invalid standalone server configuration", http.StatusInternalServerError)
-				// Log error response
+				// Set metadata for error response
 				if recorder, ok := w.(*responseRecorder); ok {
-					metadata := map[string]interface{}{
-						"response_type": "error",
-						"error_message": fmt.Sprintf("Invalid standalone server configuration: %v", err),
-					}
-					logNavigatorRequest(r, recorder, metadata)
+					recorder.SetMetadata("response_type", "error")
+					recorder.SetMetadata("error_message", fmt.Sprintf("Invalid standalone server configuration: %v", err))
 				}
+				http.Error(w, "Invalid standalone server configuration", http.StatusInternalServerError)
 				return
 			}
 			proxyWithRetry(w, r, target, ProxyRetryTimeout)
@@ -2604,25 +2579,22 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 		// Get or start the web app
 		app, err := manager.GetOrStartApp(bestMatch)
 		if err != nil {
-			http.Error(w, "Failed to start application", http.StatusInternalServerError)
-			// Log error response
+			// Set metadata for error response
 			if recorder, ok := w.(*responseRecorder); ok {
-				metadata := map[string]interface{}{
-					"tenant":        tenantName,
-					"response_type": "error",
-					"error_message": fmt.Sprintf("Failed to start application: %v", err),
-				}
-				logNavigatorRequest(r, recorder, metadata)
+				recorder.SetMetadata("tenant", tenantName)
+				recorder.SetMetadata("response_type", "error")
+				recorder.SetMetadata("error_message", fmt.Sprintf("Failed to start application: %v", err))
 			}
+			http.Error(w, "Failed to start application", http.StatusInternalServerError)
 			return
 		}
 
-		// Schedule tenant access log after request completes
-		defer func() {
-			if tenantName != "" {
-				logTenantRequest(r, recorder, tenantName)
-			}
-		}()
+		// Set tenant metadata for logging
+		if recorder, ok := w.(*responseRecorder); ok && tenantName != "" {
+			recorder.SetMetadata("tenant", tenantName)
+			recorder.SetMetadata("response_type", "proxy")
+			recorder.SetMetadata("proxy_backend", fmt.Sprintf("tenant:%s", tenantName))
+		}
 
 		// Proxy to web app
 		target, _ := url.Parse(fmt.Sprintf("http://localhost:%d", app.Port))
@@ -2681,15 +2653,12 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 			slog.Debug("Rewrite matched", "originalPath", path, "newPath", newPath, "flag", rule.Flag)
 
 			if rule.Flag == "redirect" {
-				http.Redirect(w, r, newPath, http.StatusFound)
-				// Log redirect response
+				// Set metadata for redirect
 				if recorder, ok := w.(*responseRecorder); ok {
-					metadata := map[string]interface{}{
-						"response_type": "redirect",
-						"destination":   newPath,
-					}
-					logNavigatorRequest(r, recorder, metadata)
+					recorder.SetMetadata("response_type", "redirect")
+					recorder.SetMetadata("destination", newPath)
 				}
+				http.Redirect(w, r, newPath, http.StatusFound)
 				return true
 			} else if strings.HasPrefix(rule.Flag, "fly-replay:") {
 				// Handle fly-replay: fly-replay:target:status (target can be region or app=name)
@@ -2795,9 +2764,16 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 							slog.Debug("Fly replay response body", "body", string(responseBodyBytes))
 							w.Write(responseBodyBytes)
 
-							// Log the fly-replay response with consistent format
+							// Set metadata for fly-replay response
 							if recorder, ok := w.(*responseRecorder); ok {
-								logFlyReplayRequest(r, recorder, statusCode, len(responseBodyBytes), target)
+								recorder.SetMetadata("response_type", "fly-replay")
+								recorder.SetMetadata("destination", target)
+								if statusCode != 0 {
+									recorder.statusCode = statusCode
+								}
+								if len(responseBodyBytes) != 0 {
+									recorder.size = len(responseBodyBytes)
+								}
 							}
 
 							return true
@@ -2918,10 +2894,17 @@ func handleStickySession(w http.ResponseWriter, r *http.Request, config *Config)
 			responseBytes, _ := json.Marshal(response)
 			w.Write(responseBytes)
 
-			// Log the sticky session fly-replay with consistent format
+			// Set metadata for sticky session fly-replay
 			if recorder, ok := w.(*responseRecorder); ok {
 				destination := fmt.Sprintf("machine=%s.vm.%s.internal", targetMachine, appName)
-				logFlyReplayRequest(r, recorder, statusCode, len(responseBytes), destination)
+				recorder.SetMetadata("response_type", "fly-replay")
+				recorder.SetMetadata("destination", destination)
+				if statusCode != 0 {
+					recorder.statusCode = statusCode
+				}
+				if len(responseBytes) != 0 {
+					recorder.size = len(responseBytes)
+				}
 			}
 
 			return true
@@ -3337,20 +3320,17 @@ func tryFiles(w http.ResponseWriter, r *http.Request, config *Config, bestMatch 
 
 // serveFile serves a specific file with appropriate headers
 func serveFile(w http.ResponseWriter, r *http.Request, fsPath, requestPath string) bool {
+	// Set metadata for static file response
+	if recorder, ok := w.(*responseRecorder); ok {
+		recorder.SetMetadata("response_type", "static")
+		recorder.SetMetadata("file_path", fsPath)
+	}
+
 	// Set appropriate content type
 	setContentType(w, fsPath)
 
 	// Serve the file
 	http.ServeFile(w, r, fsPath)
-
-	// Log static file response
-	if recorder, ok := w.(*responseRecorder); ok {
-		metadata := map[string]interface{}{
-			"response_type": "static",
-			"file_path":     fsPath,
-		}
-		logNavigatorRequest(r, recorder, metadata)
-	}
 	return true
 }
 
