@@ -493,10 +493,12 @@ type VectorWriter struct {
 // ResponseWriter wrapper to capture response status and size
 type responseRecorder struct {
 	http.ResponseWriter
-	statusCode int
-	size       int
-	startTime  time.Time
-	metadata   map[string]interface{} // Metadata for logging
+	statusCode  int
+	size        int
+	startTime   time.Time
+	metadata    map[string]interface{} // Metadata for logging
+	idleManager *IdleManager           // For automatic idle tracking
+	tracked     bool                   // Prevent double tracking
 }
 
 func (r *responseRecorder) WriteHeader(code int) {
@@ -513,7 +515,14 @@ func (r *responseRecorder) Write(data []byte) (int, error) {
 // Hijack implements the http.Hijacker interface for WebSocket support
 func (r *responseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if hijacker, ok := r.ResponseWriter.(http.Hijacker); ok {
-		return hijacker.Hijack()
+		conn, rw, err := hijacker.Hijack()
+		if err == nil {
+			// WebSocket connection hijacked successfully
+			// Finish tracking the HTTP request since it's now handled by WebSocket
+			slog.Debug("WebSocket hijacked, finishing HTTP request tracking")
+			r.finishTracking()
+		}
+		return conn, rw, err
 	}
 	return nil, nil, fmt.Errorf("ResponseWriter does not support hijacking")
 }
@@ -524,6 +533,22 @@ func (r *responseRecorder) SetMetadata(key string, value interface{}) {
 		r.metadata = make(map[string]interface{})
 	}
 	r.metadata[key] = value
+}
+
+// startTracking begins idle tracking for this request (idempotent)
+func (r *responseRecorder) startTracking() {
+	if r.idleManager != nil && !r.tracked {
+		r.idleManager.RequestStarted()
+		r.tracked = true
+	}
+}
+
+// finishTracking ends idle tracking for this request (idempotent)
+func (r *responseRecorder) finishTracking() {
+	if r.idleManager != nil && r.tracked {
+		r.idleManager.RequestFinished()
+		r.tracked = false
+	}
 }
 
 // AccessLogEntry represents a structured access log entry matching nginx format
@@ -1118,6 +1143,12 @@ func (im *IdleManager) RequestStarted() {
 	}
 
 	slog.Debug("Request started", "activeRequests", im.activeRequests)
+
+	// Log warning if we have an unusually high number of active requests
+	if im.activeRequests > 100 {
+		slog.Warn("High number of active requests detected",
+			"activeRequests", im.activeRequests)
+	}
 }
 
 // RequestFinished decrements active request counter and starts idle timer if idle
@@ -1129,7 +1160,16 @@ func (im *IdleManager) RequestFinished() {
 	im.mutex.Lock()
 	defer im.mutex.Unlock()
 
-	im.activeRequests--
+	// Protect against negative counts (indicates a bug)
+	if im.activeRequests <= 0 {
+		slog.Warn("RequestFinished called when activeRequests is already zero or negative",
+			"activeRequests", im.activeRequests)
+		// Reset to zero to prevent permanent "busy" state
+		im.activeRequests = 0
+	} else {
+		im.activeRequests--
+	}
+
 	im.lastActivity = time.Now()
 
 	slog.Debug("Request finished", "activeRequests", im.activeRequests)
@@ -2396,10 +2436,25 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 
 	// Health check
 	mux.HandleFunc("/up", func(w http.ResponseWriter, r *http.Request) {
-		// Set metadata if recorder is available
-		if recorder, ok := w.(*responseRecorder); ok {
-			recorder.SetMetadata("response_type", "health-check")
+		// Create recorder for health check with idle tracking
+		recorder := &responseRecorder{
+			ResponseWriter: w,
+			statusCode:     200,
+			startTime:      time.Now(),
+			metadata:       make(map[string]interface{}),
+			idleManager:    idleManager,
 		}
+
+		// Start tracking and ensure it finishes
+		recorder.startTracking()
+		defer func() {
+			recorder.finishTracking()
+			// Log the health check request
+			logNavigatorRequest(r, recorder, recorder.metadata)
+		}()
+
+		// Set metadata for health check
+		recorder.SetMetadata("response_type", "health-check")
 
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
@@ -2408,10 +2463,6 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 
 	// Main handler
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Track request for suspend management
-		idleManager.RequestStarted()
-		defer idleManager.RequestFinished()
-
 		// Generate request ID if not already present
 		requestID := r.Header.Get("X-Request-Id")
 		if requestID == "" {
@@ -2425,13 +2476,13 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 			statusCode:     200, // default status code
 			startTime:      time.Now(),
 			metadata:       make(map[string]interface{}),
+			idleManager:    idleManager,
 		}
 
-		// Use recorder for the rest of the request processing
-		w = recorder
-
-		// Defer logging until request completes
+		// Start tracking and ensure it finishes
+		recorder.startTracking()
 		defer func() {
+			recorder.finishTracking()
 			// Extract tenant name if not already set
 			if _, ok := recorder.metadata["tenant"]; !ok {
 				if tenantName := extractTenantName(r.URL.Path); tenantName != "" {
@@ -2441,6 +2492,9 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 			// Log the completed request with all metadata
 			logNavigatorRequest(r, recorder, recorder.metadata)
 		}()
+
+		// Use recorder for the rest of the request processing
+		w = recorder
 
 		slog.Debug("Request received", "method", r.Method, "path", r.URL.Path, "request_id", requestID)
 		
