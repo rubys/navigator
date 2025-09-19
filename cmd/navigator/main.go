@@ -1084,11 +1084,6 @@ func NewIdleManager(config *Config) *IdleManager {
 
 // RequestStarted increments active request counter and resets idle timer
 func (im *IdleManager) RequestStarted() {
-	im.RequestStartedConditional(true)
-}
-
-// RequestStartedConditional increments active request counter conditionally
-func (im *IdleManager) RequestStartedConditional(shouldResetIdle bool) {
 	if !im.enabled {
 		return
 	}
@@ -1127,27 +1122,19 @@ func (im *IdleManager) RequestStartedConditional(shouldResetIdle bool) {
 	}
 
 	im.activeRequests++
+	im.lastActivity = time.Now()
 
-	if shouldResetIdle {
-		im.lastActivity = time.Now()
-
-		// Cancel existing timer since we have activity
-		if im.timer != nil {
-			im.timer.Stop()
-			im.timer = nil
-		}
+	// Cancel existing timer since we have activity
+	if im.timer != nil {
+		im.timer.Stop()
+		im.timer = nil
 	}
 
-	slog.Debug("Request started", "activeRequests", im.activeRequests, "resetIdle", shouldResetIdle)
+	slog.Debug("Request started", "activeRequests", im.activeRequests)
 }
 
 // RequestFinished decrements active request counter and starts idle timer if idle
 func (im *IdleManager) RequestFinished() {
-	im.RequestFinishedConditional(true)
-}
-
-// RequestFinishedConditional decrements active request counter conditionally
-func (im *IdleManager) RequestFinishedConditional(shouldResetIdle bool) {
 	if !im.enabled {
 		return
 	}
@@ -1156,12 +1143,9 @@ func (im *IdleManager) RequestFinishedConditional(shouldResetIdle bool) {
 	defer im.mutex.Unlock()
 
 	im.activeRequests--
+	im.lastActivity = time.Now()
 
-	if shouldResetIdle {
-		im.lastActivity = time.Now()
-	}
-
-	slog.Debug("Request finished", "activeRequests", im.activeRequests, "resetIdle", shouldResetIdle)
+	slog.Debug("Request finished", "activeRequests", im.activeRequests)
 
 	// Start idle timer if no active requests
 	if im.activeRequests == 0 {
@@ -2433,18 +2417,9 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 
 	// Main handler
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Determine if this request should reset idle timeout
-		// Health checks, auth failures, and no location matches don't reset idle
-		shouldResetIdle := true
-		isHealthCheck := r.URL.Path == "/up"
-
-		if isHealthCheck {
-			shouldResetIdle = false
-		}
-
 		// Track request for suspend management
-		idleManager.RequestStartedConditional(shouldResetIdle)
-		defer idleManager.RequestFinishedConditional(shouldResetIdle)
+		idleManager.RequestStarted()
+		defer idleManager.RequestFinished()
 
 		// Generate request ID if not already present
 		requestID := r.Header.Get("X-Request-Id")
@@ -2507,11 +2482,6 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 
 		// Apply basic auth if needed
 		if needsAuth && !checkAuth(r, auth) {
-			// Mark that auth failed and don't reset idle timeout
-			idleManager.RequestFinishedConditional(false)
-			idleManager.RequestStartedConditional(false)
-			defer idleManager.RequestFinishedConditional(false)
-
 			slog.Info("Authentication failed", "path", r.URL.Path, "method", r.Method, "remoteAddr", r.RemoteAddr)
 			w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s"`, auth.Realm))
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -2573,11 +2543,6 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 				bestMatch = rootLoc
 			} else {
 				// Delegate to health check handler
-				// No location match - don't reset idle timeout
-				idleManager.RequestFinishedConditional(false)
-				idleManager.RequestStartedConditional(false)
-				defer idleManager.RequestFinishedConditional(false)
-
 				slog.Info("No location match found", "path", r.URL.Path, "method", r.Method)
 				mux.ServeHTTP(w, r)
 				return
