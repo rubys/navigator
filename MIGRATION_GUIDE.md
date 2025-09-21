@@ -8,7 +8,7 @@ This guide helps you migrate from the original single-file Navigator to the refa
 
 ```bash
 # Build the refactored Navigator
-go build -o bin/navigator-refactored cmd/navigator/main_refactored.go
+go build -o bin/navigator-refactored cmd/navigator-refactored/main.go
 
 # Or use the existing Makefile target (if added)
 make build-refactored
@@ -73,9 +73,11 @@ navigator/
 ### After: Modular Structure
 ```
 navigator/
-├── cmd/navigator/
-│   ├── main.go                 # Original (unchanged)
-│   └── main_refactored.go      # New modular entry point
+├── cmd/
+│   ├── navigator/
+│   │   └── main.go             # Original (unchanged)
+│   └── navigator-refactored/
+│       └── main.go             # New modular entry point
 └── internal/
     ├── auth/                   # Authentication
     ├── config/                 # Configuration management
@@ -94,7 +96,7 @@ navigator/
    ```bash
    # Build both versions
    go build -o bin/navigator cmd/navigator/main.go
-   go build -o bin/navigator-refactored cmd/navigator/main_refactored.go
+   go build -o bin/navigator-refactored cmd/navigator-refactored/main.go
    ```
 
 2. **Test with identical configurations**:

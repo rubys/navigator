@@ -37,10 +37,13 @@ jobs:
     - name: Run tests
       run: go test -race -cover ./...
 
-    - name: Build
+    - name: Build original navigator
       run: go build -o navigator ./cmd/navigator
 
-    - name: Test binary
+    - name: Build refactored navigator
+      run: go build -o navigator-refactored ./cmd/navigator-refactored
+
+    - name: Test binaries
       run: |
         # Create minimal test environment with YAML configuration
         mkdir -p /tmp/test-rails/config
@@ -49,31 +52,36 @@ jobs:
           listen: 0  # Use port 0 for testing
           hostname: localhost
           public_dir: /tmp/test-rails/public
-        
+
         pools:
           max_size: 1
           idle_timeout: 300
           start_port: 4000
-        
+
         auth:
           enabled: false
-        
+
         static:
           directories: []
           extensions: [html, css, js]
           try_files:
             enabled: false
-        
+
         applications:
           env: {}
           tenants: []
-        
+
         managed_processes: []
         EOF
         mkdir -p /tmp/test-rails/public
 
-        # Test that binary starts and exits cleanly with YAML config
+        # Test that original binary starts and exits cleanly with YAML config
+        echo "Testing original navigator..."
         timeout 5s ./navigator /tmp/test-rails/config/navigator.yml || [ $? -eq 124 ]
+
+        # Test that refactored binary starts and exits cleanly with YAML config
+        echo "Testing refactored navigator..."
+        timeout 5s ./navigator-refactored /tmp/test-rails/config/navigator.yml || [ $? -eq 124 ]
 
   build:
     runs-on: ubuntu-latest
@@ -90,6 +98,7 @@ jobs:
 
     - name: Build binaries
       run: |
+        # Original Navigator
         # Linux AMD64
         GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o navigator-linux-amd64 ./cmd/navigator
 
@@ -102,8 +111,21 @@ jobs:
         # macOS ARM64
         GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o navigator-darwin-arm64 ./cmd/navigator
 
+        # Refactored Navigator
+        # Linux AMD64
+        GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o navigator-refactored-linux-amd64 ./cmd/navigator-refactored
+
+        # Linux ARM64
+        GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o navigator-refactored-linux-arm64 ./cmd/navigator-refactored
+
+        # macOS AMD64
+        GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o navigator-refactored-darwin-amd64 ./cmd/navigator-refactored
+
+        # macOS ARM64
+        GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o navigator-refactored-darwin-arm64 ./cmd/navigator-refactored
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: navigator-binaries
-        path: navigator-*
+        path: navigator*
