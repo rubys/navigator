@@ -178,6 +178,7 @@ type Location struct {
 	EnvVars          map[string]string
 	MatchPattern     string      // Pattern for matching request paths (e.g., "*/cable")
 	StandaloneServer string      // If set, proxy to this server instead of web app
+	RewritePath      string      // If set, rewrite request path before proxying to standalone server
 	Hooks            TenantHooks // Tenant-specific hooks
 }
 
@@ -209,6 +210,7 @@ type Tenant struct {
 	Root                       string            `yaml:"root"`
 	MatchPattern               string            `yaml:"match_pattern"`
 	StandaloneServer           string            `yaml:"standalone_server"`
+	RewritePath                string            `yaml:"rewrite_path"`  // Path to rewrite to when proxying to standalone server
 	Env                        map[string]interface{} `yaml:"env"`
 	Var                        map[string]string `yaml:"var"`
 	ForceMaxConcurrentRequests int               `yaml:"force_max_concurrent_requests"`
@@ -643,15 +645,9 @@ func logNavigatorRequest(r *http.Request, recorder *responseRecorder, metadata m
 		}
 	}
 
-	// Log as info level with structured fields
-	slog.Info("Navigator request",
-		"client_ip", entry.ClientIP,
-		"method", entry.Method,
-		"uri", entry.URI,
-		"status", entry.Status,
-		"response_type", entry.ResponseType,
-		"request_time", entry.RequestTime,
-		"tenant", entry.Tenant)
+	// Output JSON log entry (matching nginx/rails format)
+	data, _ := json.Marshal(entry)
+	fmt.Fprintln(os.Stdout, string(data))
 }
 
 
@@ -1806,11 +1802,18 @@ func ParseYAML(content []byte) (*Config, error) {
 
 	// Convert tenant applications to locations
 	for _, tenant := range yamlConfig.Applications.Tenants {
+		// Ensure tenant path ends with a slash
+		path := tenant.Path
+		if path != "" && !strings.HasSuffix(path, "/") {
+			path = path + "/"
+		}
+
 		location := &Location{
-			Path:             tenant.Path,
+			Path:             path,
 			EnvVars:          make(map[string]string),
 			MatchPattern:     tenant.MatchPattern,
 			StandaloneServer: tenant.StandaloneServer,
+			RewritePath:      tenant.RewritePath,
 			Hooks:            tenant.Hooks, // Copy tenant-specific hooks
 		}
 
@@ -1838,7 +1841,20 @@ func ParseYAML(content []byte) (*Config, error) {
 			location.Root = yamlConfig.Server.PublicDir
 		}
 
-		config.Locations[tenant.Path] = location
+		config.Locations[path] = location
+
+		// Add automatic redirect from non-slash to slash path
+		if path != "" && path != "/" {
+			nonSlashPath := strings.TrimSuffix(path, "/")
+			// Add a rewrite rule to redirect non-slash to slash version
+			if re, err := regexp.Compile("^" + regexp.QuoteMeta(nonSlashPath) + "$"); err == nil {
+				config.RewriteRules = append(config.RewriteRules, &RewriteRule{
+					Pattern:     re,
+					Replacement: path,
+					Flag:        "redirect",
+				})
+			}
+		}
 	}
 
 	// Set app idle timeout from pools config
@@ -2497,7 +2513,7 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 		w = recorder
 
 		slog.Debug("Request received", "method", r.Method, "path", r.URL.Path, "request_id", requestID)
-		
+
 		// Handle sticky sessions early (before rewrites/redirects)
 		if handleStickySession(w, r, config) {
 			return
@@ -2521,7 +2537,14 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 		// First, check for pattern matches
 		for _, location := range config.Locations {
 			if location.MatchPattern != "" {
-				if matched, _ := filepath.Match(location.MatchPattern, r.URL.Path); matched {
+				// Special handling for suffix patterns like "*/cable"
+				if strings.HasPrefix(location.MatchPattern, "*/") {
+					suffix := location.MatchPattern[2:] // Remove "*/" prefix
+					if strings.HasSuffix(r.URL.Path, suffix) {
+						bestMatch = location
+						break // Pattern matches take priority
+					}
+				} else if matched, _ := filepath.Match(location.MatchPattern, r.URL.Path); matched {
 					bestMatch = location
 					break // Pattern matches take priority
 				}
@@ -2623,6 +2646,12 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 				http.Error(w, "Invalid standalone server configuration", http.StatusInternalServerError)
 				return
 			}
+
+			// If RewritePath is configured, rewrite the request path
+			if bestMatch.RewritePath != "" {
+				r.URL.Path = bestMatch.RewritePath
+			}
+
 			proxyWithRetry(w, r, target, ProxyRetryTimeout)
 			return
 		}
