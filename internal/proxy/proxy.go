@@ -107,6 +107,14 @@ func HandleProxyWithRetry(w http.ResponseWriter, r *http.Request, targetURL stri
 
 		// Reset buffer for retry if applicable
 		if canRetry && attempt > 1 && retryWriter != nil {
+			// If buffer limit was hit, disable further retries for this request
+			if retryWriter.bufferLimitHit {
+				slog.Debug("Disabling retry due to large response size",
+					"target", targetURL,
+					"attempt", attempt)
+				http.Error(w, "Bad Gateway", http.StatusBadGateway)
+				return
+			}
 			retryWriter.Reset()
 		}
 
@@ -267,13 +275,18 @@ func ProxyWithWebSocketSupport(w http.ResponseWriter, r *http.Request, targetURL
 }
 
 // RetryResponseWriter buffers responses to enable retry on failure
+// Note: Only buffers responses up to MaxRetryBufferSize to prevent memory issues
 type RetryResponseWriter struct {
 	http.ResponseWriter
-	statusCode int
-	body       *bytes.Buffer
-	headers    http.Header
-	written    bool
+	statusCode    int
+	body          *bytes.Buffer
+	headers       http.Header
+	written       bool
+	bufferLimitHit bool
 }
+
+// MaxRetryBufferSize limits how much response data we buffer for retries
+const MaxRetryBufferSize = 1024 * 1024 // 1MB
 
 // NewRetryResponseWriter creates a new retry response writer
 func NewRetryResponseWriter(w http.ResponseWriter) *RetryResponseWriter {
@@ -299,9 +312,22 @@ func (w *RetryResponseWriter) WriteHeader(code int) {
 	}
 }
 
-// Write captures the response body
+// Write captures the response body up to MaxRetryBufferSize
 func (w *RetryResponseWriter) Write(b []byte) (int, error) {
 	if !w.written {
+		// Check if adding this data would exceed buffer limit
+		if w.body.Len()+len(b) > MaxRetryBufferSize {
+			// If we haven't hit the limit yet, buffer what we can
+			if !w.bufferLimitHit && w.body.Len() < MaxRetryBufferSize {
+				remaining := MaxRetryBufferSize - w.body.Len()
+				w.body.Write(b[:remaining])
+			}
+			w.bufferLimitHit = true
+			// Switch to direct writing for large responses
+			w.written = true
+			w.Commit()
+			return w.ResponseWriter.Write(b)
+		}
 		return w.body.Write(b)
 	}
 	return w.ResponseWriter.Write(b)
@@ -335,6 +361,7 @@ func (w *RetryResponseWriter) Reset() {
 	w.statusCode = 0
 	w.body.Reset()
 	w.headers = make(http.Header)
+	w.bufferLimitHit = false
 }
 
 // Hijack implements http.Hijacker interface

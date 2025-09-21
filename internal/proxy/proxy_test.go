@@ -251,6 +251,46 @@ func BenchmarkIsWebSocketRequest(b *testing.B) {
 	}
 }
 
+func TestRetryResponseWriterSizeLimit(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	retryWriter := NewRetryResponseWriter(recorder)
+
+	// Write data that exceeds the buffer limit
+	largeData := make([]byte, MaxRetryBufferSize+1000)
+	for i := range largeData {
+		largeData[i] = byte('A' + (i % 26))
+	}
+
+	// First write should start buffering
+	n, err := retryWriter.Write(largeData[:500000]) // 500KB
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if n != 500000 {
+		t.Errorf("Write returned %d, expected %d", n, 500000)
+	}
+	if retryWriter.bufferLimitHit {
+		t.Error("Buffer limit should not be hit yet")
+	}
+
+	// Second write should hit the limit and switch to direct writing
+	n, err = retryWriter.Write(largeData[500000:]) // Rest of the data
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if !retryWriter.bufferLimitHit {
+		t.Error("Buffer limit should be hit")
+	}
+	if !retryWriter.written {
+		t.Error("Should have switched to direct writing")
+	}
+
+	// Verify response was written to underlying recorder
+	if recorder.Body.Len() == 0 {
+		t.Error("Response should have been written to underlying recorder")
+	}
+}
+
 func BenchmarkRetryResponseWriter(b *testing.B) {
 	testBody := []byte(strings.Repeat("test data ", 100))
 
