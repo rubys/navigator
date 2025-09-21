@@ -161,6 +161,29 @@ applications:
     # Tenants with standalone servers (e.g., Action Cable)
     - path: /external/
       standalone_server: "localhost:28080"  # Proxy to standalone server instead of app
+      rewrite_path: "/"                      # Optional: rewrite request path before proxying
+
+## Pattern Matching
+
+Navigator supports two types of pattern matching for `match_pattern`:
+
+### Suffix Patterns (`*/suffix`)
+- **Format**: `"*/cable"`, `"*/api"`, etc.
+- **Behavior**: Matches any path ending with the specified suffix
+- **Examples**:
+  - `"*/cable"` matches `/app/2025/boston/cable`, `/showcase/event/cable`
+  - `"*/api"` matches `/service/v1/api`, `/admin/api`
+- **Use case**: Perfect for routing specific endpoints (WebSockets, APIs) to standalone servers
+
+### Glob Patterns
+- **Format**: Standard filepath glob patterns
+- **Behavior**: Uses Go's `filepath.Match()` for pattern matching
+- **Examples**:
+  - `"*.json"` matches any path ending in `.json`
+  - `"/admin/*"` matches any path starting with `/admin/`
+- **Use case**: More complex pattern matching needs
+
+**Priority**: Pattern matches take priority over prefix-based path matching.
 
 # External process management
 managed_processes:
@@ -308,6 +331,28 @@ maintenance:
 - **External Services**: Proxy to standalone servers (e.g., Action Cable)
 - **Pattern Matching**: Use wildcard patterns for location matching
 - **WebSocket Support**: Full support for WebSocket connections
+- **Path Rewriting**: Optional path rewriting before proxying to standalone server
+
+Example Action Cable configuration:
+```yaml
+tenants:
+  # Route all */cable requests to standalone Action Cable server
+  - path: /cable
+    match_pattern: "*/cable"              # Matches /app/2025/boston/cable, etc.
+    standalone_server: "localhost:28080"  # Cable server address
+    rewrite_path: "/"                     # Action Cable expects requests at root
+    force_max_concurrent_requests: 0      # No request limits for WebSockets
+
+managed_processes:
+  # Start the standalone Action Cable server
+  - name: action-cable
+    command: bundle
+    args: [exec, puma, -p, "28080", cable/config.ru]
+    working_dir: /rails
+    env:
+      RAILS_ENV: production
+    auto_restart: true
+```
 
 ### Managed Processes
 
