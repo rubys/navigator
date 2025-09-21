@@ -1,4 +1,4 @@
-module navigator
+module github.com/rubys/navigator
 
 go 1.24.1
 

@@ -1,0 +1,223 @@
+// This is an example of how the refactored main.go would look
+// NOTE: This is not a complete implementation - just showing the new structure
+
+package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/rubys/navigator/internal/auth"
+	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/idle"
+	"github.com/rubys/navigator/internal/process"
+	"github.com/rubys/navigator/internal/server"
+	"github.com/rubys/navigator/internal/utils"
+)
+
+func main() {
+	// Initialize logger
+	initLogger()
+
+	// Handle command line arguments
+	if err := handleCommandLineArgs(); err != nil {
+		slog.Error("Command failed", "error", err)
+		os.Exit(1)
+	}
+
+	// Determine config file path
+	configFile := "config/navigator.yml"
+	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+		configFile = os.Args[1]
+	}
+
+	// Load configuration
+	cfg, err := config.LoadConfig(configFile)
+	if err != nil {
+		slog.Error("Failed to load configuration", "error", err)
+		os.Exit(1)
+	}
+
+	// Write PID file
+	if err := utils.WritePIDFile(config.NavigatorPIDFile); err != nil {
+		slog.Error("Failed to write PID file", "error", err)
+		os.Exit(1)
+	}
+	defer utils.RemovePIDFile(config.NavigatorPIDFile)
+
+	// Create managers
+	processManager := process.NewManager(cfg)
+	appManager := process.NewAppManager(cfg)
+	idleManager := idle.NewManager(cfg)
+
+	// Load authentication if configured
+	var basicAuth *auth.BasicAuth
+	if cfg.Server.Authentication != "" {
+		basicAuth, err = auth.LoadAuthFile(
+			cfg.Server.Authentication,
+			"Restricted", // Default realm
+			cfg.Server.AuthExclude,
+		)
+		if err != nil {
+			slog.Error("Failed to load auth file", "error", err)
+			os.Exit(1)
+		}
+	}
+
+	// Start managed processes
+	if err := processManager.StartManagedProcesses(); err != nil {
+		slog.Error("Failed to start managed processes", "error", err)
+	}
+
+	// Execute server start hooks
+	if err := process.ExecuteServerHooks(cfg.Hooks.Start, "start"); err != nil {
+		slog.Error("Failed to execute start hooks", "error", err)
+		os.Exit(1)
+	}
+
+	// Create HTTP handler with the new server package
+	handler := server.CreateHandler(cfg, appManager, basicAuth, idleManager)
+
+	// Create HTTP server
+	addr := fmt.Sprintf(":%s", cfg.Server.Listen)
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: handler,
+	}
+
+	// Setup signal handling
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
+
+	// Start server in goroutine
+	serverErrors := make(chan error, 1)
+	go func() {
+		slog.Info("Navigator starting", "address", addr)
+
+		// Execute server ready hooks
+		process.ExecuteServerHooks(cfg.Hooks.Ready, "ready")
+
+		serverErrors <- srv.ListenAndServe()
+	}()
+
+	// Wait for termination signal or server error
+	select {
+	case err := <-serverErrors:
+		if err != http.ErrServerClosed {
+			slog.Error("Server failed", "error", err)
+		}
+
+	case sig := <-sigChan:
+		switch sig {
+		case syscall.SIGHUP:
+			slog.Info("Received SIGHUP, reloading configuration")
+			handleConfigReload(cfg, configFile, appManager, processManager)
+
+		case syscall.SIGTERM, syscall.SIGINT:
+			slog.Info("Received shutdown signal", "signal", sig)
+
+			// Stop idle manager
+			idleManager.Stop()
+
+			// Graceful shutdown
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			// Shutdown server
+			if err := srv.Shutdown(ctx); err != nil {
+				slog.Error("Server shutdown failed", "error", err)
+			}
+
+			// Stop all applications
+			appManager.Cleanup()
+
+			// Stop managed processes
+			processManager.StopManagedProcesses()
+		}
+	}
+
+	slog.Info("Navigator shutdown complete")
+}
+
+func initLogger() {
+	logLevel := slog.LevelInfo
+	if lvl := os.Getenv("LOG_LEVEL"); lvl != "" {
+		switch strings.ToLower(lvl) {
+		case "debug":
+			logLevel = slog.LevelDebug
+		case "info":
+			logLevel = slog.LevelInfo
+		case "warn", "warning":
+			logLevel = slog.LevelWarn
+		case "error":
+			logLevel = slog.LevelError
+		}
+	}
+
+	opts := &slog.HandlerOptions{
+		Level: logLevel,
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
+	slog.SetDefault(logger)
+}
+
+func handleCommandLineArgs() error {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "-s":
+			if len(os.Args) > 2 && os.Args[2] == "reload" {
+				return utils.SendReloadSignal(config.NavigatorPIDFile)
+			}
+			return fmt.Errorf("option -s requires 'reload'")
+
+		case "--help", "-h":
+			printHelp()
+			os.Exit(0)
+
+		case "--version", "-v":
+			fmt.Println("Navigator v1.0.0")
+			os.Exit(0)
+		}
+	}
+	return nil
+}
+
+func printHelp() {
+	fmt.Println("Navigator - Web application server")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  navigator [config-file]     Start server with optional config file")
+	fmt.Println("  navigator -s reload         Send reload signal to running server")
+	fmt.Println("  navigator --help            Show this help message")
+	fmt.Println("  navigator --version         Show version information")
+	fmt.Println()
+	fmt.Println("Environment Variables:")
+	fmt.Println("  LOG_LEVEL                   Set log level (debug, info, warn, error)")
+	fmt.Println()
+	fmt.Println("Default config file: config/navigator.yml")
+}
+
+func handleConfigReload(oldConfig *config.Config, configFile string, appManager *process.AppManager, processManager *process.Manager) {
+	// Reload configuration
+	newConfig, err := config.LoadConfig(configFile)
+	if err != nil {
+		slog.Error("Failed to reload configuration", "error", err)
+		return
+	}
+
+	// Update configuration in managers
+	appManager.UpdateConfig(newConfig)
+	processManager.UpdateManagedProcesses(newConfig)
+
+	// Update the main config
+	config.UpdateConfig(oldConfig, newConfig)
+
+	slog.Info("Configuration reloaded successfully")
+}
