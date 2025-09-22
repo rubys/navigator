@@ -1,10 +1,10 @@
 # Introduction
 
+Navigator was extracted from my [Showcase](https://github.com/rubys/showcase?tab=readme-ov-file#showcase) application to help with a number of issues, including but not limited to, the ones that arise from the use of SQLite. While SQLite was the motivation for a number of features in Navigator, nothing in Navigator is specific to SQLite.
+
 There are many good reasons to like [SQLite](https://sqlite.org/), and these are some of the best reasons: [Multi-Tenant Rails: Everybody Gets a Database](https://www.youtube.com/watch?v=Sc4FJ0EZTAg) and [SQLite Replication with Beamer](https://www.youtube.com/watch?v=lcved9uEV5U). [Stephen Margheim](https://fractaledmind.com/), [Mike Dalessio](https://mike.daless.io/), and [Kevin McConnell](https://github.com/kevinmcconnell) have been working on making SQLite production ready, and in the process are establishing Rails as a thought leader in this space.
 
-I'm also a big fan of [fly.io](https://fly.io/) and [Kamal](https://kamal-deploy.org/), but truth be told neither is optimized for SQLite. In fact, no PaaS is -- yet. This will change with [Kamal Geo Proxy](https://www.youtube.com/watch?v=gcwzWzC7gUA&t=3541s).
-
-Navigator was extracted from my [Showcase](https://github.com/rubys/showcase?tab=readme-ov-file#showcase) application to help with a number of issues, including but not limited to, the ones that arise from the use of SQLite. While SQLite was the motivation for a number of features in Navigator, nothing in Navigator is specific to SQLite.
+I'm also a big fan of [fly.io](https://fly.io/) and [Kamal](https://kamal-deploy.org/), but truth be told neither is optimized for SQLite. In fact, no PaaS is -- yet. This will soon change with [Kamal Geo Proxy](https://www.youtube.com/watch?v=gcwzWzC7gUA&t=3541s).
 
 The inspiration for Navigator was Basecamp's [thruster](https://github.com/basecamp/thruster?tab=readme-ov-file#thruster), and like thruster, is a reverse proxy written in Go. To use it, modify your Dockerfile:
 
