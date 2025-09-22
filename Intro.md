@@ -92,9 +92,6 @@ While Navigator currently focuses on the use cases above, there are several inte
 ### A/B Testing and Feature Flags
 Route different users to different application instances based on cookies, headers, or URL parameters. This would enable testing new features with a subset of users or gradual feature rollouts.
 
-### Local Development Environment
-Replace complex nginx/Docker setups for local development. A single Navigator configuration could manage frontend, backend, and supporting services.
-
 ### Rate Limiting and Protection
 Per-tenant or per-IP rate limiting to prevent abuse, with automatic blocking of suspicious traffic patterns and potential integration with fail2ban or similar tools.
 
