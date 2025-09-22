@@ -3,6 +3,7 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rubys/navigator/internal/config"
 )
 
 func TestIsWebSocketRequest(t *testing.T) {
@@ -303,5 +305,353 @@ func BenchmarkRetryResponseWriter(b *testing.B) {
 		retryWriter.WriteHeader(http.StatusOK)
 		retryWriter.Write(testBody)
 		retryWriter.Commit()
+	}
+}
+
+func TestHandleProxy(t *testing.T) {
+	// Create a test backend server
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Echo back request info for verification
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Backend-Hit", "true")
+		w.WriteHeader(http.StatusOK)
+
+		// Check forwarded headers
+		forwardedFor := r.Header.Get("X-Forwarded-For")
+		forwardedHost := r.Header.Get("X-Forwarded-Host")
+		forwardedProto := r.Header.Get("X-Forwarded-Proto")
+
+		response := fmt.Sprintf(`{"path":"%s","method":"%s","forwarded_for":"%s","forwarded_host":"%s","forwarded_proto":"%s"}`,
+			r.URL.Path, r.Method, forwardedFor, forwardedHost, forwardedProto)
+		w.Write([]byte(response))
+	}))
+	defer backend.Close()
+
+	tests := []struct {
+		name           string
+		method         string
+		path           string
+		targetURL      string
+		location       *config.Location
+		expectStatus   int
+		expectBackend  bool
+		expectError    bool
+	}{
+		{
+			name:          "Basic GET request",
+			method:        "GET",
+			path:          "/api/users",
+			targetURL:     backend.URL,
+			expectStatus:  http.StatusOK,
+			expectBackend: true,
+		},
+		{
+			name:          "POST request with location",
+			method:        "POST",
+			path:          "/api/data",
+			targetURL:     backend.URL,
+			location:      &config.Location{Alias: "/v1"},
+			expectStatus:  http.StatusOK,
+			expectBackend: true,
+		},
+		{
+			name:          "Invalid target URL",
+			method:        "GET",
+			path:          "/test",
+			targetURL:     "://invalid-url",
+			expectStatus:  http.StatusInternalServerError,
+			expectError:   true,
+		},
+		{
+			name:          "Connection refused",
+			method:        "GET",
+			path:          "/test",
+			targetURL:     "http://localhost:99999",
+			expectStatus:  http.StatusBadGateway,
+			expectError:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req.RemoteAddr = "192.168.1.100:12345"
+			req.Host = "example.com"
+
+			recorder := httptest.NewRecorder()
+
+			HandleProxy(recorder, req, tt.targetURL, tt.location)
+
+			if recorder.Code != tt.expectStatus {
+				t.Errorf("Status code = %d, expected %d", recorder.Code, tt.expectStatus)
+			}
+
+			if tt.expectBackend {
+				backendHit := recorder.Header().Get("X-Backend-Hit")
+				if backendHit != "true" {
+					t.Error("Expected request to reach backend")
+				}
+
+				// Verify forwarded headers were set
+				body := recorder.Body.String()
+				if !strings.Contains(body, "192.168.1.100") {
+					t.Error("X-Forwarded-For not set correctly")
+				}
+				if !strings.Contains(body, "example.com") {
+					t.Error("X-Forwarded-Host not set correctly")
+				}
+				if !strings.Contains(body, "http") {
+					t.Error("X-Forwarded-Proto not set correctly")
+				}
+			}
+		})
+	}
+}
+
+func TestHandleProxyWithRetry(t *testing.T) {
+	// Test 1: Successful backend
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("success"))
+	}))
+	defer backend.Close()
+
+	req := httptest.NewRequest("GET", "/api/test", nil)
+	recorder := httptest.NewRecorder()
+
+	HandleProxyWithRetry(recorder, req, backend.URL, 3*time.Second)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", recorder.Code)
+	}
+
+	body := recorder.Body.String()
+	if body != "success" {
+		t.Errorf("Expected 'success', got %q", body)
+	}
+
+	// Test 2: Invalid URL that will cause connection failure
+	req2 := httptest.NewRequest("GET", "/api/test", nil)
+	recorder2 := httptest.NewRecorder()
+
+	HandleProxyWithRetry(recorder2, req2, "http://invalid-host-that-does-not-exist:12345", 1*time.Second)
+
+	// Should result in 502 Bad Gateway after retries
+	if recorder2.Code != http.StatusBadGateway {
+		t.Errorf("Expected status 502 for invalid backend, got %d", recorder2.Code)
+	}
+
+	// Test 3: POST request should not retry even on failure
+	req3 := httptest.NewRequest("POST", "/api/test", nil)
+	recorder3 := httptest.NewRecorder()
+
+	start := time.Now()
+	HandleProxyWithRetry(recorder3, req3, "http://invalid-host-that-does-not-exist:12345", 3*time.Second)
+	duration := time.Since(start)
+
+	// Should fail quickly without retries for POST
+	if duration > 500*time.Millisecond {
+		t.Error("POST request should not retry and should fail quickly")
+	}
+	if recorder3.Code != http.StatusBadGateway {
+		t.Errorf("Expected status 502 for POST to invalid backend, got %d", recorder3.Code)
+	}
+
+	// Test 4: Invalid URL format
+	req4 := httptest.NewRequest("GET", "/test", nil)
+	recorder4 := httptest.NewRecorder()
+
+	HandleProxyWithRetry(recorder4, req4, "://invalid-url", 1*time.Second)
+
+	if recorder4.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500 for invalid URL, got %d", recorder4.Code)
+	}
+}
+
+func TestProxyWithWebSocketSupport(t *testing.T) {
+	// Create WebSocket backend
+	wsBackend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if IsWebSocketRequest(r) {
+			w.Header().Set("Upgrade", "websocket")
+			w.Header().Set("Connection", "upgrade")
+			w.WriteHeader(http.StatusSwitchingProtocols)
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("HTTP response"))
+		}
+	}))
+	defer wsBackend.Close()
+
+	tests := []struct {
+		name                string
+		headers             map[string]string
+		targetURL           string
+		expectWebSocket     bool
+		expectStatus        int
+		trackWebSockets     bool
+	}{
+		{
+			name: "WebSocket upgrade request",
+			headers: map[string]string{
+				"Upgrade":    "websocket",
+				"Connection": "upgrade",
+			},
+			targetURL:       wsBackend.URL,
+			expectWebSocket: true,
+			expectStatus:    http.StatusBadGateway, // Will fail hijacking in test environment
+			trackWebSockets: true,
+		},
+		{
+			name:            "Regular HTTP request",
+			headers:         map[string]string{},
+			targetURL:       wsBackend.URL,
+			expectWebSocket: false,
+			expectStatus:    http.StatusOK,
+		},
+		{
+			name: "WebSocket to invalid target",
+			headers: map[string]string{
+				"Upgrade":    "websocket",
+				"Connection": "upgrade",
+			},
+			targetURL:       "http://localhost:99999",
+			expectWebSocket: true,
+			expectStatus:    http.StatusBadGateway, // Will retry and fail
+			trackWebSockets: true,
+		},
+		{
+			name:            "HTTP with retry fallback",
+			headers:         map[string]string{},
+			targetURL:       "http://localhost:99999",
+			expectWebSocket: false,
+			expectStatus:    http.StatusBadGateway,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/cable", nil)
+			for k, v := range tt.headers {
+				req.Header.Set(k, v)
+			}
+
+			recorder := httptest.NewRecorder()
+
+			var activeWebSockets int32
+			var wsPointer *int32
+			if tt.trackWebSockets {
+				wsPointer = &activeWebSockets
+			}
+
+			ProxyWithWebSocketSupport(recorder, req, tt.targetURL, wsPointer)
+
+			if recorder.Code != tt.expectStatus {
+				t.Errorf("Status = %d, expected %d", recorder.Code, tt.expectStatus)
+			}
+
+			isWS := IsWebSocketRequest(req)
+			if isWS != tt.expectWebSocket {
+				t.Errorf("IsWebSocketRequest = %v, expected %v", isWS, tt.expectWebSocket)
+			}
+
+			if tt.expectWebSocket && tt.expectStatus == http.StatusSwitchingProtocols {
+				upgrade := recorder.Header().Get("Upgrade")
+				if upgrade != "websocket" {
+					t.Errorf("Upgrade header = %q, expected %q", upgrade, "websocket")
+				}
+			}
+			// Note: In test environment, WebSocket hijacking will fail with 502
+			// This is expected behavior since httptest.ResponseRecorder doesn't support hijacking
+		})
+	}
+}
+
+func TestHandleProxy_LocationAlias(t *testing.T) {
+	// Backend that echoes the request path
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(r.URL.Path))
+	}))
+	defer backend.Close()
+
+	tests := []struct {
+		name         string
+		requestPath  string
+		alias        string
+		expectedPath string
+	}{
+		{
+			name:         "No alias",
+			requestPath:  "/api/users",
+			alias:        "",
+			expectedPath: "/api/users",
+		},
+		{
+			name:         "With alias prefix",
+			requestPath:  "/users",
+			alias:        "/api/v1",
+			expectedPath: "/api/v1/users",
+		},
+		{
+			name:         "Root path with alias",
+			requestPath:  "/",
+			alias:        "/v2",
+			expectedPath: "/v2/",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.requestPath, nil)
+			recorder := httptest.NewRecorder()
+
+			var location *config.Location
+			if tt.alias != "" {
+				location = &config.Location{Alias: tt.alias}
+			}
+
+			HandleProxy(recorder, req, backend.URL, location)
+
+			if recorder.Code != http.StatusOK {
+				t.Errorf("Status = %d, expected %d", recorder.Code, http.StatusOK)
+			}
+
+			body := recorder.Body.String()
+			if body != tt.expectedPath {
+				t.Errorf("Backend received path %q, expected %q", body, tt.expectedPath)
+			}
+		})
+	}
+}
+
+func BenchmarkHandleProxy(b *testing.B) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}))
+	defer backend.Close()
+
+	req := httptest.NewRequest("GET", "/test", nil)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		recorder := httptest.NewRecorder()
+		HandleProxy(recorder, req, backend.URL, nil)
+	}
+}
+
+func BenchmarkProxyWithWebSocketSupport(b *testing.B) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}))
+	defer backend.Close()
+
+	req := httptest.NewRequest("GET", "/test", nil)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		recorder := httptest.NewRecorder()
+		ProxyWithWebSocketSupport(recorder, req, backend.URL, nil)
 	}
 }
