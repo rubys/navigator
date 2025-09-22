@@ -28,7 +28,7 @@ See [multi-tenant-monorepo-example.yml](examples/multi-tenant-monorepo-example.y
 
 ## Use Case 2: Suspend/Stop
 
-Fly.io has the ability to [autostop](https://fly.io/docs/launch/autostop-autostart/) or [suspend](https://fly.io/docs/reference/suspend-resume/) a machine when idle. This isn't merely for broke college students, it also makes practical distributing your application across hundreds of machines. Instead of these machines running 24/7, they will only run when needed.
+Fly.io has the ability to [autostop](https://fly.io/docs/launch/autostop-autostart/) or [suspend](https://fly.io/docs/reference/suspend-resume/) a machine when idle. This isn't merely for broke college students, it also makes it practical to distribute your application across hundreds of machines. Instead of these machines running 24/7, they will only run when needed.
 
 If you want control over when a machine is to be stopped or suspended, or want actions to be taken immediately prior to or immediately after a state change, you will need to write code. Doing so will require you to keep track of requests.
 
