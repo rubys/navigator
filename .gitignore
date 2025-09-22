@@ -19,7 +19,7 @@ go.work
 
 # Built binaries
 /navigator
-/bin/navigator
+/bin/
 /navigator-*
 navigator-linux-*
 navigator-darwin-*
