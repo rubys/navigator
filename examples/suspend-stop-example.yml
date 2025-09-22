@@ -1,0 +1,56 @@
+# Suspend/Stop Example Configuration
+# This configuration demonstrates automatic machine suspension/stopping
+# for Fly.io deployments to optimize resource usage
+
+server:
+  listen: 3000
+  hostname: localhost
+  public_dir: public
+
+  # Idle configuration for Fly.io machines
+  idle:
+    action: suspend        # Options: "suspend" or "stop"
+    timeout: 20m           # Idle timeout before action (e.g., "30s", "5m", "1h30m")
+
+# Lifecycle hooks for suspend/resume events
+hooks:
+  server:
+    # Execute before machine suspends
+    idle:
+      - command: /usr/local/bin/save-cache.sh
+        timeout: 10
+      - command: echo
+        args: ["Machine suspending at $(date)"]
+
+    # Execute when machine resumes from suspension
+    resume:
+      - command: /usr/local/bin/warm-cache.sh
+        timeout: 15
+      - command: curl
+        args: ["-X", "POST", "https://monitoring.example.com/resumed"]
+
+# Rails application with proper cleanup on suspend
+applications:
+  framework: rails
+  runtime_exec: bundle
+  server_exec: exec
+  server_args: ["puma", "-p", "{{port}}"]
+
+  pools:
+    max_size: 3
+    timeout: 10m          # App process idle timeout
+    start_port: 4000
+
+  tenants:
+    - name: production
+      root: /app
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: sqlite3:db/production.sqlite3
+
+      # Tenant-specific hooks for clean shutdown
+      hooks:
+        stop:
+          - command: bundle
+            args: [exec, rails, db:checkpoint]
+            timeout: 30

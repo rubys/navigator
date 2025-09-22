@@ -1,0 +1,61 @@
+# WebSockets Example Configuration
+# This configuration demonstrates running Rails with a separate Action Cable server
+# for optimal WebSocket performance and Solid Cable support
+
+server:
+  listen: 3000
+  hostname: localhost
+  public_dir: public
+
+# Static file serving for assets
+static_files:
+  paths:
+    - /assets/*
+    - /favicon.ico
+    - /robots.txt
+  headers:
+    cache_control: "public, max-age=3600"
+
+# Standalone Action Cable server configuration
+standalone_servers:
+  - path: /cable
+    target: http://localhost:28080
+    websocket: true
+
+# Managed processes for Redis and Action Cable
+managed_processes:
+  # Redis server for Action Cable (optional with Solid Cable)
+  - name: redis
+    command: redis-server
+    auto_restart: true
+
+  # Standalone Action Cable server
+  - name: action-cable
+    command: bundle
+    args: [exec, puma, -p, "28080", config/cable.ru]
+    working_dir: /app
+    start_delay: 2
+    auto_restart: true
+    env:
+      RAILS_ENV: production
+      ACTION_CABLE_ADAPTER: solid_cable  # or redis for Redis adapter
+
+# Rails application configuration
+applications:
+  framework: rails
+  runtime_exec: bundle
+  server_exec: exec
+  server_args: ["puma", "-p", "{{port}}"]
+
+  pools:
+    max_size: 5
+    timeout: 5m
+    start_port: 4000
+
+  tenants:
+    - name: main
+      root: /app
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: sqlite3:db/production.sqlite3
+        ACTION_CABLE_URL: ws://localhost:3000/cable

@@ -1,0 +1,90 @@
+# Routing Example Configuration
+# This configuration demonstrates intelligent request routing with Fly-Replay
+# for multi-region deployments and deployment stamps pattern
+
+server:
+  listen: 3000
+  hostname: localhost
+  public_dir: public
+
+# Rewrite rules for intelligent routing
+rewrite_rules:
+  # Route admin panel to primary region
+  - pattern: ^/admin(/.*)?$
+    replacement: $1
+    fly_replay: region=iad     # Route to IAD (Virginia) region
+    flag: last
+
+  # Route specific tenants to their home regions
+  - pattern: ^/tenant/europe(/.*)?$
+    replacement: $1
+    fly_replay: region=ams     # Route to Amsterdam region
+    flag: last
+
+  - pattern: ^/tenant/asia(/.*)?$
+    replacement: $1
+    fly_replay: region=nrt     # Route to Tokyo region
+    flag: last
+
+  # Route to specific machine for debugging
+  - pattern: ^/debug/machine/(.+?)/(.*)$
+    replacement: $2
+    fly_replay: instance=$1    # Route to specific machine ID
+    flag: last
+
+  # Route to any instance of a specific app
+  - pattern: ^/app/(.+?)/(.*)$
+    replacement: $2
+    fly_replay: app=$1        # Route to any instance of the app
+    flag: last
+
+  # Maintenance mode for specific paths
+  - pattern: ^/maintenance(/.*)?$
+    replacement: /503.html
+    status: 503               # Return 503 Service Unavailable
+    flag: last
+
+# Static maintenance page
+static_files:
+  paths:
+    - /503.html
+    - /assets/*
+  headers:
+    cache_control: "no-cache, no-store, must-revalidate"
+
+# Multi-tenant application configuration
+applications:
+  framework: rails
+  runtime_exec: bundle
+  server_exec: exec
+  server_args: ["puma", "-p", "{{port}}"]
+
+  pools:
+    max_size: 10
+    timeout: 5m
+    start_port: 4000
+
+  tenants:
+    # US East tenant
+    - name: us-east
+      root: /app/tenants/us-east
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: sqlite3:db/us-east.sqlite3
+        REGION: us-east
+
+    # Europe tenant
+    - name: europe
+      root: /app/tenants/europe
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: sqlite3:db/europe.sqlite3
+        REGION: europe
+
+    # Asia tenant
+    - name: asia
+      root: /app/tenants/asia
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: sqlite3:db/asia.sqlite3
+        REGION: asia

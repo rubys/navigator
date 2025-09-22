@@ -1,0 +1,137 @@
+# Multi-tenant and Monorepo Example Configuration
+# This configuration demonstrates:
+# 1. Multiple tenants sharing the same codebase with different databases
+# 2. Monorepo with multiple services (web server, API server, admin panel)
+
+server:
+  listen: 3000
+  hostname: localhost
+  public_dir: public
+
+# Static file serving shared across all tenants
+static_files:
+  paths:
+    - /assets/*
+    - /favicon.ico
+    - /robots.txt
+  headers:
+    cache_control: "public, max-age=3600"
+
+# Rewrite rules to route to different services
+rewrite_rules:
+  # Route API requests to API server
+  - pattern: ^/api/v1/(.*)$
+    replacement: /api/$1
+    proxy: http://localhost:4100
+    flag: last
+
+  # Route admin panel to separate admin app
+  - pattern: ^/admin(/.*)?$
+    replacement: $1
+    proxy: http://localhost:4200
+    flag: last
+
+# Managed processes for additional services in monorepo
+managed_processes:
+  # API server from monorepo
+  - name: api-server
+    command: bundle
+    args: [exec, rails, server, -p, "4100"]
+    working_dir: /monorepo/api
+    auto_restart: true
+    env:
+      RAILS_ENV: production
+      DATABASE_URL: postgresql://api_db
+
+  # Admin panel from monorepo
+  - name: admin-panel
+    command: npm
+    args: [run, start]
+    working_dir: /monorepo/admin
+    auto_restart: true
+    env:
+      PORT: 4200
+      REACT_APP_API_URL: http://localhost:3000/api/v1
+
+  # Background job processor shared by all tenants
+  - name: sidekiq
+    command: bundle
+    args: [exec, sidekiq]
+    working_dir: /monorepo/web
+    auto_restart: true
+    env:
+      RAILS_ENV: production
+
+# Multi-tenant Rails application configuration
+applications:
+  framework: rails
+  runtime_exec: bundle
+  server_exec: exec
+  server_args: ["puma", "-p", "{{port}}"]
+
+  # Template variables for tenant configuration
+  env:
+    RAILS_ENV: production
+    DATABASE_URL: "sqlite3:db/tenants/${tenant_id}/production.sqlite3"
+    TENANT_NAME: "${tenant_name}"
+    TENANT_DOMAIN: "${tenant_domain}"
+    STORAGE_PATH: "/data/tenants/${tenant_id}/storage"
+    CACHE_PATH: "/data/tenants/${tenant_id}/cache"
+
+  pools:
+    max_size: 20           # Support many tenant instances
+    timeout: 15m          # Longer timeout for less active tenants
+    start_port: 5000
+
+  tenants:
+    # Production tenants with isolated databases
+    - name: acme-corp
+      root: /monorepo/web
+      var:
+        tenant_id: "acme"
+        tenant_name: "Acme Corporation"
+        tenant_domain: "acme.example.com"
+      env:
+        FEATURE_FLAGS: "advanced_analytics,custom_branding"
+
+    - name: tech-startup
+      root: /monorepo/web
+      var:
+        tenant_id: "techstart"
+        tenant_name: "Tech Startup Inc"
+        tenant_domain: "techstart.example.com"
+      env:
+        FEATURE_FLAGS: "beta_features"
+
+    - name: global-retail
+      root: /monorepo/web
+      var:
+        tenant_id: "retail"
+        tenant_name: "Global Retail"
+        tenant_domain: "retail.example.com"
+      env:
+        FEATURE_FLAGS: "inventory_management,multi_currency"
+        LOCALE: "en-GB"
+
+    # Staging/demo tenants
+    - name: demo
+      root: /monorepo/web
+      var:
+        tenant_id: "demo"
+        tenant_name: "Demo Account"
+        tenant_domain: "demo.example.com"
+      env:
+        DEMO_MODE: "true"
+        FEATURE_FLAGS: "all"
+
+    # Development tenant with debug features
+    - name: development
+      root: /monorepo/web
+      var:
+        tenant_id: "dev"
+        tenant_name: "Development"
+        tenant_domain: "dev.example.com"
+      env:
+        RAILS_ENV: development
+        DEBUG_MODE: "true"
+        FEATURE_FLAGS: "all,debug_toolbar"

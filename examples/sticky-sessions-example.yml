@@ -1,0 +1,79 @@
+# Sticky Sessions Example Configuration
+# This configuration demonstrates session affinity for maintaining
+# WebSocket connections and volume-based data access
+
+server:
+  listen: 3000
+  hostname: localhost
+  public_dir: public
+
+# Sticky sessions configuration
+sticky_sessions:
+  enabled: true
+  cookie_name: "_navigator_machine"
+  cookie_max_age: "2h"        # Session duration (e.g., "30m", "1h", "24h")
+  cookie_secure: true         # Use secure cookies in production
+  cookie_httponly: true       # Prevent JavaScript access
+  cookie_samesite: "Lax"      # CSRF protection
+
+  # Apply sticky sessions only to specific paths
+  paths:
+    - "/app/*"                # Main application paths
+    - "/dashboard/*"          # Dashboard requires session continuity
+    - "/cable"                # WebSocket connections
+    - "/upload/*"             # File upload sessions
+
+# WebSocket support with sticky routing
+standalone_servers:
+  - path: /cable
+    target: http://localhost:28080
+    websocket: true
+
+# Managed process for Action Cable
+managed_processes:
+  - name: action-cable
+    command: bundle
+    args: [exec, puma, -p, "28080", config/cable.ru]
+    working_dir: /app
+    start_delay: 2
+    auto_restart: true
+    env:
+      RAILS_ENV: production
+
+# Multi-tenant configuration with volume-based storage
+applications:
+  framework: rails
+  runtime_exec: bundle
+  server_exec: exec
+  server_args: ["puma", "-p", "{{port}}"]
+
+  pools:
+    max_size: 5
+    timeout: 10m
+    start_port: 4000
+
+  tenants:
+    # Tenant with local volume storage
+    - name: tenant-a
+      root: /app/tenants/a
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: sqlite3:/data/tenant-a/production.sqlite3
+        ACTIVE_STORAGE_DISK_ROOT: /data/tenant-a/storage
+
+    # Another tenant with separate volume
+    - name: tenant-b
+      root: /app/tenants/b
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: sqlite3:/data/tenant-b/production.sqlite3
+        ACTIVE_STORAGE_DISK_ROOT: /data/tenant-b/storage
+
+# Static files bypass sticky sessions
+static_files:
+  paths:
+    - /assets/*
+    - /public/*
+    - /favicon.ico
+  headers:
+    cache_control: "public, max-age=3600"

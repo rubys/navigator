@@ -2,6 +2,8 @@
 
 Navigator is a Go-based web server that provides multi-tenant web application hosting with on-demand process management. It supports multiple web frameworks through configurable settings.
 
+For background on the motivations and use cases for Navigator, see [Introduction](Intro.md).
+
 ## Overview
 
 Navigator uses YAML configuration format for:
