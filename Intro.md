@@ -11,37 +11,7 @@ COPY --from=samruby/navigator:latest /navigator /usr/local/bin/navigator
 CMD ["navigator", "config/navigator.yml"]
 ```
 
-## Use case 1: WebSockets
-
-WebSockets enable two-way communication between a server and a browser. A WebSocket connection is typically open for minutes or hours rather than tens or hundreds of milliseconds.
-
-Rails recommends running a separate [Standalone Cable Server](https://guides.rubyonrails.org/action_cable_overview.html#running-standalone-cable-servers) for performance, scalability, and stability.
-
-Prior to Rails 8, the recommended configuration was three services: Rails, Redis, and Action Cable. With Rails 8, the new default is [Solid Cable](https://github.com/rails/solid_cable?tab=readme-ov-file#solid-cable) with Sqlite3. This requires Action Cable and Rails to be run on the same machine.
-
-This could be accomplished via a reverse proxy like [Nginx](https://nginx.org/) or [Traefik](https://traefik.io/traefik), and a process manager like [Foreman](https://github.com/ddollar/foreman?tab=readme-ov-file#foreman) or [Overmind](https://github.com/DarthSim/overmind/blob/master/README.md).
-
-Navigator can be configured to do both tasks, without needing to modify the configuration of your Rails application. See [websockets-example.yml](examples/websockets-example.yml) for a complete configuration example.
-
-## Use Case 2: Suspend/Stop
-
-Fly.io has the ability to [autostop](https://fly.io/docs/launch/autostop-autostart/) or [suspend](https://fly.io/docs/reference/suspend-resume/) a machine when idle. This isn't merely for broke college students, it also makes practical distributing your application across hundreds of machines. Instead of these machines running 24/7, they will only run when needed.
-
-If you want control over when a machine is to be stopped or suspended, or want actions to be taken immediately prior to or immediately after a state change, you will need to write code. Doing so will require you to keep track of requests.
-
-All of this is something a reverse proxy like Navigator can do. See [suspend-stop-example.yml](examples/suspend-stop-example.yml) for a complete configuration example.
-
-## Use Case 3: Routing
-
-Fly.io supports [Dynamic Routing](https://fly.io/docs/networking/dynamic-request-routing/), which has two modes: _prefer_ or _force_. With _prefer_ requests that can't be routed to the intended destination are routed to an available server. With _force_, such requests fail.
-
-Having requests routed somewhere means that your application has an ability to detect, log, recover, or take other actions. For now, Navigator shows a maintenance page, which is more user friendly and something that can be searched for in logs. See [routing-example.yml](examples/routing-example.yml) for a complete configuration example.
-
-## Use Case 4: Sticky Sessions
-
-Navigator provides built-in sticky session support using HTTP cookies, ensuring requests from the same client are routed to the same machine. This is particularly useful for maintaining WebSocket connections or accessing locally stored data on specific machines. See [sticky-sessions-example.yml](examples/sticky-sessions-example.yml) for a complete configuration example.
-
-## Use Case 5: Multi-tenant and Monorepos
+## Use Case 1: Multi-tenant and Monorepos
 
 The multi-tenant work linked at the top of this page will enable a single Rails application to support multiple tenant databases. My showcase application takes a different approach: launching a separate instance of the same Rails application for each tenant, varying environment variables such as `DATABASE_URL`.
 
@@ -55,6 +25,36 @@ Navigator supports both patterns with:
 - **Different tenant types**: Production, staging/demo, and development environments
 
 See [multi-tenant-monorepo-example.yml](examples/multi-tenant-monorepo-example.yml) for a complete configuration example.
+
+## Use Case 2: Suspend/Stop
+
+Fly.io has the ability to [autostop](https://fly.io/docs/launch/autostop-autostart/) or [suspend](https://fly.io/docs/reference/suspend-resume/) a machine when idle. This isn't merely for broke college students, it also makes practical distributing your application across hundreds of machines. Instead of these machines running 24/7, they will only run when needed.
+
+If you want control over when a machine is to be stopped or suspended, or want actions to be taken immediately prior to or immediately after a state change, you will need to write code. Doing so will require you to keep track of requests.
+
+All of this is something a reverse proxy like Navigator can do. See [suspend-stop-example.yml](examples/suspend-stop-example.yml) for a complete configuration example.
+
+## Use Case 3: WebSockets
+
+WebSockets enable two-way communication between a server and a browser. A WebSocket connection is typically open for minutes or hours rather than tens or hundreds of milliseconds.
+
+Rails recommends running a separate [Standalone Cable Server](https://guides.rubyonrails.org/action_cable_overview.html#running-standalone-cable-servers) for performance, scalability, and stability.
+
+Prior to Rails 8, the recommended configuration was three services: Rails, Redis, and Action Cable. With Rails 8, the new default is [Solid Cable](https://github.com/rails/solid_cable?tab=readme-ov-file#solid-cable) with Sqlite3. This requires Action Cable and Rails to be run on the same machine.
+
+This could be accomplished via a reverse proxy like [Nginx](https://nginx.org/) or [Traefik](https://traefik.io/traefik), and a process manager like [Foreman](https://github.com/ddollar/foreman?tab=readme-ov-file#foreman) or [Overmind](https://github.com/DarthSim/overmind/blob/master/README.md).
+
+Navigator can be configured to do both tasks, without needing to modify the configuration of your Rails application. See [websockets-example.yml](examples/websockets-example.yml) for a complete configuration example.
+
+## Use Case 4: Sticky Sessions
+
+Navigator provides built-in sticky session support using HTTP cookies, ensuring requests from the same client are routed to the same machine. This is particularly useful for maintaining WebSocket connections or accessing locally stored data on specific machines. See [sticky-sessions-example.yml](examples/sticky-sessions-example.yml) for a complete configuration example.
+
+## Use Case 5: Routing
+
+Fly.io supports [Dynamic Routing](https://fly.io/docs/networking/dynamic-request-routing/), which has two modes: _prefer_ or _force_. With _prefer_ requests that can't be routed to the intended destination are routed to an available server. With _force_, such requests fail.
+
+Having requests routed somewhere means that your application has an ability to detect, log, recover, or take other actions. For now, Navigator shows a maintenance page, which is more user friendly and something that can be searched for in logs. See [routing-example.yml](examples/routing-example.yml) for a complete configuration example.
 
 ## Use Case 6: Log Aggregation with Vector
 
