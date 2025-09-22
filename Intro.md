@@ -1,8 +1,8 @@
 # Introduction
 
-There are many good reasons to like [SQLite](https://sqlite.org/), and this is one of the best reasons: [Multi-Tenant Rails: Everybody Gets a Database](https://www.youtube.com/watch?v=Sc4FJ0EZTAg). Some of the best work in this area is done by [Stephen Margheim](https://fractaledmind.com/) and [Mike Dalessio](https://mike.daless.io/), establishing Rails as a thought leader in this space.
+There are many good reasons to like [SQLite](https://sqlite.org/), and these are some of the best reasons: [Multi-Tenant Rails: Everybody Gets a Database](https://www.youtube.com/watch?v=Sc4FJ0EZTAg) and [SQLite Replication with Beamer](https://www.youtube.com/watch?v=lcved9uEV5U). [Stephen Margheim](https://fractaledmind.com/), [Mike Dalessio](https://mike.daless.io/), and [Kevin McConnell](https://github.com/kevinmcconnell) have been working on making SQLite production ready, and in the process are establishing Rails as a thought leader in this space.
 
-I'm also a big fan of [fly.io](https://fly.io/) and [Kamal](https://kamal-deploy.org/), but truth be told neither is optimized for SQLite. In fact, no PaaS is.
+I'm also a big fan of [fly.io](https://fly.io/) and [Kamal](https://kamal-deploy.org/), but truth be told neither is optimized for SQLite. In fact, no PaaS is -- yet. This will change with [Kamal Geo Proxy](https://www.youtube.com/watch?v=gcwzWzC7gUA&t=3541s).
 
 Navigator was extracted from my [Showcase](https://github.com/rubys/showcase?tab=readme-ov-file#showcase) application to help with a number of issues, including but not limited to, the ones that arise from the use of SQLite. While SQLite was the motivation for a number of features in Navigator, nothing in Navigator is specific to SQLite.
 
@@ -34,7 +34,25 @@ Fly.io has the ability to [autostop](https://fly.io/docs/launch/autostop-autosta
 
 If you want control over when a machine is to be stopped or suspended, or want actions to be taken immediately prior to or immediately after a state change, you will need to write code. Doing so will require you to keep track of requests.
 
-All of this is something a reverse proxy like Navigator can do. See [suspend-stop-example.yml](examples/suspend-stop-example.yml) for a complete configuration example.
+All of this is something a reverse proxy like Navigator can do. Navigator's lifecycle hooks enable powerful automation for machine state changes:
+
+**Pre-suspension hooks** (`idle` event) could:
+- Flush in-memory caches to persistent storage
+- Save session data to Redis or database
+- Upload temporary files to S3 or cloud storage
+- Send metrics to monitoring services
+- Notify other services about pending suspension
+- Checkpoint long-running computations
+
+**Post-resume hooks** (`resume` event) could:
+- Warm up application caches
+- Reconnect to external services
+- Pre-load frequently accessed data
+- Notify monitoring systems of machine availability
+- Sync state from shared storage
+- Re-establish WebSocket connections
+
+See [suspend-stop-example.yml](examples/suspend-stop-example.yml) for a complete configuration example.
 
 ## Use Case 3: WebSockets
 
