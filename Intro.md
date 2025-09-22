@@ -56,6 +56,20 @@ Navigator supports both patterns with:
 
 See [multi-tenant-monorepo-example.yml](examples/multi-tenant-monorepo-example.yml) for a complete configuration example.
 
+## Use Case 6: Log Aggregation with Vector
+
+Modern applications generate logs from multiple sources: web servers, background workers, databases, and the application itself. When running across multiple machines or regions, centralizing these logs becomes essential for debugging and monitoring. [Vector](https://vector.dev/) is a high-performance observability data pipeline that can collect, transform, and route logs to various destinations.
+
+Navigator includes built-in Vector integration that:
+- **Automatic Process Management**: Starts and manages Vector as a high-priority process
+- **Unix Socket Streaming**: Efficient log transfer via Unix sockets without file I/O overhead
+- **Structured Logging**: JSON format support for rich metadata and easy parsing
+- **Source Identification**: Automatically tags logs with source (tenant, process name, stream)
+- **Graceful Degradation**: Continues operating if Vector is unavailable
+- **Multiple Destinations**: Route logs to files, Elasticsearch, S3, or any Vector-supported sink
+
+This integration eliminates the need for complex log collection setups and provides a unified logging pipeline for all Navigator-managed processes. See [navigator-with-vector.yml](examples/navigator-with-vector.yml) and [vector.toml](examples/vector.toml) for complete configuration examples.
+
 ## Future Use Case Ideas
 
 While Navigator currently focuses on the use cases above, there are several interesting directions worth exploring:
