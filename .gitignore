@@ -20,7 +20,10 @@ go.work
 # Built binaries
 /navigator
 /bin/navigator
-navigator-*
+/navigator-*
+navigator-linux-*
+navigator-darwin-*
+navigator-refactored-*
 
 # Development files
 *.log
