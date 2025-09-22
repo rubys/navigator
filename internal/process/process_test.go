@@ -1,6 +1,7 @@
 package process
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -307,6 +308,330 @@ func TestWebAppManager(t *testing.T) {
 
 	// Test cleanup
 	appManager.Cleanup()
+}
+
+func TestManagedProcessLifecycle(t *testing.T) {
+	cfg := &config.Config{
+		ManagedProcesses: []config.ManagedProcessConfig{
+			{
+				Name:        "test-echo",
+				Command:     "echo",
+				Args:        []string{"hello", "world"},
+				WorkingDir:  "/tmp",
+				Env:         map[string]string{"TEST": "value"},
+				AutoRestart: false,
+				StartDelay:  "100ms",
+			},
+		},
+	}
+
+	manager := NewManager(cfg)
+
+	// Test starting processes
+	err := manager.StartManagedProcesses()
+	if err != nil {
+		t.Fatalf("StartManagedProcesses failed: %v", err)
+	}
+
+	// Give processes time to start
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify process was created
+	if len(manager.processes) != 1 {
+		t.Errorf("Expected 1 process, got %d", len(manager.processes))
+	}
+
+	proc := manager.processes[0]
+	if proc.Name != "test-echo" {
+		t.Errorf("Process name = %q, expected %q", proc.Name, "test-echo")
+	}
+
+	// Test stopping processes
+	manager.StopManagedProcesses()
+
+	// Give processes time to stop
+	time.Sleep(100 * time.Millisecond)
+}
+
+func TestManagedProcessAutoRestart(t *testing.T) {
+	// Create a process that will fail quickly for testing auto-restart
+	cfg := &config.Config{
+		ManagedProcesses: []config.ManagedProcessConfig{
+			{
+				Name:        "test-failing",
+				Command:     "false", // Command that exits with error
+				Args:        []string{},
+				AutoRestart: true,
+				StartDelay:  "0s",
+			},
+		},
+	}
+
+	manager := NewManager(cfg)
+
+	err := manager.StartManagedProcesses()
+	if err != nil {
+		t.Fatalf("StartManagedProcesses failed: %v", err)
+	}
+
+	// Give time for process to fail and restart attempt
+	time.Sleep(1 * time.Second)
+
+	// Verify process exists (restart logic should be working)
+	if len(manager.processes) != 1 {
+		t.Errorf("Expected 1 process after restart, got %d", len(manager.processes))
+	}
+
+	// Stop the auto-restart cycle quickly to avoid long test times
+	manager.StopManagedProcesses()
+}
+
+func TestManagedProcessInvalidCommand(t *testing.T) {
+	cfg := &config.Config{
+		ManagedProcesses: []config.ManagedProcessConfig{
+			{
+				Name:    "test-invalid",
+				Command: "non-existent-command-12345",
+				Args:    []string{},
+			},
+		},
+	}
+
+	manager := NewManager(cfg)
+
+	// Should not return error even if process fails to start
+	err := manager.StartManagedProcesses()
+	if err != nil {
+		t.Fatalf("StartManagedProcesses should not fail for invalid command: %v", err)
+	}
+
+	// Give time for start attempt
+	time.Sleep(100 * time.Millisecond)
+
+	manager.StopManagedProcesses()
+}
+
+func TestWebAppManagerIntegration(t *testing.T) {
+	cfg := &config.Config{
+		Applications: config.Applications{
+			Pools: config.Pools{
+				MaxSize:   5,
+				StartPort: 4000,
+				Timeout:   "5m",
+			},
+			Tenants: []config.Tenant{
+				{
+					Name: "test-tenant",
+					Root: "/tmp",
+					Var:  map[string]interface{}{"database": "test_db"},
+				},
+			},
+			Env: map[string]string{
+				"DATABASE_URL": "sqlite:///${database}.db",
+				"PORT":         "${port}",
+			},
+		},
+	}
+
+	appManager := NewAppManager(cfg)
+
+	// Test getting non-existent tenant
+	_, err := appManager.GetOrStartApp("non-existent-tenant")
+	if err == nil {
+		t.Error("Expected error for non-existent tenant")
+	}
+
+	// Test basic app manager functionality without actually starting processes
+	// (since we don't have a real web app to start in tests)
+
+	// Test port allocation (use the module function)
+	port, err := findAvailablePort(appManager.minPort, appManager.maxPort)
+	if err != nil {
+		t.Fatalf("findAvailablePort failed: %v", err)
+	}
+	if port < appManager.minPort || port > appManager.maxPort {
+		t.Errorf("Port %d is outside expected range [%d, %d]", port, appManager.minPort, appManager.maxPort)
+	}
+
+	// Test cleanup
+	appManager.Cleanup()
+}
+
+func TestUpdateManagedProcessesIntegration(t *testing.T) {
+	// Initial config with one process
+	cfg := &config.Config{
+		ManagedProcesses: []config.ManagedProcessConfig{
+			{
+				Name:    "initial-process",
+				Command: "echo",
+				Args:    []string{"initial"},
+			},
+		},
+	}
+
+	manager := NewManager(cfg)
+	manager.StartManagedProcesses()
+	time.Sleep(100 * time.Millisecond)
+
+	if len(manager.processes) != 1 {
+		t.Errorf("Expected 1 initial process, got %d", len(manager.processes))
+	}
+
+	// Updated config with different processes
+	newCfg := &config.Config{
+		ManagedProcesses: []config.ManagedProcessConfig{
+			{
+				Name:    "new-process",
+				Command: "echo",
+				Args:    []string{"new"},
+			},
+			{
+				Name:    "another-process",
+				Command: "echo",
+				Args:    []string{"another"},
+			},
+		},
+	}
+
+	// Test configuration update
+	manager.UpdateManagedProcesses(newCfg)
+	time.Sleep(200 * time.Millisecond)
+
+	if len(manager.processes) != 3 {
+		t.Errorf("Expected 3 processes after update (1 stopped + 2 new), got %d", len(manager.processes))
+	}
+
+	manager.StopManagedProcesses()
+}
+
+func TestProcessManagerConcurrency(t *testing.T) {
+	cfg := &config.Config{
+		ManagedProcesses: []config.ManagedProcessConfig{
+			{
+				Name:    "concurrent-test",
+				Command: "echo",
+				Args:    []string{"concurrent"},
+			},
+		},
+	}
+
+	manager := NewManager(cfg)
+
+	// Test concurrent access
+	var wg sync.WaitGroup
+
+	// Start multiple goroutines accessing the manager
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			manager.StartManagedProcesses()
+		}()
+	}
+
+	wg.Wait()
+
+	// Concurrent calls might create multiple processes, but should eventually stabilize
+	// This tests that the manager doesn't crash under concurrent access
+	if len(manager.processes) == 0 {
+		t.Error("Expected at least some processes to be created")
+	}
+
+	manager.StopManagedProcesses()
+}
+
+func TestWebAppPortAllocation(t *testing.T) {
+	// Test port allocation (independent of config)
+	port1, err1 := findAvailablePort(4000, 4099)
+	if err1 != nil {
+		t.Fatalf("findAvailablePort failed: %v", err1)
+	}
+	port2, err2 := findAvailablePort(4000, 4099)
+	if err2 != nil {
+		t.Fatalf("findAvailablePort failed: %v", err2)
+	}
+
+	// Ports should be in valid range
+	if port1 < 4000 || port1 > 4099 {
+		t.Errorf("Port1 %d out of range", port1)
+	}
+	if port2 < 4000 || port2 > 4099 {
+		t.Errorf("Port2 %d out of range", port2)
+	}
+
+	// Should get different ports (most of the time)
+	// Note: This test might occasionally have the same port due to timing
+}
+
+func TestExecuteHooksTimeout(t *testing.T) {
+	hooks := []config.HookConfig{
+		{
+			Command: "sleep",
+			Args:    []string{"10"}, // Long sleep to trigger timeout
+			Timeout: "100ms",
+		},
+	}
+
+	start := time.Now()
+	err := ExecuteHooks(hooks, map[string]string{}, "timeout-test")
+	duration := time.Since(start)
+
+	// Should timeout and return error
+	if err == nil {
+		t.Error("Expected timeout error, got nil")
+	}
+
+	// Should complete in reasonable time (not wait for full 10 seconds)
+	if duration > 2*time.Second {
+		t.Errorf("Hook took too long: %v", duration)
+	}
+}
+
+func TestWebAppGetApp(t *testing.T) {
+	cfg := &config.Config{
+		Applications: config.Applications{
+			Pools: config.Pools{
+				MaxSize:   5,
+				StartPort: 4000,
+				Timeout:   "5m",
+			},
+			Tenants: []config.Tenant{
+				{
+					Name: "get-app-test",
+					Root: "/tmp",
+				},
+			},
+		},
+	}
+
+	appManager := NewAppManager(cfg)
+
+	// Test getting non-existent app
+	app, exists := appManager.GetApp("non-existent")
+	if exists {
+		t.Error("GetApp should return false for non-existent app")
+	}
+	if app != nil {
+		t.Error("GetApp should return nil for non-existent app")
+	}
+
+	// Test updating config
+	newCfg := &config.Config{
+		Applications: config.Applications{
+			Pools: config.Pools{
+				MaxSize:   10,
+				StartPort: 4500,
+				Timeout:   "10m",
+			},
+		},
+	}
+
+	// Should not panic
+	appManager.UpdateConfig(newCfg)
+
+	if appManager.config != newCfg {
+		t.Error("UpdateConfig should update the config reference")
+	}
 }
 
 // Helper functions for testing
