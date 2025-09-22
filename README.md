@@ -49,6 +49,23 @@ go build -mod=readonly -o bin/navigator cmd/navigator/main.go
 
 ## Quick Start
 
+Create a minimal configuration file:
+
+```yaml
+# config/navigator.yml
+server:
+  listen: 3000
+  public_dir: ./public
+
+applications:
+  tenants:
+    - name: myapp
+      path: /
+      working_dir: /path/to/rails/app
+```
+
+Run Navigator:
+
 ```bash
 # Display help
 ./bin/navigator --help
@@ -335,26 +352,6 @@ maintenance:
 - **WebSocket Support**: Full support for WebSocket connections
 - **Path Rewriting**: Optional path rewriting before proxying to standalone server
 
-Example Action Cable configuration:
-```yaml
-tenants:
-  # Route all */cable requests to standalone Action Cable server
-  - path: /cable
-    match_pattern: "*/cable"              # Matches /app/2025/boston/cable, etc.
-    standalone_server: "localhost:28080"  # Cable server address
-    rewrite_path: "/"                     # Action Cable expects requests at root
-    force_max_concurrent_requests: 0      # No request limits for WebSockets
-
-managed_processes:
-  # Start the standalone Action Cable server
-  - name: action-cable
-    command: bundle
-    args: [exec, puma, -p, "28080", cable/config.ru]
-    working_dir: /rails
-    env:
-      RAILS_ENV: production
-    auto_restart: true
-```
 
 ### Managed Processes
 
@@ -418,42 +415,6 @@ curl -u username:password http://localhost:9999/protected/path
 
 # Test web app proxy (authenticated routes)
 curl -u username:password http://localhost:9999/showcase/2025/boston/
-```
-
-## Documentation
-
-📚 **Complete documentation is available at: https://rubys.github.io/navigator/**
-
-The documentation includes:
-- **Getting Started**: Installation and basic configuration
-- **Configuration Reference**: Complete YAML options with examples
-- **Working Examples**: Redis, Action Cable, multi-tenant setups
-- **Feature Guides**: Process management, routing, authentication
-- **Deployment**: Production deployment and best practices
-- **CLI Reference**: Command-line options and usage
-
-### Local Documentation Development
-
-```bash
-# Set up development environment
-mise trust
-mise settings experimental=true
-uv venv
-uv pip install -r pyproject.toml
-
-# Serve documentation locally
-mkdocs serve
-# Open http://localhost:8000 in your browser
-```
-
-### Alternative Setup (without mise)
-
-```bash
-# Install dependencies directly
-pip install -r requirements.txt
-
-# Serve documentation
-mkdocs serve
 ```
 
 ## Development
