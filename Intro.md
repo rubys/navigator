@@ -37,20 +37,15 @@ If you want control over when a machine is to be stopped or suspended, or want a
 All of this is something a reverse proxy like Navigator can do. Navigator's lifecycle hooks enable powerful automation for machine state changes:
 
 **Pre-suspension hooks** (`idle` event) could:
-- Flush in-memory caches to persistent storage
-- Save session data to Redis or database
-- Upload temporary files to S3 or cloud storage
+- Upload databases and files to S3 or cloud storage
 - Send metrics to monitoring services
 - Notify other services about pending suspension
 - Checkpoint long-running computations
 
 **Post-resume hooks** (`resume` event) could:
-- Warm up application caches
-- Reconnect to external services
-- Pre-load frequently accessed data
-- Notify monitoring systems of machine availability
 - Sync state from shared storage
-- Re-establish WebSocket connections
+- Reconnect to external services
+- Notify monitoring systems of machine availability
 
 See [suspend-stop-example.yml](examples/suspend-stop-example.yml) for a complete configuration example.
 
@@ -98,16 +93,13 @@ While Navigator currently focuses on the use cases above, there are several inte
 Route different users to different application instances based on cookies, headers, or URL parameters. This would enable testing new features with a subset of users or gradual feature rollouts.
 
 ### Local Development Environment
-Replace complex nginx/Docker setups for local development. A single Navigator configuration could manage frontend, backend, and supporting services with automatic SSL certificates for HTTPS testing.
+Replace complex nginx/Docker setups for local development. A single Navigator configuration could manage frontend, backend, and supporting services.
 
 ### Rate Limiting and Protection
 Per-tenant or per-IP rate limiting to prevent abuse, with automatic blocking of suspicious traffic patterns and potential integration with fail2ban or similar tools.
 
 ### Health Checks and Circuit Breakers
 Automatic health monitoring of backend services with circuit breaker patterns to prevent cascading failures and enable graceful degradation when services are unavailable.
-
-### Database Connection Management
-PgBouncer-like functionality for Postgres connections or sophisticated SQLite connection management for multi-tenant setups, including read/write splitting for database replicas.
 
 ### Enhanced Observability
 Integration with observability platforms (Datadog, New Relic, OpenTelemetry) for distributed tracing and comprehensive monitoring across all tenants.
