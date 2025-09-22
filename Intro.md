@@ -1,8 +1,10 @@
-There are many good reasons to like [Sqlite3](https://sqlite.org/), and this is one of the best reasons: [Multi-Tenant Rails: Everybody Gets a Database](https://www.youtube.com/watch?v=Sc4FJ0EZTAg). Some of the best work in this area is done by [Stephen Margheim](https://fractaledmind.com/) and [Mike Dalessio](https://mike.daless.io/), establishing Rails as a thought leader in this space.
+# Introduction
 
-I'm also a big fan of [fly.io](https://fly.io/) and [Kamal](https://kamal-deploy.org/), but truth be told neither is optimized for sqlite3. In fact, no PaaS is.
+There are many good reasons to like [SQLite](https://sqlite.org/), and this is one of the best reasons: [Multi-Tenant Rails: Everybody Gets a Database](https://www.youtube.com/watch?v=Sc4FJ0EZTAg). Some of the best work in this area is done by [Stephen Margheim](https://fractaledmind.com/) and [Mike Dalessio](https://mike.daless.io/), establishing Rails as a thought leader in this space.
 
-Navigator was extracted from my [Showcase](https://github.com/rubys/showcase?tab=readme-ov-file#showcase) application to help with a number of issues, including but not limited to, the ones that arise from the use of sqlite3. While sqlite3 was the motivation for a number of features in Navigator, nothing in Navigator is specific to Sqlite3.
+I'm also a big fan of [fly.io](https://fly.io/) and [Kamal](https://kamal-deploy.org/), but truth be told neither is optimized for SQLite. In fact, no PaaS is.
+
+Navigator was extracted from my [Showcase](https://github.com/rubys/showcase?tab=readme-ov-file#showcase) application to help with a number of issues, including but not limited to, the ones that arise from the use of SQLite. While SQLite was the motivation for a number of features in Navigator, nothing in Navigator is specific to SQLite.
 
 The inspiration for Navigator was Basecamp's [thruster](https://github.com/basecamp/thruster?tab=readme-ov-file#thruster), and like thruster, is a reverse proxy written in Go. To use it, modify your Dockerfile:
 
@@ -40,7 +42,7 @@ WebSockets enable two-way communication between a server and a browser. A WebSoc
 
 Rails recommends running a separate [Standalone Cable Server](https://guides.rubyonrails.org/action_cable_overview.html#running-standalone-cable-servers) for performance, scalability, and stability.
 
-Prior to Rails 8, the recommended configuration was three services: Rails, Redis, and Action Cable. With Rails 8, the new default is [Solid Cable](https://github.com/rails/solid_cable?tab=readme-ov-file#solid-cable) with Sqlite3. This requires Action Cable and Rails to be run on the same machine.
+Prior to Rails 8, the recommended configuration was three services: Rails, Redis, and Action Cable. With Rails 8, the new default is [Solid Cable](https://github.com/rails/solid_cable?tab=readme-ov-file#solid-cable) with SQLite. This requires Action Cable and Rails to be run on the same machine.
 
 This could be accomplished via a reverse proxy like [Nginx](https://nginx.org/) or [Traefik](https://traefik.io/traefik), and a process manager like [Foreman](https://github.com/ddollar/foreman?tab=readme-ov-file#foreman) or [Overmind](https://github.com/DarthSim/overmind/blob/master/README.md).
 
@@ -73,9 +75,6 @@ This integration eliminates the need for complex log collection setups and provi
 ## Future Use Case Ideas
 
 While Navigator currently focuses on the use cases above, there are several interesting directions worth exploring:
-
-### Blue-Green Deployments
-Zero-downtime deployments by running old and new versions simultaneously, gradually shifting traffic between them. Navigator could manage both versions as separate tenants with weighted routing rules.
 
 ### A/B Testing and Feature Flags
 Route different users to different application instances based on cookies, headers, or URL parameters. This would enable testing new features with a subset of users or gradual feature rollouts.
