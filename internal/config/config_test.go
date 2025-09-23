@@ -541,6 +541,101 @@ hooks:
 	}
 }
 
+func TestRoutesWithRedirects(t *testing.T) {
+	// Test configuration with both redirects and rewrites
+	testConfig := `
+server:
+  listen: 3000
+  hostname: localhost
+
+routes:
+  redirects:
+    - from: "^/(showcase)?$"
+      to: "/showcase/studios/"
+    - from: "^/old-path$"
+      to: "/new-path"
+  rewrites:
+    - from: "^/assets/(.*)"
+      to: "/showcase/assets/$1"
+    - from: "^/([^/]+\\.(gif|png|jpg))$"
+      to: "/showcase/$1"
+
+applications:
+  pools:
+    max_size: 5
+    timeout: "5m"
+    start_port: 4000
+  tenants: []
+`
+
+	tmpFile, err := os.CreateTemp("", "navigator-routes-test-*.yml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(testConfig); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+	tmpFile.Close()
+
+	config, err := LoadConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to load config with routes: %v", err)
+	}
+
+	// Verify redirects are loaded correctly
+	if len(config.Routes.Redirects) != 2 {
+		t.Errorf("Expected 2 redirects, got %d", len(config.Routes.Redirects))
+	}
+
+	if len(config.Routes.Redirects) > 0 {
+		redirect1 := config.Routes.Redirects[0]
+		if redirect1.From != "^/(showcase)?$" {
+			t.Errorf("Expected redirect from '^/(showcase)?$', got '%s'", redirect1.From)
+		}
+		if redirect1.To != "/showcase/studios/" {
+			t.Errorf("Expected redirect to '/showcase/studios/', got '%s'", redirect1.To)
+		}
+	}
+
+	// Verify rewrites are loaded correctly
+	if len(config.Routes.Rewrites) != 2 {
+		t.Errorf("Expected 2 rewrites, got %d", len(config.Routes.Rewrites))
+	}
+
+	if len(config.Routes.Rewrites) > 0 {
+		rewrite1 := config.Routes.Rewrites[0]
+		if rewrite1.From != "^/assets/(.*)" {
+			t.Errorf("Expected rewrite from '^/assets/(.*)', got '%s'", rewrite1.From)
+		}
+		if rewrite1.To != "/showcase/assets/$1" {
+			t.Errorf("Expected rewrite to '/showcase/assets/$1', got '%s'", rewrite1.To)
+		}
+	}
+
+	// Verify rewrite rules are converted correctly
+	// Redirects should become rewrite rules with "redirect" flag
+	// Rewrites should become rewrite rules with "last" flag
+	redirectCount := 0
+	rewriteCount := 0
+
+	for _, rule := range config.Server.RewriteRules {
+		if rule.Flag == "redirect" {
+			redirectCount++
+		} else if rule.Flag == "last" {
+			rewriteCount++
+		}
+	}
+
+	if redirectCount != 2 {
+		t.Errorf("Expected 2 redirect rewrite rules, got %d", redirectCount)
+	}
+	if rewriteCount != 2 {
+		t.Errorf("Expected 2 internal rewrite rules, got %d", rewriteCount)
+	}
+}
+
 func BenchmarkLoadConfig(b *testing.B) {
 	testConfig := `
 server:

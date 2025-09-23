@@ -106,7 +106,20 @@ func ParseYAML(content []byte) (*Config, error) {
 		}
 	}
 
-	// Convert rewrite rules from routes section (maintenance mode style)
+	// Convert redirect rules from routes section (redirects with 302 status)
+	for _, redirect := range yamlConfig.Routes.Redirects {
+		if re, err := regexp.Compile(redirect.From); err == nil {
+			config.Server.RewriteRules = append(config.Server.RewriteRules, RewriteRule{
+				Pattern:     re,
+				Replacement: redirect.To,
+				Flag:        "redirect", // Use "redirect" flag for 302 redirects
+			})
+		} else {
+			slog.Warn("Invalid routes redirect pattern", "from", redirect.From, "error", err)
+		}
+	}
+
+	// Convert rewrite rules from routes section (internal rewrites)
 	for _, rewrite := range yamlConfig.Routes.Rewrites {
 		if re, err := regexp.Compile(rewrite.From); err == nil {
 			config.Server.RewriteRules = append(config.Server.RewriteRules, RewriteRule{
@@ -224,7 +237,8 @@ func ParseYAML(content []byte) (*Config, error) {
 	config.Static.TryFiles.Fallback = yamlConfig.Static.TryFiles.Fallback
 
 	// Set routes configuration
-	config.Routes = yamlConfig.Routes
+	config.Routes.Redirects = yamlConfig.Routes.Redirects
+	config.Routes.Rewrites = yamlConfig.Routes.Rewrites
 
 	// Convert standalone servers
 	for _, server := range yamlConfig.StandaloneServers {

@@ -100,6 +100,10 @@ type StaticConfig struct {
 
 // RoutesConfig represents routes configuration
 type RoutesConfig struct {
+	Redirects []struct {
+		From string `yaml:"from"`
+		To   string `yaml:"to"`
+	} `yaml:"redirects"`
 	Rewrites []struct {
 		From string `yaml:"from"`
 		To   string `yaml:"to"`
@@ -277,6 +281,10 @@ type YAMLConfig struct {
 		} `yaml:"try_files"`
 	} `yaml:"static"`
 	Routes struct {
+		Redirects []struct {
+			From string `yaml:"from"`
+			To   string `yaml:"to"`
+		} `yaml:"redirects"`
 		Rewrites []struct {
 			From string `yaml:"from"`
 			To   string `yaml:"to"`
