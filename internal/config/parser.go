@@ -195,8 +195,12 @@ func (p *ConfigParser) parseApplicationConfig() {
 
 	// Process tenants
 	for _, yamlTenant := range yamlApps.Tenants {
+		// Extract tenant name from path (e.g., "/showcase/2025/raleigh/" -> "2025/raleigh")
+		tenantName := strings.TrimPrefix(yamlTenant.Path, "/showcase/")
+		tenantName = strings.TrimSuffix(tenantName, "/")
+
 		tenant := Tenant{
-			Name:      yamlTenant.Name,
+			Name:      tenantName,
 			Root:      yamlTenant.Root,
 			PublicDir: yamlTenant.PublicDir,
 			Framework: yamlTenant.Framework,

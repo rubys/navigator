@@ -322,7 +322,7 @@ type YAMLConfig struct {
 			StartPort int    `yaml:"start_port"`
 		} `yaml:"pools"`
 		Tenants []struct {
-			Name      string                 `yaml:"name"`
+			Path      string                 `yaml:"path"`
 			Root      string                 `yaml:"root"`
 			PublicDir string                 `yaml:"public_dir"`
 			Env       map[string]string      `yaml:"env"`

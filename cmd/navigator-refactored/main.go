@@ -44,6 +44,10 @@ func main() {
 		slog.Error("Failed to load configuration", "error", err)
 		os.Exit(1)
 	}
+	slog.Info("Loaded configuration",
+		"locations", len(cfg.Locations),
+		"tenants", len(cfg.Applications.Tenants),
+		"standaloneServers", len(cfg.StandaloneServers))
 
 	// Setup logging format based on configuration
 	setupLogging(cfg)
@@ -153,7 +157,7 @@ func main() {
 				// Stop managed processes
 				processManager.StopManagedProcesses()
 
-				// Exit the loop for shutdown signals
+				// Log shutdown completion and exit
 				slog.Info("Navigator shutdown complete")
 				return
 			}

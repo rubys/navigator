@@ -22,7 +22,7 @@ applications:
     timeout: 5m
     start_port: 4000
   tenants:
-    - name: test-app
+    - path: /showcase/test-app/
       root: /tmp/test-app
       env:
         PORT: "${PORT}"
@@ -90,7 +90,7 @@ applications:
     DATABASE_URL: "postgres://user:pass@localhost/app_${tenant}"
     SECRET_KEY: "${secret}"
   tenants:
-    - name: "test-tenant"
+    - path: "/showcase/test-tenant/"
       var:
         tenant: "test"
         secret: "test-secret-123"
@@ -1035,6 +1035,59 @@ applications:
 		_, err := LoadConfig(tmpFile.Name())
 		if err != nil {
 			b.Fatalf("Failed to load config: %v", err)
+		}
+	}
+}
+
+// TestTenantNameExtractionFromPath tests the critical tenant name extraction logic
+func TestTenantNameExtractionFromPath(t *testing.T) {
+	testConfig := `
+applications:
+  tenants:
+    - path: /showcase/2025/raleigh/shimmer-shine/
+      root: /app/shimmer-shine
+    - path: /showcase/2025/boston/april/
+      root: /app/boston
+    - path: /showcase/test-simple/
+      root: /app/simple
+`
+
+	tmpFile, err := os.CreateTemp("", "navigator-tenant-test-*.yml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(testConfig); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+	tmpFile.Close()
+
+	config, err := LoadConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify tenant names are extracted correctly from paths
+	if len(config.Applications.Tenants) != 3 {
+		t.Fatalf("Expected 3 tenants, got %d", len(config.Applications.Tenants))
+	}
+
+	expectedTenants := []struct{
+		name string
+		root string
+	}{
+		{"2025/raleigh/shimmer-shine", "/app/shimmer-shine"},
+		{"2025/boston/april", "/app/boston"},
+		{"test-simple", "/app/simple"},
+	}
+
+	for i, expected := range expectedTenants {
+		if config.Applications.Tenants[i].Name != expected.name {
+			t.Errorf("Tenant %d: expected name %q, got %q", i, expected.name, config.Applications.Tenants[i].Name)
+		}
+		if config.Applications.Tenants[i].Root != expected.root {
+			t.Errorf("Tenant %d: expected root %q, got %q", i, expected.root, config.Applications.Tenants[i].Root)
 		}
 	}
 }

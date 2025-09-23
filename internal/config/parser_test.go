@@ -136,7 +136,7 @@ func TestConfigParser_ParseApplicationConfig(t *testing.T) {
 				StartPort int    `yaml:"start_port"`
 			} `yaml:"pools"`
 			Tenants []struct {
-				Name      string                 `yaml:"name"`
+				Path      string                 `yaml:"path"`
 				Root      string                 `yaml:"root"`
 				PublicDir string                 `yaml:"public_dir"`
 				Env       map[string]string      `yaml:"env"`
@@ -173,7 +173,7 @@ func TestConfigParser_ParseApplicationConfig(t *testing.T) {
 				"DB_HOST": "localhost",
 			},
 			Tenants: []struct {
-				Name      string                 `yaml:"name"`
+				Path      string                 `yaml:"path"`
 				Root      string                 `yaml:"root"`
 				PublicDir string                 `yaml:"public_dir"`
 				Env       map[string]string      `yaml:"env"`
@@ -188,7 +188,7 @@ func TestConfigParser_ParseApplicationConfig(t *testing.T) {
 				} `yaml:"hooks"`
 			}{
 				{
-					Name: "test-app",
+					Path: "/showcase/test-app/",
 					Root: "/app/test",
 					Var: map[string]interface{}{
 						"app": "myapp",

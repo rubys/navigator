@@ -412,11 +412,14 @@ func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request, loca
 	// Extract tenant name from path
 	tenantName := ""
 	for _, tenant := range h.config.Applications.Tenants {
-		if location != nil && strings.HasPrefix(r.URL.Path, "/"+tenant.Name+"/") {
+		lookingFor := "/showcase/" + tenant.Name + "/"
+		if strings.HasPrefix(r.URL.Path, lookingFor) {
 			tenantName = tenant.Name
 			break
 		}
 	}
+
+	slog.Debug("Tenant extraction result", "tenantName", tenantName, "path", r.URL.Path)
 
 	if tenantName == "" {
 		http.NotFound(w, r)
