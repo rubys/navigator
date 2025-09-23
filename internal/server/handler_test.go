@@ -3,6 +3,10 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/rubys/navigator/internal/auth"
@@ -470,5 +474,185 @@ func TestHandler_handleStickySession(t *testing.T) {
 				t.Errorf("handleStickySession returned %v, expected %v", handled, tt.expectHandled)
 			}
 		})
+	}
+}
+
+func TestMaintenanceModeHandler(t *testing.T) {
+	// Create a temporary directory for test files
+	tempDir, err := os.MkdirTemp("", "navigator-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a maintenance page
+	maintenanceHTML := `<!DOCTYPE html>
+<html>
+<head><title>Maintenance</title></head>
+<body><h1>Site Under Maintenance</h1></body>
+</html>`
+
+	maintenancePath := filepath.Join(tempDir, "503.html")
+	if err := os.WriteFile(maintenancePath, []byte(maintenanceHTML), 0644); err != nil {
+		t.Fatalf("Failed to create maintenance file: %v", err)
+	}
+
+	// Create test configuration for maintenance mode
+	cfg := &config.Config{
+		Applications: config.Applications{
+			Tenants: []config.Tenant{}, // Empty tenants for maintenance mode
+		},
+	}
+	cfg.Server.PublicDir = tempDir
+	cfg.Static.TryFiles.Enabled = true
+	cfg.Static.TryFiles.Fallback = "/503.html"
+
+	// Create handler
+	handler := CreateHandler(cfg, nil, nil, nil)
+
+	// Test cases
+	tests := []struct {
+		name           string
+		path           string
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "Root path returns maintenance page",
+			path:           "/",
+			expectedStatus: http.StatusOK,
+			expectedBody:   "Site Under Maintenance",
+		},
+		{
+			name:           "Random path returns maintenance page",
+			path:           "/some/random/path",
+			expectedStatus: http.StatusOK,
+			expectedBody:   "Site Under Maintenance",
+		},
+		{
+			name:           "Path with query params returns maintenance page",
+			path:           "/test?param=value",
+			expectedStatus: http.StatusOK,
+			expectedBody:   "Site Under Maintenance",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create request
+			req, err := http.NewRequest("GET", tt.path, nil)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+
+			// Create response recorder
+			rr := httptest.NewRecorder()
+
+			// Serve the request
+			handler.ServeHTTP(rr, req)
+
+			// Check status code
+			if rr.Code != tt.expectedStatus {
+				t.Errorf("Expected status %d, got %d", tt.expectedStatus, rr.Code)
+			}
+
+			// Check response body contains expected text
+			body := rr.Body.String()
+			if tt.expectedBody != "" && !strings.Contains(body, tt.expectedBody) {
+				t.Errorf("Expected body to contain '%s', got: %s", tt.expectedBody, body)
+			}
+		})
+	}
+}
+
+func TestRewriteRulesWithMaintenanceConfig(t *testing.T) {
+	// Create test configuration with rewrite rules (maintenance mode style)
+	cfg := &config.Config{
+		Applications: config.Applications{
+			Tenants: []config.Tenant{}, // Empty tenants
+		},
+	}
+
+	// Add a rewrite rule that matches everything and rewrites to /503.html
+	pattern := regexp.MustCompile("^.*$")
+	cfg.Server.RewriteRules = []config.RewriteRule{
+		{
+			Pattern:     pattern,
+			Replacement: "/503.html",
+			Flag:        "last",
+		},
+	}
+
+	// Create handler
+	handler := &Handler{
+		config: cfg,
+	}
+
+	// Test rewrite handling
+	req, err := http.NewRequest("GET", "/test/path", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+
+	// Call handleRewrites
+	result := handler.handleRewrites(rr, req)
+
+	// For "last" flag, the function should not return true (continue processing)
+	if result {
+		t.Error("Expected handleRewrites to return false for 'last' flag")
+	}
+
+	// Check that the path was rewritten
+	if req.URL.Path != "/503.html" {
+		t.Errorf("Expected path to be rewritten to /503.html, got %s", req.URL.Path)
+	}
+}
+
+func TestStaticFallbackWithNoTenants(t *testing.T) {
+	// Create a temporary directory for test files
+	tempDir, err := os.MkdirTemp("", "navigator-fallback-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a fallback page
+	fallbackHTML := `<!DOCTYPE html><html><body>Fallback Page</body></html>`
+	fallbackPath := filepath.Join(tempDir, "fallback.html")
+	if err := os.WriteFile(fallbackPath, []byte(fallbackHTML), 0644); err != nil {
+		t.Fatalf("Failed to create fallback file: %v", err)
+	}
+
+	// Create test configuration with no tenants and static fallback
+	cfg := &config.Config{
+		Applications: config.Applications{
+			Tenants: []config.Tenant{}, // Empty tenants
+		},
+	}
+	cfg.Server.PublicDir = tempDir
+	cfg.Static.TryFiles.Fallback = "/fallback.html"
+
+	// Create handler
+	handler := &Handler{
+		config: cfg,
+	}
+
+	// Test fallback handling
+	req := httptest.NewRequest("GET", "/any/path", nil)
+	rr := httptest.NewRecorder()
+
+	handler.handleStaticFallback(rr, req)
+
+	// Check status code
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+
+	// Check response body
+	body := rr.Body.String()
+	if !strings.Contains(body, "Fallback Page") {
+		t.Errorf("Expected body to contain 'Fallback Page', got: %s", body)
 	}
 }

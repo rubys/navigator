@@ -105,7 +105,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Handle web application proxy
-	h.handleWebAppProxy(recorder, r, location)
+	if len(h.config.Applications.Tenants) > 0 {
+		h.handleWebAppProxy(recorder, r, location)
+	} else {
+		// No tenants configured - check for static fallback (maintenance mode)
+		h.handleStaticFallback(recorder, r)
+	}
 }
 
 // handleHealthCheck handles the /up health check endpoint
@@ -493,6 +498,37 @@ func (h *Handler) serveFile(w http.ResponseWriter, r *http.Request, fsPath, requ
 	http.ServeFile(w, r, fsPath)
 	slog.Info("Serving file via tryFiles", "requestPath", requestPath, "fsPath", fsPath)
 	return true
+}
+
+// handleStaticFallback handles requests when no tenants are configured (maintenance mode)
+func (h *Handler) handleStaticFallback(w http.ResponseWriter, r *http.Request) {
+	// Check if static fallback is configured
+	if h.config.Static.TryFiles.Fallback != "" {
+		fallbackPath := h.config.Static.TryFiles.Fallback
+
+		// Build the filesystem path
+		publicDir := h.config.Server.PublicDir
+		if publicDir == "" {
+			publicDir = "public"
+		}
+		fsPath := filepath.Join(publicDir, fallbackPath)
+
+		// Check if the fallback file exists
+		if info, err := os.Stat(fsPath); err == nil && !info.IsDir() {
+			if recorder, ok := w.(*ResponseRecorder); ok {
+				recorder.SetMetadata("response_type", "static-fallback")
+				recorder.SetMetadata("file_path", fsPath)
+			}
+
+			setContentType(w, fsPath)
+			http.ServeFile(w, r, fsPath)
+			slog.Info("Serving static fallback", "path", r.URL.Path, "fallback", fallbackPath, "fsPath", fsPath)
+			return
+		}
+	}
+
+	// No fallback configured or file not found
+	http.NotFound(w, r)
 }
 
 // setContentType sets the appropriate Content-Type header based on file extension

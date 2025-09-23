@@ -87,6 +87,25 @@ type TenantHooks struct {
 	Stop  []HookConfig `yaml:"stop"`
 }
 
+// StaticConfig represents static file configuration
+type StaticConfig struct {
+	Directories []StaticDir `yaml:"directories"`
+	Extensions  []string    `yaml:"extensions"`
+	TryFiles    struct {
+		Enabled  bool     `yaml:"enabled"`
+		Suffixes []string `yaml:"suffixes"`
+		Fallback string   `yaml:"fallback"`
+	} `yaml:"try_files"`
+}
+
+// RoutesConfig represents routes configuration
+type RoutesConfig struct {
+	Rewrites []struct {
+		From string `yaml:"from"`
+		To   string `yaml:"to"`
+	} `yaml:"rewrites"`
+}
+
 // Config represents the main configuration
 type Config struct {
 	Server struct {
@@ -116,6 +135,8 @@ type Config struct {
 			cookieMaxAge   time.Duration
 		} `yaml:"sticky_sessions"`
 	} `yaml:"server"`
+	Static              StaticConfig           `yaml:"static"`
+	Routes              RoutesConfig           `yaml:"routes"`
 	Locations           []Location             `yaml:"locations"`
 	Applications        Applications           `yaml:"applications"`
 	ManagedProcesses    []ManagedProcessConfig `yaml:"managed_processes"`
@@ -242,6 +263,25 @@ type YAMLConfig struct {
 			Paths          []string `yaml:"paths"`
 		} `yaml:"sticky_sessions"`
 	} `yaml:"server"`
+	Static struct {
+		Directories []struct {
+			Path  string `yaml:"path"`
+			Root  string `yaml:"root"`
+			Cache int    `yaml:"cache"`
+		} `yaml:"directories"`
+		Extensions []string `yaml:"extensions"`
+		TryFiles   struct {
+			Enabled  bool     `yaml:"enabled"`
+			Suffixes []string `yaml:"suffixes"`
+			Fallback string   `yaml:"fallback"`
+		} `yaml:"try_files"`
+	} `yaml:"static"`
+	Routes struct {
+		Rewrites []struct {
+			From string `yaml:"from"`
+			To   string `yaml:"to"`
+		} `yaml:"rewrites"`
+	} `yaml:"routes"`
 	Locations []struct {
 		Path               string   `yaml:"path"`
 		PublicDir          string   `yaml:"public_dir"`

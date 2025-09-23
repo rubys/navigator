@@ -92,7 +92,7 @@ func ParseYAML(content []byte) (*Config, error) {
 		}
 	}
 
-	// Convert rewrite rules
+	// Convert rewrite rules from server section
 	for _, rewrite := range yamlConfig.Server.Rewrites {
 		if re, err := regexp.Compile(rewrite.Pattern); err == nil {
 			config.Server.RewriteRules = append(config.Server.RewriteRules, RewriteRule{
@@ -103,6 +103,19 @@ func ParseYAML(content []byte) (*Config, error) {
 			})
 		} else {
 			slog.Warn("Invalid rewrite pattern", "pattern", rewrite.Pattern, "error", err)
+		}
+	}
+
+	// Convert rewrite rules from routes section (maintenance mode style)
+	for _, rewrite := range yamlConfig.Routes.Rewrites {
+		if re, err := regexp.Compile(rewrite.From); err == nil {
+			config.Server.RewriteRules = append(config.Server.RewriteRules, RewriteRule{
+				Pattern:     re,
+				Replacement: rewrite.To,
+				Flag:        "last", // Default to "last" for internal rewrites
+			})
+		} else {
+			slog.Warn("Invalid routes rewrite pattern", "from", rewrite.From, "error", err)
 		}
 	}
 
@@ -195,6 +208,23 @@ func ParseYAML(content []byte) (*Config, error) {
 	config.Hooks.Ready = yamlConfig.Hooks.Ready
 	config.Hooks.Resume = yamlConfig.Hooks.Resume
 	config.Hooks.Idle = yamlConfig.Hooks.Idle
+
+	// Set static configuration
+	for _, dir := range yamlConfig.Static.Directories {
+		staticDir := StaticDir{
+			Path:     dir.Path,
+			Prefix:   dir.Root,
+			CacheAge: dir.Cache,
+		}
+		config.Static.Directories = append(config.Static.Directories, staticDir)
+	}
+	config.Static.Extensions = yamlConfig.Static.Extensions
+	config.Static.TryFiles.Enabled = yamlConfig.Static.TryFiles.Enabled
+	config.Static.TryFiles.Suffixes = yamlConfig.Static.TryFiles.Suffixes
+	config.Static.TryFiles.Fallback = yamlConfig.Static.TryFiles.Fallback
+
+	// Set routes configuration
+	config.Routes = yamlConfig.Routes
 
 	// Convert standalone servers
 	for _, server := range yamlConfig.StandaloneServers {
