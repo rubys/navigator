@@ -212,9 +212,9 @@ func ParseYAML(content []byte) (*Config, error) {
 	// Set static configuration
 	for _, dir := range yamlConfig.Static.Directories {
 		staticDir := StaticDir{
-			Path:     dir.Path,
-			Prefix:   dir.Root,
-			CacheAge: dir.Cache,
+			Path:   dir.Path,
+			Prefix: dir.Root,
+			Cache:  dir.Cache,
 		}
 		config.Static.Directories = append(config.Static.Directories, staticDir)
 	}
