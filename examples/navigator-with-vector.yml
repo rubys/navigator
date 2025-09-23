@@ -1,0 +1,58 @@
+# Navigator configuration with Vector integration
+# This example shows how to configure Navigator to send logs to Vector
+
+# Logging configuration with Vector integration
+logging:
+  format: json  # JSON format works best with Vector
+  file: /var/log/navigator/direct/{{app}}.log  # Optional: also write directly to files
+  vector:
+    enabled: true
+    socket: /tmp/navigator-vector.sock  # Must match vector.toml
+    config: examples/vector.toml        # Path to Vector configuration
+
+# Framework configuration
+framework:
+  runtime: ruby
+  server: bundle
+  args: [exec, rails, server]
+
+# Example web applications
+applications:
+  - path: /app1
+    dir: /path/to/app1
+    env:
+      RAILS_ENV: production
+      DATABASE_URL: postgresql://localhost/app1
+
+  - path: /app2
+    dir: /path/to/app2
+    env:
+      RAILS_ENV: production
+      DATABASE_URL: postgresql://localhost/app2
+
+# Example managed processes
+managed_processes:
+  # Redis - logs will be sent to Vector
+  - name: redis
+    command: redis-server
+    args: [--port, "6379"]
+    auto_restart: true
+    
+  # Sidekiq - logs will be sent to Vector
+  - name: sidekiq
+    command: bundle
+    args: [exec, sidekiq]
+    working_dir: /path/to/app1
+    env:
+      RAILS_ENV: production
+    auto_restart: true
+    start_delay: 2  # Wait for Redis to start
+
+  # PostgreSQL - logs will be sent to Vector
+  - name: postgres
+    command: postgres
+    args: [-D, /var/lib/postgresql/data]
+    auto_restart: true
+    
+# Note: Vector itself is automatically started as a managed process
+# when vector.enabled is true. You don't need to add it manually.
