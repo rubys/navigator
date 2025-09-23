@@ -199,6 +199,296 @@ func TestLocationMatching(t *testing.T) {
 	}
 }
 
+func TestTryFilesWithStaticDirectories(t *testing.T) {
+	// Create temporary directory structure for testing
+	tempDir, err := os.MkdirTemp("", "navigator-tryfiles-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create test files
+	studiosDir := filepath.Join(tempDir, "studios")
+	if err := os.MkdirAll(studiosDir, 0755); err != nil {
+		t.Fatalf("Failed to create studios dir: %v", err)
+	}
+
+	docsDir := filepath.Join(tempDir, "docs")
+	if err := os.MkdirAll(docsDir, 0755); err != nil {
+		t.Fatalf("Failed to create docs dir: %v", err)
+	}
+
+	// Create index.html files
+	indexContent := "<html><body>Test Page</body></html>"
+	if err := os.WriteFile(filepath.Join(studiosDir, "index.html"), []byte(indexContent), 0644); err != nil {
+		t.Fatalf("Failed to write studios/index.html: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(docsDir, "guide.html"), []byte(indexContent), 0644); err != nil {
+		t.Fatalf("Failed to write docs/guide.html: %v", err)
+	}
+
+	cfg := &config.Config{}
+	cfg.Server.PublicDir = tempDir
+	cfg.Static.Directories = []config.StaticDir{
+		{
+			Path:   "/showcase/studios/",
+			Prefix: "studios/",
+		},
+		{
+			Path:   "/showcase/docs/",
+			Prefix: "docs/",
+		},
+	}
+	cfg.Static.TryFiles.Enabled = true
+	cfg.Static.TryFiles.Suffixes = []string{"index.html", ".html"}
+
+	handler := &Handler{
+		config: cfg,
+		auth:   &auth.BasicAuth{},
+	}
+
+	tests := []struct {
+		name           string
+		path           string
+		expectedFound  bool
+		shouldContain  string
+	}{
+		{
+			name:          "Studios directory with index.html",
+			path:          "/showcase/studios/",
+			expectedFound: true,
+			shouldContain: "Test Page",
+		},
+		{
+			name:          "Docs directory with .html suffix",
+			path:          "/showcase/docs/guide",
+			expectedFound: true,
+			shouldContain: "Test Page",
+		},
+		{
+			name:          "Non-existent path",
+			path:          "/showcase/nonexistent/",
+			expectedFound: false,
+		},
+		{
+			name:          "Path with extension should be skipped",
+			path:          "/showcase/studios/existing.html",
+			expectedFound: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.path, nil)
+			recorder := httptest.NewRecorder()
+			respRecorder := NewResponseRecorder(recorder, nil)
+
+			// Test tryFiles directly
+			found := handler.tryFiles(respRecorder, req, nil)
+
+			if found != tt.expectedFound {
+				t.Errorf("Expected tryFiles to return %v for %s, got %v", tt.expectedFound, tt.path, found)
+			}
+
+			if tt.expectedFound && tt.shouldContain != "" {
+				if recorder.Code != http.StatusOK {
+					t.Errorf("Expected status %d, got %d", http.StatusOK, recorder.Code)
+				}
+				if !strings.Contains(recorder.Body.String(), tt.shouldContain) {
+					t.Errorf("Expected body to contain %q, got %q", tt.shouldContain, recorder.Body.String())
+				}
+			}
+		})
+	}
+}
+
+func TestStaticDirectoryMatching(t *testing.T) {
+	cfg := &config.Config{
+		Static: config.StaticConfig{
+			Directories: []config.StaticDir{
+				{
+					Path:   "/showcase/studios/",
+					Prefix: "studios/",
+				},
+				{
+					Path:   "/showcase/docs/",
+					Prefix: "docs/",
+				},
+				{
+					Path:   "/showcase/",
+					Prefix: "general/",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		path             string
+		expectedPath     string
+		expectedPrefix   string
+		shouldMatch      bool
+	}{
+		{
+			path:           "/showcase/studios/",
+			expectedPath:   "/showcase/studios/",
+			expectedPrefix: "studios/",
+			shouldMatch:    true,
+		},
+		{
+			path:           "/showcase/studios/page",
+			expectedPath:   "/showcase/studios/",
+			expectedPrefix: "studios/",
+			shouldMatch:    true,
+		},
+		{
+			path:           "/showcase/docs/guide",
+			expectedPath:   "/showcase/docs/",
+			expectedPrefix: "docs/",
+			shouldMatch:    true,
+		},
+		{
+			path:           "/showcase/other",
+			expectedPath:   "/showcase/",
+			expectedPrefix: "general/",
+			shouldMatch:    true,
+		},
+		{
+			path:        "/different/path",
+			shouldMatch: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			var bestStaticDir *config.StaticDir
+			bestStaticDirLen := 0
+
+			// Simulate the static directory matching logic from tryFiles
+			for _, staticDir := range cfg.Static.Directories {
+				if strings.HasPrefix(tt.path, staticDir.Path) && len(staticDir.Path) > bestStaticDirLen {
+					bestStaticDir = &staticDir
+					bestStaticDirLen = len(staticDir.Path)
+				}
+			}
+
+			if tt.shouldMatch {
+				if bestStaticDir == nil {
+					t.Errorf("Expected to find matching static directory for %s", tt.path)
+				} else {
+					if bestStaticDir.Path != tt.expectedPath {
+						t.Errorf("Expected path %s, got %s", tt.expectedPath, bestStaticDir.Path)
+					}
+					if bestStaticDir.Prefix != tt.expectedPrefix {
+						t.Errorf("Expected prefix %s, got %s", tt.expectedPrefix, bestStaticDir.Prefix)
+					}
+				}
+			} else {
+				if bestStaticDir != nil {
+					t.Errorf("Expected no match for %s, but got %s", tt.path, bestStaticDir.Path)
+				}
+			}
+		})
+	}
+}
+
+func TestTryFilesConfigurationPriority(t *testing.T) {
+	tests := []struct {
+		name            string
+		locationTryFiles []string
+		serverTryFiles   []string
+		staticTryFiles   struct {
+			Enabled  bool
+			Suffixes []string
+		}
+		expectedSuffixes []string
+	}{
+		{
+			name:             "Location try_files takes priority",
+			locationTryFiles: []string{".location"},
+			serverTryFiles:   []string{".server"},
+			staticTryFiles: struct {
+				Enabled  bool
+				Suffixes []string
+			}{
+				Enabled:  true,
+				Suffixes: []string{".static"},
+			},
+			expectedSuffixes: []string{".location"},
+		},
+		{
+			name:           "Server try_files when no location",
+			serverTryFiles: []string{".server"},
+			staticTryFiles: struct {
+				Enabled  bool
+				Suffixes []string
+			}{
+				Enabled:  true,
+				Suffixes: []string{".static"},
+			},
+			expectedSuffixes: []string{".server"},
+		},
+		{
+			name: "Static try_files when no server or location",
+			staticTryFiles: struct {
+				Enabled  bool
+				Suffixes []string
+			}{
+				Enabled:  true,
+				Suffixes: []string{".static"},
+			},
+			expectedSuffixes: []string{".static"},
+		},
+		{
+			name: "Default extensions when static disabled",
+			staticTryFiles: struct {
+				Enabled  bool
+				Suffixes []string
+			}{
+				Enabled: false,
+			},
+			expectedSuffixes: []string{".html", ".htm", ".txt", ".xml", ".json"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.Server.TryFiles = tt.serverTryFiles
+			cfg.Static.TryFiles.Enabled = tt.staticTryFiles.Enabled
+			cfg.Static.TryFiles.Suffixes = tt.staticTryFiles.Suffixes
+
+			var location *config.Location
+			if len(tt.locationTryFiles) > 0 {
+				location = &config.Location{
+					TryFiles: tt.locationTryFiles,
+				}
+			}
+
+			// Test the extension priority logic from tryFiles
+			var extensions []string
+			if location != nil && len(location.TryFiles) > 0 {
+				extensions = location.TryFiles
+			} else if len(cfg.Server.TryFiles) > 0 {
+				extensions = cfg.Server.TryFiles
+			} else if cfg.Static.TryFiles.Enabled && len(cfg.Static.TryFiles.Suffixes) > 0 {
+				extensions = cfg.Static.TryFiles.Suffixes
+			} else {
+				extensions = []string{".html", ".htm", ".txt", ".xml", ".json"}
+			}
+
+			if len(extensions) != len(tt.expectedSuffixes) {
+				t.Errorf("Expected %d suffixes, got %d", len(tt.expectedSuffixes), len(extensions))
+			}
+
+			for i, expected := range tt.expectedSuffixes {
+				if i >= len(extensions) || extensions[i] != expected {
+					t.Errorf("Expected suffix[%d] to be %s, got %s", i, expected, extensions[i])
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkResponseRecorder(b *testing.B) {
 	recorder := httptest.NewRecorder()
 	testData := []byte("benchmark test data")

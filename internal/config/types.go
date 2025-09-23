@@ -237,6 +237,16 @@ type Tenant struct {
 
 // YAMLConfig represents the raw YAML configuration structure
 type YAMLConfig struct {
+	Auth struct {
+		Enabled         bool     `yaml:"enabled"`
+		Realm           string   `yaml:"realm"`
+		HTPasswd        string   `yaml:"htpasswd"`
+		PublicPaths     []string `yaml:"public_paths"`
+		ExcludePatterns []struct {
+			Pattern     string `yaml:"pattern"`
+			Description string `yaml:"description"`
+		} `yaml:"exclude_patterns"`
+	} `yaml:"auth"`
 	Server struct {
 		Listen         interface{} `yaml:"listen"`
 		Hostname       string      `yaml:"hostname"`

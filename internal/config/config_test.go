@@ -155,6 +155,201 @@ server:
 	}
 }
 
+func TestAuthSectionParsing(t *testing.T) {
+	testConfig := `
+auth:
+  enabled: true
+  realm: "Test Realm"
+  htpasswd: "/path/to/htpasswd"
+  public_paths:
+    - "/showcase/studios/"
+    - "/showcase/docs/"
+    - "*.css"
+    - "*.js"
+  exclude_patterns:
+    - pattern: "^/showcase/?$"
+      description: "Root showcase path"
+
+server:
+  listen: 3000
+  hostname: localhost
+  auth_exclude:
+    - "/server/public/"
+
+applications:
+  pools:
+    max_size: 10
+    timeout: 5m
+    start_port: 4000
+`
+
+	tmpFile, err := os.CreateTemp("", "navigator-auth-test-*.yml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(testConfig); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+	tmpFile.Close()
+
+	config, err := LoadConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify auth section overrides server auth_exclude with public_paths
+	expectedAuthExclude := []string{"/showcase/studios/", "/showcase/docs/", "*.css", "*.js"}
+	if len(config.Server.AuthExclude) != len(expectedAuthExclude) {
+		t.Errorf("Expected %d auth exclude paths, got %d", len(expectedAuthExclude), len(config.Server.AuthExclude))
+	}
+
+	for i, expected := range expectedAuthExclude {
+		if i >= len(config.Server.AuthExclude) || config.Server.AuthExclude[i] != expected {
+			t.Errorf("Expected auth exclude[%d] to be %s, got %s", i, expected, config.Server.AuthExclude[i])
+		}
+	}
+
+	// Verify authentication file path is set from auth section
+	if config.Server.Authentication != "/path/to/htpasswd" {
+		t.Errorf("Expected authentication file /path/to/htpasswd, got %s", config.Server.Authentication)
+	}
+}
+
+func TestAuthSectionDisabled(t *testing.T) {
+	testConfig := `
+auth:
+  enabled: false
+  public_paths:
+    - "/should/not/be/used/"
+
+server:
+  listen: 3000
+  auth_exclude:
+    - "/server/original/"
+
+applications:
+  pools:
+    max_size: 10
+`
+
+	tmpFile, err := os.CreateTemp("", "navigator-auth-disabled-test-*.yml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(testConfig); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+	tmpFile.Close()
+
+	config, err := LoadConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// When auth is disabled, server auth_exclude should remain unchanged
+	if len(config.Server.AuthExclude) != 1 || config.Server.AuthExclude[0] != "/server/original/" {
+		t.Errorf("Expected server auth_exclude to remain unchanged when auth disabled, got %v", config.Server.AuthExclude)
+	}
+}
+
+func TestStaticConfigWithTryFiles(t *testing.T) {
+	testConfig := `
+server:
+  listen: 3000
+  public_dir: /Users/test/public
+
+static:
+  directories:
+    - path: "/showcase/studios/"
+      root: "studios/"
+      cache: "24h"
+    - path: "/showcase/docs/"
+      root: "docs/"
+  extensions:
+    - html
+    - css
+    - js
+  try_files:
+    enabled: true
+    suffixes:
+      - "index.html"
+      - ".html"
+      - ".htm"
+
+applications:
+  pools:
+    max_size: 10
+`
+
+	tmpFile, err := os.CreateTemp("", "navigator-static-test-*.yml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(testConfig); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+	tmpFile.Close()
+
+	config, err := LoadConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify static directories parsing
+	if len(config.Static.Directories) != 2 {
+		t.Errorf("Expected 2 static directories, got %d", len(config.Static.Directories))
+	}
+
+	// Check first static directory
+	dir0 := config.Static.Directories[0]
+	if dir0.Path != "/showcase/studios/" {
+		t.Errorf("Expected first directory path /showcase/studios/, got %s", dir0.Path)
+	}
+	if dir0.Prefix != "studios/" {
+		t.Errorf("Expected first directory prefix studios/, got %s", dir0.Prefix)
+	}
+	if dir0.Cache != "24h" {
+		t.Errorf("Expected first directory cache 24h, got %s", dir0.Cache)
+	}
+
+	// Check second static directory
+	dir1 := config.Static.Directories[1]
+	if dir1.Path != "/showcase/docs/" {
+		t.Errorf("Expected second directory path /showcase/docs/, got %s", dir1.Path)
+	}
+	if dir1.Prefix != "docs/" {
+		t.Errorf("Expected second directory prefix docs/, got %s", dir1.Prefix)
+	}
+
+	// Verify try_files configuration
+	if !config.Static.TryFiles.Enabled {
+		t.Error("Expected try_files to be enabled")
+	}
+
+	expectedSuffixes := []string{"index.html", ".html", ".htm"}
+	if len(config.Static.TryFiles.Suffixes) != len(expectedSuffixes) {
+		t.Errorf("Expected %d try_files suffixes, got %d", len(expectedSuffixes), len(config.Static.TryFiles.Suffixes))
+	}
+
+	for i, expected := range expectedSuffixes {
+		if i >= len(config.Static.TryFiles.Suffixes) || config.Static.TryFiles.Suffixes[i] != expected {
+			t.Errorf("Expected suffix[%d] to be %s, got %s", i, expected, config.Static.TryFiles.Suffixes[i])
+		}
+	}
+
+	// Verify extensions
+	expectedExtensions := []string{"html", "css", "js"}
+	if len(config.Static.Extensions) != len(expectedExtensions) {
+		t.Errorf("Expected %d extensions, got %d", len(expectedExtensions), len(config.Static.Extensions))
+	}
+}
+
 func TestDefaultValues(t *testing.T) {
 	// Test with minimal config
 	minimalConfig := `

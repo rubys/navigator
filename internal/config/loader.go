@@ -61,6 +61,13 @@ func ParseYAML(content []byte) (*Config, error) {
 	config.Server.Authentication = yamlConfig.Server.Authentication
 	config.Server.AuthExclude = yamlConfig.Server.AuthExclude
 
+	// Parse auth section and map public_paths to AuthExclude (like original navigator)
+	if yamlConfig.Auth.Enabled {
+		config.Server.Authentication = yamlConfig.Auth.HTPasswd
+		config.Server.AuthExclude = yamlConfig.Auth.PublicPaths
+		// TODO: Handle exclude patterns if needed
+	}
+
 	// Parse listen port
 	switch v := yamlConfig.Server.Listen.(type) {
 	case int:

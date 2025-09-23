@@ -299,12 +299,15 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request, location *con
 		return false
 	}
 
-	// Default suffixes for try_files behavior
+	// Get try_files suffixes from config
 	var extensions []string
 	if location != nil && len(location.TryFiles) > 0 {
 		extensions = location.TryFiles
 	} else if len(h.config.Server.TryFiles) > 0 {
 		extensions = h.config.Server.TryFiles
+	} else if h.config.Static.TryFiles.Enabled && len(h.config.Static.TryFiles.Suffixes) > 0 {
+		// Use static try_files configuration (like the original navigator)
+		extensions = h.config.Static.TryFiles.Suffixes
 	} else {
 		// Default extensions if not configured
 		extensions = []string{".html", ".htm", ".txt", ".xml", ".json"}
@@ -316,7 +319,48 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request, location *con
 		return false
 	}
 
-	// Determine the public directory to search
+	// First, check static directories from config (like the original navigator)
+	var bestStaticDir *config.StaticDir
+	bestStaticDirLen := 0
+	for _, staticDir := range h.config.Static.Directories {
+		if strings.HasPrefix(path, staticDir.Path) && len(staticDir.Path) > bestStaticDirLen {
+			bestStaticDir = &staticDir
+			bestStaticDirLen = len(staticDir.Path)
+		}
+	}
+
+	// If we found a matching static directory, try to serve from there
+	if bestStaticDir != nil {
+		slog.Debug("Found matching static directory", "path", path, "staticPath", bestStaticDir.Path, "prefix", bestStaticDir.Prefix)
+
+		// Remove the URL prefix to get the relative path
+		relativePath := strings.TrimPrefix(path, bestStaticDir.Path)
+		if relativePath == "" {
+			relativePath = "/"
+		}
+		if relativePath[0] != '/' {
+			relativePath = "/" + relativePath
+		}
+
+		// Use server public directory as base
+		publicDir := h.config.Server.PublicDir
+		if publicDir == "" {
+			publicDir = "public"
+		}
+
+		// Try each extension
+		for _, ext := range extensions {
+			// Build the full filesystem path using static directory prefix
+			fsPath := filepath.Join(publicDir, bestStaticDir.Prefix, relativePath+ext)
+			slog.Debug("tryFiles checking static", "fsPath", fsPath)
+			if info, err := os.Stat(fsPath); err == nil && !info.IsDir() {
+				return h.serveFile(w, r, fsPath, path+ext)
+			}
+		}
+		return false
+	}
+
+	// Fallback: check location-based public directory
 	var publicDir string
 	if location != nil && location.PublicDir != "" {
 		publicDir = location.PublicDir
