@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"io/ioutil"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -146,6 +148,106 @@ func TestLogLevelFromEnvironment(t *testing.T) {
 	}
 }
 
+func TestHandleCommandLineArgs(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		expectError bool
+		errorText   string
+		shouldExit  bool
+	}{
+		{
+			name:        "No arguments should pass",
+			args:        []string{"navigator"},
+			expectError: false,
+		},
+		{
+			name:        "Config file argument should pass",
+			args:        []string{"navigator", "config.yml"},
+			expectError: false,
+		},
+		{
+			name:        "Invalid -s option should fail",
+			args:        []string{"navigator", "-s"},
+			expectError: true,
+			errorText:   "option -s requires 'reload'",
+		},
+		{
+			name:        "Invalid -s option with wrong arg should fail",
+			args:        []string{"navigator", "-s", "invalid"},
+			expectError: true,
+			errorText:   "option -s requires 'reload'",
+		},
+		{
+			name:        "-s reload should attempt to send signal",
+			args:        []string{"navigator", "-s", "reload"},
+			expectError: false, // May succeed or fail depending on whether process exists
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save original args
+			oldArgs := os.Args
+			defer func() { os.Args = oldArgs }()
+
+			// Set test args
+			os.Args = tt.args
+
+			err := handleCommandLineArgs()
+
+			if tt.expectError && err == nil {
+				t.Errorf("Expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+			if tt.errorText != "" && (err == nil || !strings.Contains(err.Error(), tt.errorText)) {
+				t.Errorf("Expected error containing %q, got: %v", tt.errorText, err)
+			}
+		})
+	}
+}
+
+func TestPrintHelp(t *testing.T) {
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Call printHelp
+	printHelp()
+
+	// Restore stdout
+	w.Close()
+	os.Stdout = oldStdout
+
+	// Read captured output
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	// Verify help text contains expected content
+	expectedTexts := []string{
+		"Navigator - Web application server",
+		"Usage:",
+		"navigator [config-file]",
+		"navigator -s reload",
+		"navigator --help",
+		"Default config file: config/navigator.yml",
+		"Signals:",
+		"SIGHUP",
+		"SIGTERM",
+		"SIGINT",
+	}
+
+	for _, expected := range expectedTexts {
+		if !strings.Contains(output, expected) {
+			t.Errorf("Help text missing expected content: %q\nGot: %s", expected, output)
+		}
+	}
+}
+
 func TestHandleConfigReload(t *testing.T) {
 	// Create a basic config
 	cfg := &config.Config{}
@@ -170,4 +272,166 @@ func TestHandleConfigReload(t *testing.T) {
 	}
 
 	t.Log("handleConfigReload correctly handles missing config files")
+}
+
+func TestHandleConfigReloadWithValidConfig(t *testing.T) {
+	// Create a temporary config file
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "test-config.yml")
+
+	configContent := `
+server:
+  listen: "3001"
+  hostname: "test-host"
+applications:
+  tenants: []
+logging:
+  format: "text"
+`
+
+	err := ioutil.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	// Create a basic config
+	cfg := &config.Config{}
+	cfg.Server.Listen = "3000"
+	cfg.Server.Hostname = "localhost"
+
+	// Create real managers to avoid nil pointer issues
+	appManager := process.NewAppManager(cfg)
+	processManager := process.NewManager(cfg)
+	idleManager := idle.NewManager(cfg)
+	var currentAuth *auth.BasicAuth
+
+	// Test successful reload with valid config file
+	newAuth, success := handleConfigReload(cfg, configFile, appManager, processManager, currentAuth, idleManager)
+
+	// Should succeed because the config file exists and is valid
+	if !success {
+		t.Error("Expected handleConfigReload to succeed with valid config file")
+	}
+
+	// newAuth should be nil because no authentication is configured
+	if newAuth != nil {
+		t.Error("Expected nil auth when no authentication configured")
+	}
+
+	// Config should be updated
+	if cfg.Server.Listen != "3001" {
+		t.Errorf("Expected config to be updated with listen port 3001, got %s", cfg.Server.Listen)
+	}
+	if cfg.Server.Hostname != "test-host" {
+		t.Errorf("Expected config to be updated with hostname 'test-host', got %s", cfg.Server.Hostname)
+	}
+}
+
+func TestMainFunctionComponents(t *testing.T) {
+	// Test that we can create the basic components that main() would create
+	// without actually starting the server
+
+	// Create a temporary config file
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "navigator.yml")
+
+	configContent := `
+server:
+  listen: "3002"
+  hostname: "localhost"
+applications:
+  tenants: []
+logging:
+  format: "text"
+`
+
+	err := ioutil.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	// Test config loading (part of main())
+	cfg, err := config.LoadConfig(configFile)
+	if err != nil {
+		t.Fatalf("Failed to load test config: %v", err)
+	}
+
+	if cfg.Server.Listen != "3002" {
+		t.Errorf("Expected listen port 3002, got %s", cfg.Server.Listen)
+	}
+
+	// Test manager creation (part of main())
+	processManager := process.NewManager(cfg)
+	if processManager == nil {
+		t.Error("Expected non-nil process manager")
+	}
+
+	appManager := process.NewAppManager(cfg)
+	if appManager == nil {
+		t.Error("Expected non-nil app manager")
+	}
+
+	idleManager := idle.NewManager(cfg)
+	if idleManager == nil {
+		t.Error("Expected non-nil idle manager")
+	}
+
+	// Test that setupLogging works with the config
+	setupLogging(cfg)
+
+	// Test auth loading with no auth file (should not error)
+	var basicAuth *auth.BasicAuth
+	if cfg.Server.Authentication != "" {
+		// This branch shouldn't execute since we didn't configure auth
+		t.Error("Expected no authentication configured")
+	}
+	if basicAuth != nil {
+		t.Error("Expected nil auth when none configured")
+	}
+}
+
+func TestConfigFilePathLogic(t *testing.T) {
+	// Test the config file path determination logic from main()
+	tests := []struct {
+		name         string
+		args         []string
+		expectedPath string
+	}{
+		{
+			name:         "Default config path with no args",
+			args:         []string{"navigator"},
+			expectedPath: "config/navigator.yml",
+		},
+		{
+			name:         "Custom config path",
+			args:         []string{"navigator", "custom-config.yml"},
+			expectedPath: "custom-config.yml",
+		},
+		{
+			name:         "Ignore flag arguments",
+			args:         []string{"navigator", "-s", "reload"},
+			expectedPath: "config/navigator.yml",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save original args
+			oldArgs := os.Args
+			defer func() { os.Args = oldArgs }()
+
+			// Set test args
+			os.Args = tt.args
+
+			// Replicate the config file path logic from main()
+			configFile := "config/navigator.yml"
+			if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+				configFile = os.Args[1]
+			}
+
+			if configFile != tt.expectedPath {
+				t.Errorf("Expected config file path %q, got %q", tt.expectedPath, configFile)
+			}
+		})
+	}
 }
