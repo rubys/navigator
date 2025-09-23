@@ -7,7 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rubys/navigator/internal/auth"
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/idle"
+	"github.com/rubys/navigator/internal/process"
 )
 
 func TestSetupLogging(t *testing.T) {
@@ -141,4 +144,30 @@ func TestLogLevelFromEnvironment(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandleConfigReload(t *testing.T) {
+	// Create a basic config
+	cfg := &config.Config{}
+	cfg.Server.Listen = "3000"
+	cfg.Server.Hostname = "localhost"
+
+	// Create managers (they can be nil for this test)
+	var appManager *process.AppManager
+	var processManager *process.Manager
+	var currentAuth *auth.BasicAuth
+	var idleManager *idle.Manager
+
+	// Test failed reload with nonexistent config file
+	newAuth, success := handleConfigReload(cfg, "nonexistent-config.yml", appManager, processManager, currentAuth, idleManager)
+
+	// Should fail because the config file doesn't exist
+	if success {
+		t.Error("Expected handleConfigReload to fail with nonexistent config file")
+	}
+	if newAuth != nil {
+		t.Error("Expected nil auth when reload fails")
+	}
+
+	t.Log("handleConfigReload correctly handles missing config files")
 }

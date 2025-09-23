@@ -110,39 +110,52 @@ func main() {
 		serverErrors <- srv.ListenAndServe()
 	}()
 
-	// Wait for termination signal or server error
-	select {
-	case err := <-serverErrors:
-		if err != http.ErrServerClosed {
-			slog.Error("Server failed", "error", err)
-		}
-
-	case sig := <-sigChan:
-		switch sig {
-		case syscall.SIGHUP:
-			slog.Info("Received SIGHUP, reloading configuration")
-			handleConfigReload(cfg, configFile, appManager, processManager)
-
-		case syscall.SIGTERM, syscall.SIGINT:
-			slog.Info("Received shutdown signal", "signal", sig)
-
-			// Stop idle manager
-			idleManager.Stop()
-
-			// Graceful shutdown
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-
-			// Shutdown server
-			if err := srv.Shutdown(ctx); err != nil {
-				slog.Error("Server shutdown failed", "error", err)
+	// Handle signals and server errors
+	for {
+		select {
+		case err := <-serverErrors:
+			if err != http.ErrServerClosed {
+				slog.Error("Server failed", "error", err)
 			}
+			return
 
-			// Stop all applications
-			appManager.Cleanup()
+		case sig := <-sigChan:
+			switch sig {
+			case syscall.SIGHUP:
+				slog.Info("Received SIGHUP, reloading configuration")
+				newBasicAuth, reloadSuccess := handleConfigReload(cfg, configFile, appManager, processManager, basicAuth, idleManager)
+				if reloadSuccess {
+					// Update handler after successful config reload (auth may have changed)
+					basicAuth = newBasicAuth
+					newHandler := server.CreateHandler(cfg, appManager, basicAuth, idleManager)
+					srv.Handler = newHandler
+				}
+				// Continue the loop to keep the server running
 
-			// Stop managed processes
-			processManager.StopManagedProcesses()
+			case syscall.SIGTERM, syscall.SIGINT:
+				slog.Info("Received shutdown signal", "signal", sig)
+
+				// Stop idle manager
+				idleManager.Stop()
+
+				// Graceful shutdown
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				// Shutdown server
+				if err := srv.Shutdown(ctx); err != nil {
+					slog.Error("Server shutdown failed", "error", err)
+				}
+
+				// Stop all applications
+				appManager.Cleanup()
+
+				// Stop managed processes
+				processManager.StopManagedProcesses()
+
+				// Exit the loop for shutdown signals
+				return
+			}
 		}
 	}
 
@@ -227,30 +240,55 @@ func printHelp() {
 	fmt.Println()
 	fmt.Println("Usage:")
 	fmt.Println("  navigator [config-file]     Start server with optional config file")
-	fmt.Println("  navigator -s reload         Send reload signal to running server")
+	fmt.Println("  navigator -s reload         Reload configuration of running server")
 	fmt.Println("  navigator --help            Show this help message")
-	fmt.Println("  navigator --version         Show version information")
-	fmt.Println()
-	fmt.Println("Environment Variables:")
-	fmt.Println("  LOG_LEVEL                   Set log level (debug, info, warn, error)")
 	fmt.Println()
 	fmt.Println("Default config file: config/navigator.yml")
+	fmt.Println()
+	fmt.Println("Signals:")
+	fmt.Println("  SIGHUP   Reload configuration without restart")
+	fmt.Println("  SIGTERM  Graceful shutdown")
+	fmt.Println("  SIGINT   Immediate shutdown")
 }
 
-func handleConfigReload(oldConfig *config.Config, configFile string, appManager *process.AppManager, processManager *process.Manager) {
+func handleConfigReload(oldConfig *config.Config, configFile string, appManager *process.AppManager, processManager *process.Manager, currentAuth *auth.BasicAuth, idleManager *idle.Manager) (*auth.BasicAuth, bool) {
 	// Reload configuration
 	newConfig, err := config.LoadConfig(configFile)
 	if err != nil {
 		slog.Error("Failed to reload configuration", "error", err)
-		return
+		return nil, false
 	}
 
 	// Update configuration in managers
 	appManager.UpdateConfig(newConfig)
 	processManager.UpdateManagedProcesses(newConfig)
 
+	// Reload auth if configured
+	var newAuth *auth.BasicAuth
+	if newConfig.Server.Authentication != "" {
+		newAuth, err = auth.LoadAuthFile(
+			newConfig.Server.Authentication,
+			"Restricted", // Default realm
+			newConfig.Server.AuthExclude,
+		)
+		if err != nil {
+			slog.Warn("Failed to reload auth file", "file", newConfig.Server.Authentication, "error", err)
+			// Keep existing auth on error
+			newAuth = currentAuth
+		} else {
+			slog.Info("Reloaded authentication", "file", newConfig.Server.Authentication)
+		}
+	} else {
+		// Auth disabled in new config
+		newAuth = nil
+	}
+
 	// Update the main config
 	config.UpdateConfig(oldConfig, newConfig)
 
+	// Update logging format if changed
+	setupLogging(newConfig)
+
 	slog.Info("Configuration reloaded successfully")
+	return newAuth, true
 }
