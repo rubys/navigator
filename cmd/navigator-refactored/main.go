@@ -23,7 +23,7 @@ import (
 )
 
 func main() {
-	// Initialize logger
+	// Initialize basic logger
 	initLogger()
 
 	// Handle command line arguments
@@ -44,6 +44,9 @@ func main() {
 		slog.Error("Failed to load configuration", "error", err)
 		os.Exit(1)
 	}
+
+	// Setup logging format based on configuration
+	setupLogging(cfg)
 
 	// Write PID file
 	if err := utils.WritePIDFile(config.NavigatorPIDFile); err != nil {
@@ -166,6 +169,36 @@ func initLogger() {
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
 	slog.SetDefault(logger)
+}
+
+func setupLogging(cfg *config.Config) {
+	// Check if JSON logging is configured
+	if cfg.Logging.Format == "json" {
+		// Get current log level from existing logger
+		logLevel := slog.LevelInfo
+		if lvl := os.Getenv("LOG_LEVEL"); lvl != "" {
+			switch strings.ToLower(lvl) {
+			case "debug":
+				logLevel = slog.LevelDebug
+			case "info":
+				logLevel = slog.LevelInfo
+			case "warn", "warning":
+				logLevel = slog.LevelWarn
+			case "error":
+				logLevel = slog.LevelError
+			}
+		}
+
+		// Switch to JSON handler
+		opts := &slog.HandlerOptions{
+			Level: logLevel,
+		}
+		jsonLogger := slog.New(slog.NewJSONHandler(os.Stdout, opts))
+		slog.SetDefault(jsonLogger)
+
+		// Log the format switch (like the original navigator)
+		slog.Info("Switched to JSON logging format")
+	}
 }
 
 func handleCommandLineArgs() error {

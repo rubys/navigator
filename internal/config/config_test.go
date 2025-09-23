@@ -831,6 +831,170 @@ applications:
 	}
 }
 
+func TestLoggingConfigurationParsing(t *testing.T) {
+	tests := []struct {
+		name           string
+		config         string
+		expectedFormat string
+		expectedFile   string
+	}{
+		{
+			name: "JSON logging format",
+			config: `
+server:
+  listen: 3000
+logging:
+  format: json
+applications:
+  pools:
+    max_size: 5
+`,
+			expectedFormat: "json",
+			expectedFile:   "",
+		},
+		{
+			name: "Text logging format",
+			config: `
+server:
+  listen: 3000
+logging:
+  format: text
+applications:
+  pools:
+    max_size: 5
+`,
+			expectedFormat: "text",
+			expectedFile:   "",
+		},
+		{
+			name: "JSON logging with file output",
+			config: `
+server:
+  listen: 3000
+logging:
+  format: json
+  file: "/var/log/navigator.log"
+applications:
+  pools:
+    max_size: 5
+`,
+			expectedFormat: "json",
+			expectedFile:   "/var/log/navigator.log",
+		},
+		{
+			name: "Default logging format (empty)",
+			config: `
+server:
+  listen: 3000
+applications:
+  pools:
+    max_size: 5
+`,
+			expectedFormat: "",
+			expectedFile:   "",
+		},
+		{
+			name: "Logging section without format",
+			config: `
+server:
+  listen: 3000
+logging:
+  file: "/tmp/navigator.log"
+applications:
+  pools:
+    max_size: 5
+`,
+			expectedFormat: "",
+			expectedFile:   "/tmp/navigator.log",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpFile, err := os.CreateTemp("", "navigator-logging-test-*.yml")
+			if err != nil {
+				t.Fatalf("Failed to create temp file: %v", err)
+			}
+			defer os.Remove(tmpFile.Name())
+
+			if _, err := tmpFile.WriteString(tt.config); err != nil {
+				t.Fatalf("Failed to write test config: %v", err)
+			}
+			tmpFile.Close()
+
+			config, err := LoadConfig(tmpFile.Name())
+			if err != nil {
+				t.Fatalf("Failed to load config: %v", err)
+			}
+
+			// Verify logging format
+			if config.Logging.Format != tt.expectedFormat {
+				t.Errorf("Expected logging format %q, got %q", tt.expectedFormat, config.Logging.Format)
+			}
+
+			// Verify logging file
+			if config.Logging.File != tt.expectedFile {
+				t.Errorf("Expected logging file %q, got %q", tt.expectedFile, config.Logging.File)
+			}
+		})
+	}
+}
+
+func TestLoggingWithVectorConfiguration(t *testing.T) {
+	testConfig := `
+server:
+  listen: 3000
+logging:
+  format: json
+  file: "/var/log/navigator.log"
+  vector:
+    enabled: true
+    socket: "/tmp/vector.sock"
+    config: "/etc/vector/vector.toml"
+applications:
+  pools:
+    max_size: 5
+`
+
+	tmpFile, err := os.CreateTemp("", "navigator-vector-test-*.yml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(testConfig); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+	tmpFile.Close()
+
+	config, err := LoadConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify logging configuration
+	if config.Logging.Format != "json" {
+		t.Errorf("Expected logging format json, got %s", config.Logging.Format)
+	}
+
+	if config.Logging.File != "/var/log/navigator.log" {
+		t.Errorf("Expected logging file /var/log/navigator.log, got %s", config.Logging.File)
+	}
+
+	// Verify Vector configuration
+	if !config.Logging.Vector.Enabled {
+		t.Error("Expected Vector to be enabled")
+	}
+
+	if config.Logging.Vector.Socket != "/tmp/vector.sock" {
+		t.Errorf("Expected Vector socket /tmp/vector.sock, got %s", config.Logging.Vector.Socket)
+	}
+
+	if config.Logging.Vector.Config != "/etc/vector/vector.toml" {
+		t.Errorf("Expected Vector config /etc/vector/vector.toml, got %s", config.Logging.Vector.Config)
+	}
+}
+
 func BenchmarkLoadConfig(b *testing.B) {
 	testConfig := `
 server:
