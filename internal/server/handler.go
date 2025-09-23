@@ -37,6 +37,14 @@ type Handler struct {
 	idleManager *idle.Manager
 }
 
+// getPublicDir returns the configured public directory or the default
+func (h *Handler) getPublicDir() string {
+	if h.config.Server.PublicDir != "" {
+		return h.config.Server.PublicDir
+	}
+	return config.DefaultPublicDir
+}
+
 // ServeHTTP handles all incoming HTTP requests
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Generate request ID if not present
@@ -261,12 +269,9 @@ func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request, locati
 			relativePath = "/" + relativePath
 		}
 		fsPath = filepath.Join(location.PublicDir, relativePath)
-	} else if h.config.Server.PublicDir != "" {
-		// Use server-level public directory
-		fsPath = filepath.Join(h.config.Server.PublicDir, path)
 	} else {
-		// Default to public directory in current working directory
-		fsPath = filepath.Join("public", path)
+		// Use server-level public directory (or default)
+		fsPath = filepath.Join(h.getPublicDir(), path)
 	}
 
 	// Check if file exists
@@ -343,10 +348,7 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request, location *con
 		}
 
 		// Use server public directory as base
-		publicDir := h.config.Server.PublicDir
-		if publicDir == "" {
-			publicDir = "public"
-		}
+		publicDir := h.getPublicDir()
 
 		// Try each extension
 		for _, ext := range extensions {
@@ -377,7 +379,7 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request, location *con
 		publicDir = h.config.Server.PublicDir
 	} else {
 		// Default to public directory in current working directory
-		publicDir = "public"
+		publicDir = h.getPublicDir()
 	}
 
 	// Try each extension
@@ -551,10 +553,7 @@ func (h *Handler) handleStaticFallback(w http.ResponseWriter, r *http.Request) {
 		fallbackPath := h.config.Static.TryFiles.Fallback
 
 		// Build the filesystem path
-		publicDir := h.config.Server.PublicDir
-		if publicDir == "" {
-			publicDir = "public"
-		}
+		publicDir := h.getPublicDir()
 		fsPath := filepath.Join(publicDir, fallbackPath)
 
 		// Check if the fallback file exists

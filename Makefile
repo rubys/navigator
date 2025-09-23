@@ -25,8 +25,16 @@ clean:
 	rm -f bin/navigator bin/navigator-refactored
 	@echo "Clean complete"
 
+# Run comprehensive tests and linting
+test:
+	@echo "Running go vet on entire codebase..."
+	go vet ./...
+	@echo "Running tests on entire codebase..."
+	go test ./... -v
+	@echo "All tests and linting passed!"
+
 # Test the build (basic smoke test)
-test: build
+test-build: build
 	@echo "Testing navigator build..."
 	./bin/navigator --help 2>/dev/null || echo "Navigator executable built successfully"
 
@@ -43,7 +51,8 @@ help:
 	@echo "  build             Build the navigator executable (default)"
 	@echo "  build-refactored  Build the navigator-refactored executable"
 	@echo "  clean             Remove build artifacts"
-	@echo "  test              Test the build"
+	@echo "  test              Run comprehensive tests and linting on entire codebase"
+	@echo "  test-build        Test the build (basic smoke test)"
 	@echo "  deps              Download Go dependencies"
 	@echo "  help              Show this help message"
 	@echo ""
@@ -51,4 +60,5 @@ help:
 	@echo "  make                    # Build the navigator"
 	@echo "  make build-refactored   # Build the refactored navigator"
 	@echo "  make clean              # Clean build artifacts"
-	@echo "  make test               # Test the build"
+	@echo "  make test               # Run comprehensive tests and linting"
+	@echo "  make test-build         # Test the build (smoke test)"

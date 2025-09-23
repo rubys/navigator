@@ -154,12 +154,11 @@ func main() {
 				processManager.StopManagedProcesses()
 
 				// Exit the loop for shutdown signals
+				slog.Info("Navigator shutdown complete")
 				return
 			}
 		}
 	}
-
-	slog.Info("Navigator shutdown complete")
 }
 
 func initLogger() {

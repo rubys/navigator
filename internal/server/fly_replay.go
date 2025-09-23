@@ -231,9 +231,9 @@ func ServeMaintenancePage(w http.ResponseWriter, r *http.Request, config *config
 	w.WriteHeader(http.StatusServiceUnavailable)
 
 	// Try to serve custom 503.html if available
-	publicDir := config.Server.PublicDir
-	if publicDir == "" {
-		publicDir = "public"
+	publicDir := "public" // Default fallback
+	if config.Server.PublicDir != "" {
+		publicDir = config.Server.PublicDir
 	}
 
 	// Check for custom 503.html
