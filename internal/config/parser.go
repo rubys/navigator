@@ -63,6 +63,7 @@ func (p *ConfigParser) Parse() (*Config, error) {
 func (p *ConfigParser) parseServerConfig() {
 	p.config.Server.Hostname = p.yamlConfig.Server.Hostname
 	p.config.Server.PublicDir = p.yamlConfig.Server.PublicDir
+	p.config.Server.RootPath = p.yamlConfig.Server.RootPath
 	p.config.Server.NamedHosts = p.yamlConfig.Server.NamedHosts
 	p.config.Server.Root = p.yamlConfig.Server.Root
 	p.config.Server.TryFiles = p.yamlConfig.Server.TryFiles

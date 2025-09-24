@@ -19,6 +19,7 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 					Listen         interface{} `yaml:"listen"`
 					Hostname       string      `yaml:"hostname"`
 					PublicDir      string      `yaml:"public_dir"`
+					RootPath       string      `yaml:"root_path"`
 					NamedHosts     []string    `yaml:"named_hosts"`
 					Root           string      `yaml:"root"`
 					TryFiles       []string    `yaml:"try_files"`
@@ -61,6 +62,7 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 					Listen         interface{} `yaml:"listen"`
 					Hostname       string      `yaml:"hostname"`
 					PublicDir      string      `yaml:"public_dir"`
+					RootPath       string      `yaml:"root_path"`
 					NamedHosts     []string    `yaml:"named_hosts"`
 					Root           string      `yaml:"root"`
 					TryFiles       []string    `yaml:"try_files"`
@@ -235,6 +237,7 @@ func TestConfigParser_ParseStickySessionConfig(t *testing.T) {
 			Listen         interface{} `yaml:"listen"`
 			Hostname       string      `yaml:"hostname"`
 			PublicDir      string      `yaml:"public_dir"`
+			RootPath       string      `yaml:"root_path"`
 			NamedHosts     []string    `yaml:"named_hosts"`
 			Root           string      `yaml:"root"`
 			TryFiles       []string    `yaml:"try_files"`

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/rubys/navigator/internal/auth"
@@ -489,6 +490,137 @@ func TestTryFilesConfigurationPriority(t *testing.T) {
 	}
 }
 
+func TestServeStaticFileWithRootPath(t *testing.T) {
+	// Create temporary directory for test files
+	tempDir, err := os.CreateTemp("", "navigator-test-")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.Remove(tempDir.Name())
+	tempDir.Close()
+
+	publicDir := filepath.Dir(tempDir.Name())
+	testPublicDir := filepath.Join(publicDir, "test-public")
+	assetsDir := filepath.Join(testPublicDir, "assets", "controllers")
+
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("Failed to create test directories: %v", err)
+	}
+	defer os.RemoveAll(testPublicDir)
+
+	// Create test file
+	testFile := filepath.Join(assetsDir, "live_scores_controller-3e78916c.js")
+	testContent := "// Test JS file content\nconsole.log('test');"
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		requestPath    string
+		rootPath       string
+		publicDir      string
+		expectedStatus int
+		expectContent  bool
+	}{
+		{
+			name:           "static file with root path stripping",
+			requestPath:    "/showcase/assets/controllers/live_scores_controller-3e78916c.js",
+			rootPath:       "/showcase",
+			publicDir:      testPublicDir,
+			expectedStatus: http.StatusOK,
+			expectContent:  true,
+		},
+		{
+			name:           "static file with empty root path (no stripping)",
+			requestPath:    "/showcase/assets/controllers/live_scores_controller-3e78916c.js",
+			rootPath:       "",
+			publicDir:      testPublicDir,
+			expectedStatus: 0, // Should not be handled by static file serving
+			expectContent:  false,
+		},
+		{
+			name:           "static file without root path prefix",
+			requestPath:    "/assets/controllers/live_scores_controller-3e78916c.js",
+			rootPath:       "/showcase",
+			publicDir:      testPublicDir,
+			expectedStatus: http.StatusOK,
+			expectContent:  true,
+		},
+		{
+			name:           "non-static file extension",
+			requestPath:    "/showcase/some/path/without/extension",
+			rootPath:       "/showcase",
+			publicDir:      testPublicDir,
+			expectedStatus: 0, // Should not be handled by serveStaticFile
+			expectContent:  false,
+		},
+		{
+			name:           "static file not found",
+			requestPath:    "/showcase/assets/nonexistent.js",
+			rootPath:       "/showcase",
+			publicDir:      testPublicDir,
+			expectedStatus: 0, // Should not be handled (file doesn't exist)
+			expectContent:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create config
+			cfg := &config.Config{}
+			cfg.Server.RootPath = tt.rootPath
+			cfg.Server.PublicDir = tt.publicDir
+
+			// Create handler
+			handler := &Handler{config: cfg}
+
+			// Create request and response recorder
+			req := httptest.NewRequest(http.MethodGet, tt.requestPath, nil)
+			recorder := httptest.NewRecorder()
+			respRecorder := NewResponseRecorder(recorder, nil)
+
+			// Test serveStaticFile
+			handled := handler.serveStaticFile(respRecorder, req, nil)
+
+			if tt.expectedStatus == 0 {
+				// Should not be handled
+				if handled {
+					t.Errorf("Expected file not to be handled, but it was")
+				}
+			} else {
+				// Should be handled
+				if !handled {
+					t.Errorf("Expected file to be handled, but it wasn't")
+					return
+				}
+
+				if recorder.Code != tt.expectedStatus {
+					t.Errorf("Expected status %d, got %d", tt.expectedStatus, recorder.Code)
+				}
+
+				if tt.expectContent {
+					body := recorder.Body.String()
+					if body != testContent {
+						t.Errorf("Expected content %q, got %q", testContent, body)
+					}
+
+					// Check Content-Type header
+					contentType := recorder.Header().Get("Content-Type")
+					if !strings.Contains(contentType, "javascript") && !strings.Contains(contentType, "text/plain") {
+						t.Errorf("Expected javascript or text content type, got %s", contentType)
+					}
+				}
+
+				// Check metadata was set
+				if respRecorder.metadata["response_type"] != "static" {
+					t.Errorf("Expected response_type metadata to be 'static', got %v", respRecorder.metadata["response_type"])
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkResponseRecorder(b *testing.B) {
 	recorder := httptest.NewRecorder()
 	testData := []byte("benchmark test data")
@@ -944,5 +1076,270 @@ func TestStaticFallbackWithNoTenants(t *testing.T) {
 	body := rr.Body.String()
 	if !strings.Contains(body, "Fallback Page") {
 		t.Errorf("Expected body to contain 'Fallback Page', got: %s", body)
+	}
+}
+
+// TestAssetServingIntegration tests the complete HTTP request flow for asset serving
+// with root path stripping functionality. This is an integration test that verifies
+// the full handler chain works correctly for the original 404 asset issue.
+func TestAssetServingIntegration(t *testing.T) {
+	// Create temporary directory structure mimicking showcase app
+	tempDir, err := os.MkdirTemp("", "navigator-asset-integration-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create assets directory and test files
+	assetsDir := filepath.Join(tempDir, "assets")
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("Failed to create assets dir: %v", err)
+	}
+
+	jsContent := "// Test JavaScript controller\nconsole.log('Live scores controller loaded');"
+	jsFile := filepath.Join(assetsDir, "controllers", "live_scores_controller-3e78916c.js")
+	if err := os.MkdirAll(filepath.Dir(jsFile), 0755); err != nil {
+		t.Fatalf("Failed to create controllers dir: %v", err)
+	}
+	if err := os.WriteFile(jsFile, []byte(jsContent), 0644); err != nil {
+		t.Fatalf("Failed to write JS file: %v", err)
+	}
+
+	cssContent := "/* Test CSS styles */\n.live-scores { color: blue; }"
+	cssFile := filepath.Join(assetsDir, "stylesheets", "application-1a2b3c4d.css")
+	if err := os.MkdirAll(filepath.Dir(cssFile), 0755); err != nil {
+		t.Fatalf("Failed to create stylesheets dir: %v", err)
+	}
+	if err := os.WriteFile(cssFile, []byte(cssContent), 0644); err != nil {
+		t.Fatalf("Failed to write CSS file: %v", err)
+	}
+
+	// Test configurations: with explicit root_path
+	testCases := []struct {
+		name        string
+		rootPath    string
+		description string
+	}{
+		{
+			name:        "with_configured_root_path",
+			rootPath:    "/showcase",
+			description: "root_path explicitly configured to '/showcase'",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create config for this test case
+			cfg := &config.Config{
+				LocationConfigMutex: sync.RWMutex{},
+			}
+			cfg.Server.PublicDir = tempDir
+			cfg.Server.RootPath = tc.rootPath
+			cfg.Server.AuthPatterns = []config.AuthPattern{}
+			cfg.Server.RewriteRules = []config.RewriteRule{}
+
+			// Create handler with all required components
+			handler := &Handler{
+				config:      cfg,
+				auth:        &auth.BasicAuth{},
+				idleManager: idle.NewManager(cfg),
+				appManager:  &process.AppManager{},
+			}
+
+			// Test cases for asset requests that should succeed
+			assetTests := []struct {
+				path        string
+				expectedExt string
+				description string
+			}{
+				{
+					path:        "/showcase/assets/controllers/live_scores_controller-3e78916c.js",
+					expectedExt: ".js",
+					description: "JavaScript controller asset that was originally failing with 404",
+				},
+				{
+					path:        "/showcase/assets/stylesheets/application-1a2b3c4d.css",
+					expectedExt: ".css",
+					description: "CSS stylesheet asset",
+				},
+			}
+
+			for _, assetTest := range assetTests {
+				t.Run(assetTest.description, func(t *testing.T) {
+					// Create HTTP request
+					req := httptest.NewRequest("GET", assetTest.path, nil)
+					rr := httptest.NewRecorder()
+
+					// Process request through full handler
+					handler.ServeHTTP(rr, req)
+
+					// Verify successful response
+					if rr.Code != http.StatusOK {
+						t.Errorf("Expected status %d for %s, got %d (%s)",
+							http.StatusOK, assetTest.path, rr.Code, tc.description)
+					}
+
+					// Verify content type is set correctly
+					contentType := rr.Header().Get("Content-Type")
+					if assetTest.expectedExt == ".js" {
+						if !strings.Contains(contentType, "javascript") && !strings.Contains(contentType, "text/plain") {
+							t.Errorf("Expected JS content type for %s, got: %s", assetTest.path, contentType)
+						}
+					} else if assetTest.expectedExt == ".css" {
+						if !strings.Contains(contentType, "css") && !strings.Contains(contentType, "text/plain") {
+							t.Errorf("Expected CSS content type for %s, got: %s", assetTest.path, contentType)
+						}
+					}
+
+					// Verify file content is returned
+					body := rr.Body.String()
+					if len(body) == 0 {
+						t.Errorf("Expected non-empty response body for %s", assetTest.path)
+					}
+
+					// Verify actual content matches expected
+					if assetTest.expectedExt == ".js" {
+						if !strings.Contains(body, "Live scores controller loaded") {
+							t.Errorf("JS file content not found in response for %s", assetTest.path)
+						}
+					} else if assetTest.expectedExt == ".css" {
+						if !strings.Contains(body, ".live-scores") {
+							t.Errorf("CSS content not found in response for %s", assetTest.path)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+// TestAssetServingIntegrationErrorCases tests error scenarios in the asset serving integration
+func TestAssetServingIntegrationErrorCases(t *testing.T) {
+	// Create temporary directory structure
+	tempDir, err := os.MkdirTemp("", "navigator-asset-error-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	cfg := &config.Config{
+		LocationConfigMutex: sync.RWMutex{},
+	}
+	cfg.Server.PublicDir = tempDir
+	cfg.Server.RootPath = "/showcase"
+	cfg.Server.AuthPatterns = []config.AuthPattern{}
+	cfg.Server.RewriteRules = []config.RewriteRule{}
+
+	handler := &Handler{
+		config:      cfg,
+		auth:        &auth.BasicAuth{},
+		idleManager: idle.NewManager(cfg),
+		appManager:  &process.AppManager{},
+	}
+
+	// Test 404 for non-existent asset
+	req := httptest.NewRequest("GET", "/showcase/assets/nonexistent-file.js", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	// Should return 404 for missing files
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("Expected 404 for non-existent asset, got %d", rr.Code)
+	}
+}
+
+// TestAssetServingRootPathVariations tests different root path configurations
+func TestAssetServingRootPathVariations(t *testing.T) {
+	// Create temporary directory with test asset
+	tempDir, err := os.MkdirTemp("", "navigator-rootpath-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create test asset
+	assetsDir := filepath.Join(tempDir, "assets")
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("Failed to create assets dir: %v", err)
+	}
+
+	testContent := "/* test css */"
+	testFile := filepath.Join(assetsDir, "test.css")
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	testCases := []struct {
+		name        string
+		rootPath    string
+		requestPath string
+		shouldWork  bool
+		description string
+	}{
+		{
+			name:        "showcase_prefix",
+			rootPath:    "/showcase",
+			requestPath: "/showcase/assets/test.css",
+			shouldWork:  true,
+			description: "Standard showcase root path",
+		},
+		{
+			name:        "app_prefix",
+			rootPath:    "/app",
+			requestPath: "/app/assets/test.css",
+			shouldWork:  true,
+			description: "Custom app root path",
+		},
+		{
+			name:        "empty_root_no_stripping",
+			rootPath:    "",
+			requestPath: "/showcase/assets/test.css",
+			shouldWork:  false,
+			description: "Empty root path should not strip any prefix",
+		},
+		{
+			name:        "wrong_prefix",
+			rootPath:    "/showcase",
+			requestPath: "/wrong/assets/test.css",
+			shouldWork:  false,
+			description: "Wrong prefix should not work",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &config.Config{
+				LocationConfigMutex: sync.RWMutex{},
+			}
+			cfg.Server.PublicDir = tempDir
+			cfg.Server.RootPath = tc.rootPath
+			cfg.Server.AuthPatterns = []config.AuthPattern{}
+			cfg.Server.RewriteRules = []config.RewriteRule{}
+
+			handler := &Handler{
+				config:      cfg,
+				auth:        &auth.BasicAuth{},
+				idleManager: idle.NewManager(cfg),
+				appManager:  &process.AppManager{},
+			}
+
+			req := httptest.NewRequest("GET", tc.requestPath, nil)
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
+
+			if tc.shouldWork {
+				if rr.Code != http.StatusOK {
+					t.Errorf("Expected 200 for %s (%s), got %d", tc.requestPath, tc.description, rr.Code)
+				}
+				body := rr.Body.String()
+				if body != testContent {
+					t.Errorf("Expected '%s' in body, got: %s", testContent, body)
+				}
+			} else {
+				if rr.Code == http.StatusOK {
+					t.Errorf("Expected non-200 for %s (%s), got %d", tc.requestPath, tc.description, rr.Code)
+				}
+			}
+		})
 	}
 }

@@ -96,6 +96,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Find best matching location
 	location := h.findBestLocation(r.URL.Path)
 
+	slog.Debug("Handler: about to check static file",
+		"path", r.URL.Path,
+		"hasLocation", location != nil)
+
 	// Try to serve static files
 	if h.serveStaticFile(recorder, r, location) {
 		return
@@ -240,7 +244,20 @@ func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request, locati
 
 	slog.Debug("Checking static file",
 		"path", path,
-		"publicDir", h.config.Server.PublicDir)
+		"publicDir", h.config.Server.PublicDir,
+		"rootPath", h.config.Server.RootPath)
+
+	// Strip the root path if configured (e.g., "/showcase" prefix)
+	rootPath := h.config.Server.RootPath
+
+	if rootPath != "" && strings.HasPrefix(path, rootPath) {
+		slog.Debug("Stripping root path", "originalPath", path, "rootPath", rootPath, "configured", h.config.Server.RootPath != "")
+		path = strings.TrimPrefix(path, rootPath)
+		if path == "" {
+			path = "/"
+		}
+		slog.Debug("Path after stripping", "newPath", path)
+	}
 
 	// Check if file has a static extension (common static extensions)
 	isStatic := false
@@ -275,7 +292,9 @@ func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request, locati
 	}
 
 	// Check if file exists
+	slog.Debug("Checking file existence", "fsPath", fsPath, "originalPath", path)
 	if info, err := os.Stat(fsPath); os.IsNotExist(err) || info.IsDir() {
+		slog.Debug("File not found or is directory", "fsPath", fsPath, "err", err)
 		return false
 	}
 
@@ -288,7 +307,7 @@ func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request, locati
 	// Set content type and serve the file
 	setContentType(w, fsPath)
 	http.ServeFile(w, r, fsPath)
-	slog.Info("Serving static file", "path", path, "fsPath", fsPath)
+	slog.Debug("Serving static file", "path", path, "fsPath", fsPath)
 	return true
 }
 
@@ -377,9 +396,23 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request, location *con
 		path = relativePath
 	} else if h.config.Server.PublicDir != "" {
 		publicDir = h.config.Server.PublicDir
+		// Strip the root path if configured (e.g., "/showcase" prefix)
+		if h.config.Server.RootPath != "" && strings.HasPrefix(path, h.config.Server.RootPath) {
+			path = strings.TrimPrefix(path, h.config.Server.RootPath)
+			if path == "" {
+				path = "/"
+			}
+		}
 	} else {
 		// Default to public directory in current working directory
 		publicDir = h.getPublicDir()
+		// Strip the root path if configured (e.g., "/showcase" prefix)
+		if h.config.Server.RootPath != "" && strings.HasPrefix(path, h.config.Server.RootPath) {
+			path = strings.TrimPrefix(path, h.config.Server.RootPath)
+			if path == "" {
+				path = "/"
+			}
+		}
 	}
 
 	// Try each extension

@@ -11,6 +11,7 @@ func TestLoadConfig(t *testing.T) {
 server:
   listen: 3000
   hostname: localhost
+  root_path: /showcase
   public_dir: public
   idle:
     action: suspend
@@ -58,6 +59,11 @@ applications:
 
 	if config.Server.PublicDir != "public" {
 		t.Errorf("Expected public_dir public, got %s", config.Server.PublicDir)
+	}
+
+	// RootPath should be correctly parsed from YAML
+	if config.Server.RootPath != "/showcase" {
+		t.Errorf("Expected root_path /showcase, got %s", config.Server.RootPath)
 	}
 
 	// Verify idle config
@@ -572,6 +578,24 @@ pools:
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
 		t.Fatalf("Failed to load maintenance config: %v", err)
+	}
+
+	// Verify server configuration
+	if config.Server.Listen != "3000" {
+		t.Errorf("Expected listen port 3000, got %s", config.Server.Listen)
+	}
+
+	if config.Server.Hostname != "localhost" {
+		t.Errorf("Expected hostname localhost, got %s", config.Server.Hostname)
+	}
+
+	// RootPath should be correctly parsed from YAML
+	if config.Server.RootPath != "/" {
+		t.Errorf("Expected root_path /, got %s", config.Server.RootPath)
+	}
+
+	if config.Server.PublicDir != "public" {
+		t.Errorf("Expected public_dir public, got %s", config.Server.PublicDir)
 	}
 
 	// Verify maintenance mode characteristics
