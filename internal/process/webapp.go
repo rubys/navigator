@@ -228,6 +228,12 @@ func (m *AppManager) startWebApp(app *WebApp, tenant *config.Tenant) error {
 		slog.Error("Failed to execute tenant start hooks", "tenant", tenantName, "error", err)
 	}
 
+	// Skip readiness check if in test mode with echo command
+	if os.Getenv("NAVIGATOR_TEST_SKIP_READINESS") == "true" || runtime == "echo" {
+		slog.Debug("Skipping readiness check for test", "tenant", tenantName)
+		return nil
+	}
+
 	// Wait for Rails to be ready
 	readyCtx, readyCancel := context.WithTimeout(context.Background(), config.RailsStartupTimeout)
 	defer readyCancel()

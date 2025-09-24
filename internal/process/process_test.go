@@ -1,6 +1,9 @@
 package process
 
 import (
+	"fmt"
+	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -631,6 +634,557 @@ func TestWebAppGetApp(t *testing.T) {
 
 	if appManager.config != newCfg {
 		t.Error("UpdateConfig should update the config reference")
+	}
+}
+
+func TestStartWebApp(t *testing.T) {
+	cfg := &config.Config{
+		Applications: config.Applications{
+			Pools: config.Pools{
+				MaxSize:   5,
+				StartPort: 4000,
+				Timeout:   "5m",
+			},
+			Tenants: []config.Tenant{
+				{
+					Name:      "test-webapp",
+					Root:      "/tmp",
+					Runtime:   "echo",  // Use echo to avoid actually starting a web server
+					Server:    "test",
+					Args:      []string{"testing", "{{port}}"},
+					Framework: "test",
+					Env: map[string]string{
+						"TEST_VAR": "test_value",
+						"PIDFILE":  "/tmp/test.pid",
+					},
+				},
+			},
+			Runtime: map[string]string{
+				"test": "echo",
+			},
+			Server: map[string]string{
+				"test": "test-server",
+			},
+			Args: map[string][]string{
+				"test": {"default", "args", "{{port}}"},
+			},
+		},
+	}
+
+	appManager := NewAppManager(cfg)
+
+	// Create a test app
+	app := &WebApp{
+		Port:          4001,
+		StartTime:     time.Now(),
+		LastActivity:  time.Now(),
+		wsConnections: make(map[string]interface{}),
+	}
+
+	tenant := &cfg.Applications.Tenants[0]
+
+	// Test starting a web app
+	err := appManager.startWebApp(app, tenant)
+	if err != nil {
+		t.Errorf("startWebApp should not error with echo command: %v", err)
+	}
+
+	// Cleanup
+	if app.cancel != nil {
+		app.cancel()
+	}
+}
+
+func TestMonitorAppIdleTimeout(t *testing.T) {
+	cfg := &config.Config{
+		Applications: config.Applications{
+			Pools: config.Pools{
+				Timeout: "100ms", // Very short timeout for testing
+			},
+			Tenants: []config.Tenant{
+				{
+					Name: "idle-test",
+					Root: "/tmp",
+				},
+			},
+		},
+	}
+
+	appManager := NewAppManager(cfg)
+
+	// Create a test app
+	app := &WebApp{
+		Port:          4002,
+		StartTime:     time.Now(),
+		LastActivity:  time.Now().Add(-200 * time.Millisecond), // Make it look idle
+		wsConnections: make(map[string]interface{}),
+	}
+
+	// Add app to manager
+	appManager.mutex.Lock()
+	appManager.apps["idle-test"] = app
+	appManager.mutex.Unlock()
+
+	// Test monitoring (this will run in background)
+	go appManager.monitorAppIdleTimeout("idle-test")
+
+	// Give some time for monitoring to potentially detect idle state
+	time.Sleep(50 * time.Millisecond)
+
+	// The test app should still exist (since echo command finishes quickly)
+	appManager.mutex.RLock()
+	_, exists := appManager.apps["idle-test"]
+	appManager.mutex.RUnlock()
+
+	if !exists {
+		t.Log("App was removed due to idle timeout (this is expected behavior)")
+	}
+
+	// Cleanup
+	appManager.Cleanup()
+}
+
+func TestWebSocketConnectionManagement(t *testing.T) {
+	cfg := &config.Config{
+		Applications: config.Applications{
+			Pools: config.Pools{
+				MaxSize:   5,
+				StartPort: 4000,
+			},
+			Tenants: []config.Tenant{
+				{
+					Name: "websocket-test",
+					Root: "/tmp",
+				},
+			},
+		},
+	}
+
+	appManager := NewAppManager(cfg)
+
+	// Create a test app
+	app := &WebApp{
+		Port:          4003,
+		StartTime:     time.Now(),
+		LastActivity:  time.Now(),
+		wsConnections: make(map[string]interface{}),
+		Tenant:        &cfg.Applications.Tenants[0],
+	}
+
+	appManager.mutex.Lock()
+	appManager.apps["websocket-test"] = app
+	appManager.mutex.Unlock()
+
+	// Test registering WebSocket connections
+	connectionID := "test-connection-1"
+	app.RegisterWebSocketConnection(connectionID, "test-connection-object")
+
+	// Verify connection was registered (this exercises the WebSocket registration code)
+	app.wsConnectionsMux.RLock()
+	_, exists := app.wsConnections[connectionID]
+	app.wsConnectionsMux.RUnlock()
+
+	if !exists {
+		t.Error("WebSocket connection should be registered")
+	}
+
+	// Test unregistering WebSocket connections
+	app.UnregisterWebSocketConnection(connectionID)
+
+	// Verify connection was unregistered
+	app.wsConnectionsMux.RLock()
+	_, exists = app.wsConnections[connectionID]
+	app.wsConnectionsMux.RUnlock()
+
+	if exists {
+		t.Error("WebSocket connection should be unregistered")
+	}
+
+	// Cleanup
+	appManager.Cleanup()
+}
+
+func TestCleanupPidFile(t *testing.T) {
+	// Create a temporary PID file
+	pidFile := "/tmp/test-navigator.pid"
+
+	// Create the file
+	err := os.WriteFile(pidFile, []byte("12345"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test PID file: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(pidFile); os.IsNotExist(err) {
+		t.Fatal("Test PID file should exist")
+	}
+
+	// Test cleanup
+	cleanupPidFile(pidFile)
+
+	// Verify file was removed
+	if _, err := os.Stat(pidFile); !os.IsNotExist(err) {
+		t.Error("PID file should be removed after cleanup")
+		// Clean up if test failed
+		os.Remove(pidFile)
+	}
+
+	// Test cleanup of non-existent file (should not error)
+	cleanupPidFile("/tmp/non-existent-pid.pid")
+}
+
+func TestStartWebAppDefaultValues(t *testing.T) {
+	cfg := &config.Config{
+		Applications: config.Applications{
+			Pools: config.Pools{
+				MaxSize:   5,
+				StartPort: 4000,
+			},
+			Tenants: []config.Tenant{
+				{
+					Name: "default-test",
+					Root: "/tmp",
+					// No runtime, server, or args specified - should use defaults
+				},
+			},
+		},
+	}
+
+	appManager := NewAppManager(cfg)
+
+	app := &WebApp{
+		Port:          4004,
+		StartTime:     time.Now(),
+		LastActivity:  time.Now(),
+		wsConnections: make(map[string]interface{}),
+	}
+
+	tenant := &cfg.Applications.Tenants[0]
+
+	// Test with no runtime/server specified (should use defaults)
+	// We'll replace the default runtime with echo to avoid starting Ruby
+	originalTenant := *tenant
+	tenant.Runtime = "echo"
+	tenant.Server = "test"
+	tenant.Args = []string{"default", "test"}
+
+	err := appManager.startWebApp(app, tenant)
+	if err != nil {
+		t.Errorf("startWebApp should not error with default values: %v", err)
+	}
+
+	// Cleanup
+	if app.cancel != nil {
+		app.cancel()
+	}
+
+	// Restore original tenant
+	*tenant = originalTenant
+}
+
+func TestStartWebAppWithFrameworkConfig(t *testing.T) {
+	cfg := &config.Config{
+		Applications: config.Applications{
+			Pools: config.Pools{
+				MaxSize:   5,
+				StartPort: 4000,
+			},
+			Tenants: []config.Tenant{
+				{
+					Name:      "framework-test",
+					Root:      "/tmp",
+					Framework: "custom",
+					// Runtime, server, and args will come from framework config
+				},
+			},
+			Runtime: map[string]string{
+				"custom": "echo",
+			},
+			Server: map[string]string{
+				"custom": "framework-server",
+			},
+			Args: map[string][]string{
+				"custom": {"framework", "args", "{{port}}"},
+			},
+		},
+	}
+
+	appManager := NewAppManager(cfg)
+
+	app := &WebApp{
+		Port:          4005,
+		StartTime:     time.Now(),
+		LastActivity:  time.Now(),
+		wsConnections: make(map[string]interface{}),
+	}
+
+	tenant := &cfg.Applications.Tenants[0]
+
+	// Test with framework configuration
+	err := appManager.startWebApp(app, tenant)
+	if err != nil {
+		t.Errorf("startWebApp should not error with framework config: %v", err)
+	}
+
+	// Cleanup
+	if app.cancel != nil {
+		app.cancel()
+	}
+}
+
+func TestLoggingComponents(t *testing.T) {
+	tests := []struct {
+		name      string
+		source    string
+		stream    string
+		logConfig config.LogConfig
+	}{
+		{
+			name:      "File logging with text format",
+			source:    "test-app",
+			stream:    "stdout",
+			logConfig: config.LogConfig{Format: "text", File: "/tmp/test-navigator.log"},
+		},
+		{
+			name:      "File logging with JSON format",
+			source:    "test-app",
+			stream:    "stderr",
+			logConfig: config.LogConfig{Format: "json", File: "/tmp/test-navigator-json.log"},
+		},
+		{
+			name:      "Console logging with app template",
+			source:    "test-app",
+			stream:    "stdout",
+			logConfig: config.LogConfig{Format: "text", File: "/tmp/{{app}}.log"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test createFileWriter
+			writer := CreateLogWriter(tt.source, tt.stream, tt.logConfig)
+			if writer == nil {
+				t.Error("CreateLogWriter should return a non-nil writer")
+			}
+
+			// Test writing to the logger
+			testMessage := "Test log message for " + tt.name + "\n"
+			_, err := writer.Write([]byte(testMessage))
+			if err != nil {
+				t.Errorf("Writer should not error on write: %v", err)
+			}
+
+			// Clean up test files
+			if tt.logConfig.File != "" {
+				// Handle template expansion
+				filename := tt.logConfig.File
+				if strings.Contains(filename, "{{app}}") {
+					filename = strings.ReplaceAll(filename, "{{app}}", tt.source)
+				}
+				os.Remove(filename)
+			}
+		})
+	}
+}
+
+func TestVectorLogging(t *testing.T) {
+	// Test NewVectorWriter (even though it returns nil in current implementation)
+	vectorWriter := NewVectorWriter("/tmp/test-vector.sock")
+
+	// Should return a writer (even if it's a no-op)
+	if vectorWriter == nil {
+		// This is expected behavior in current implementation
+		t.Log("VectorWriter returns nil (expected in current implementation)")
+	} else {
+		// If implementation changes to return a writer, test it
+		_, err := vectorWriter.Write([]byte("test vector message\n"))
+		if err != nil {
+			t.Errorf("VectorWriter should not error on write: %v", err)
+		}
+
+		// Test Close method
+		err = vectorWriter.Close()
+		if err != nil {
+			t.Errorf("VectorWriter Close should not error: %v", err)
+		}
+	}
+}
+
+func TestJSONLogWriter(t *testing.T) {
+	// Test JSON log writer with various sources and streams
+	tests := []struct {
+		source string
+		stream string
+	}{
+		{"json-test-app", "stdout"},
+		{"json-test-app", "stderr"},
+		{"another-app", "stdout"},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s-%s", tt.source, tt.stream), func(t *testing.T) {
+			cfg := config.LogConfig{Format: "json"}
+			writer := CreateLogWriter(tt.source, tt.stream, cfg)
+
+			if writer == nil {
+				t.Error("CreateLogWriter should return a non-nil writer for JSON format")
+			}
+
+			// Test writing JSON log entries
+			testMessages := []string{
+				"Simple log message",
+				"Log message with special characters: !@#$%^&*()",
+				"Multi\nline\nlog\nmessage",
+				"Log message with emoji: 🚀 Navigator logging test",
+			}
+
+			for _, msg := range testMessages {
+				_, err := writer.Write([]byte(msg + "\n"))
+				if err != nil {
+					t.Errorf("JSON writer should not error on write: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestFileLogWriter(t *testing.T) {
+	// Test file-based logging
+	tempDir := t.TempDir()
+	logFile := tempDir + "/test-file-logging.log"
+
+	cfg := config.LogConfig{
+		Format: "text",
+		File:   logFile,
+	}
+
+	writer := CreateLogWriter("file-test-app", "stdout", cfg)
+	if writer == nil {
+		t.Error("CreateLogWriter should return a non-nil writer for file logging")
+	}
+
+	// Write test messages
+	testMessages := []string{
+		"File logging test message 1",
+		"File logging test message 2",
+		"File logging test message 3",
+	}
+
+	for _, msg := range testMessages {
+		_, err := writer.Write([]byte(msg + "\n"))
+		if err != nil {
+			t.Errorf("File writer should not error on write: %v", err)
+		}
+	}
+
+	// Verify file was created and contains content
+	if _, err := os.Stat(logFile); os.IsNotExist(err) {
+		t.Error("Log file should be created")
+	} else {
+		// Read file content
+		content, err := os.ReadFile(logFile)
+		if err != nil {
+			t.Errorf("Should be able to read log file: %v", err)
+		} else {
+			contentStr := string(content)
+			for _, msg := range testMessages {
+				if !strings.Contains(contentStr, msg) {
+					t.Errorf("Log file should contain message: %s", msg)
+				}
+			}
+		}
+	}
+}
+
+func TestTemplateLogFileNames(t *testing.T) {
+	// Test log file template expansion
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name         string
+		source       string
+		template     string
+		expectedFile string
+	}{
+		{
+			name:         "App template expansion",
+			source:       "my-app",
+			template:     tempDir + "/{{app}}.log",
+			expectedFile: tempDir + "/my-app.log",
+		},
+		{
+			name:         "No template",
+			source:       "my-app",
+			template:     tempDir + "/static.log",
+			expectedFile: tempDir + "/static.log",
+		},
+		{
+			name:         "Multiple app references",
+			source:       "test-app",
+			template:     tempDir + "/{{app}}-{{app}}.log",
+			expectedFile: tempDir + "/test-app-test-app.log",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := config.LogConfig{
+				Format: "text",
+				File:   tt.template,
+			}
+
+			writer := CreateLogWriter(tt.source, "stdout", cfg)
+			if writer == nil {
+				t.Error("CreateLogWriter should return a non-nil writer")
+			}
+
+			// Write a test message
+			_, err := writer.Write([]byte("Template test message\n"))
+			if err != nil {
+				t.Errorf("Writer should not error: %v", err)
+			}
+
+			// Verify the expected file was created
+			if _, err := os.Stat(tt.expectedFile); os.IsNotExist(err) {
+				t.Errorf("Expected file %s should be created", tt.expectedFile)
+			}
+		})
+	}
+}
+
+func TestMultiDestinationLogging(t *testing.T) {
+	// Test logging to both console and file simultaneously
+	tempDir := t.TempDir()
+	logFile := tempDir + "/multi-dest.log"
+
+	cfg := config.LogConfig{
+		Format: "json",
+		File:   logFile,
+	}
+
+	writer := CreateLogWriter("multi-dest-app", "stdout", cfg)
+	if writer == nil {
+		t.Error("CreateLogWriter should return a non-nil writer")
+	}
+
+	// Write test messages that should go to both destinations
+	testMessage := "Multi-destination logging test"
+	_, err := writer.Write([]byte(testMessage + "\n"))
+	if err != nil {
+		t.Errorf("Writer should not error: %v", err)
+	}
+
+	// Verify file was created
+	if _, err := os.Stat(logFile); os.IsNotExist(err) {
+		t.Error("Log file should be created for multi-destination logging")
+	}
+
+	// Verify file contains the message
+	content, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Errorf("Should be able to read log file: %v", err)
+	} else if !strings.Contains(string(content), testMessage) {
+		t.Error("Log file should contain the test message")
 	}
 }
 

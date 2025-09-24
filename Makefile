@@ -3,7 +3,7 @@
 .PHONY: all build clean test help
 
 # Default target
-all: build
+all: build build-refactored
 
 # Build the navigator executable
 build:
