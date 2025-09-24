@@ -37,8 +37,8 @@ jobs:
     - name: Run tests
       run: go test -race -cover ./...
 
-    - name: Build original navigator
-      run: go build -o navigator ./cmd/navigator
+    - name: Build legacy navigator
+      run: go build -o navigator-legacy ./cmd/navigator-legacy
 
     - name: Build refactored navigator
       run: go build -o navigator-refactored ./cmd/navigator-refactored
@@ -77,7 +77,7 @@ jobs:
 
         # Test that original binary starts and exits cleanly with YAML config
         echo "Testing original navigator..."
-        timeout 5s ./navigator /tmp/test-rails/config/navigator.yml || [ $? -eq 124 ]
+        timeout 5s ./navigator-legacy /tmp/test-rails/config/navigator.yml || [ $? -eq 124 ]
 
         # Test that refactored binary starts and exits cleanly with YAML config
         echo "Testing refactored navigator..."
