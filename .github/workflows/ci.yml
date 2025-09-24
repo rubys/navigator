@@ -98,18 +98,18 @@ jobs:
 
     - name: Build binaries
       run: |
-        # Original Navigator
+        # Legacy Navigator
         # Linux AMD64
-        GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o navigator-linux-amd64 ./cmd/navigator
+        GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o navigator-linux-amd64 ./cmd/navigator-legacy
 
         # Linux ARM64
-        GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o navigator-linux-arm64 ./cmd/navigator
+        GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o navigator-linux-arm64 ./cmd/navigator-legacy
 
         # macOS AMD64
-        GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o navigator-darwin-amd64 ./cmd/navigator
+        GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o navigator-darwin-amd64 ./cmd/navigator-legacy
 
         # macOS ARM64
-        GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o navigator-darwin-arm64 ./cmd/navigator
+        GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o navigator-darwin-arm64 ./cmd/navigator-legacy
 
         # Refactored Navigator
         # Linux AMD64
