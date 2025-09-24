@@ -117,17 +117,8 @@ func (p *ConfigParser) parseAuthConfig() {
 		p.config.Server.AuthExclude = p.yamlConfig.Auth.PublicPaths
 	}
 
-	// Parse auth exclude patterns
-	for _, exclude := range p.config.Server.AuthExclude {
-		if pattern, err := regexp.Compile(exclude); err == nil {
-			p.config.Server.AuthPatterns = append(p.config.Server.AuthPatterns, AuthPattern{
-				Pattern: pattern,
-				Action:  "off",
-			})
-		} else {
-			slog.Warn("Invalid auth exclude pattern", "pattern", exclude, "error", err)
-		}
-	}
+	// Note: AuthExclude patterns are handled as glob patterns in auth.go's ShouldExcludeFromAuth()
+	// We don't compile them as regex here since they use glob syntax (e.g., *.css, *.js)
 }
 
 // parseStaticConfig parses static file configuration

@@ -318,6 +318,132 @@ func TestConfigParser_ParseStickySessionConfig(t *testing.T) {
 	}
 }
 
+func TestConfigParser_ParseAuthConfig(t *testing.T) {
+	tests := []struct {
+		name                  string
+		yamlConfig            YAMLConfig
+		wantAuthFile          string
+		wantAuthExcludeCount  int
+		wantAuthExclude       []string
+		wantAuthPatternsCount int
+	}{
+		{
+			name: "auth with glob patterns",
+			yamlConfig: YAMLConfig{
+				Auth: struct {
+					Enabled         bool     `yaml:"enabled"`
+					Realm           string   `yaml:"realm"`
+					HTPasswd        string   `yaml:"htpasswd"`
+					PublicPaths     []string `yaml:"public_paths"`
+					ExcludePatterns []struct {
+						Pattern     string `yaml:"pattern"`
+						Description string `yaml:"description"`
+					} `yaml:"exclude_patterns"`
+				}{
+					Enabled:  true,
+					HTPasswd: "/etc/htpasswd",
+					PublicPaths: []string{
+						"*.css",
+						"*.js",
+						"*.png",
+						"*.jpg",
+						"*.gif",
+						"/assets/",
+						"/favicon.ico",
+					},
+				},
+			},
+			wantAuthFile:          "/etc/htpasswd",
+			wantAuthExcludeCount:  7,
+			wantAuthExclude:       []string{"*.css", "*.js", "*.png", "*.jpg", "*.gif", "/assets/", "/favicon.ico"},
+			wantAuthPatternsCount: 0, // Glob patterns should NOT be compiled as regex
+		},
+		{
+			name: "auth disabled",
+			yamlConfig: YAMLConfig{
+				Auth: struct {
+					Enabled         bool     `yaml:"enabled"`
+					Realm           string   `yaml:"realm"`
+					HTPasswd        string   `yaml:"htpasswd"`
+					PublicPaths     []string `yaml:"public_paths"`
+					ExcludePatterns []struct {
+						Pattern     string `yaml:"pattern"`
+						Description string `yaml:"description"`
+					} `yaml:"exclude_patterns"`
+				}{
+					Enabled:     false,
+					HTPasswd:    "/etc/htpasswd",
+					PublicPaths: []string{"*.css"},
+				},
+			},
+			wantAuthFile:          "",
+			wantAuthExcludeCount:  0,
+			wantAuthPatternsCount: 0,
+		},
+		{
+			name: "auth with mixed patterns",
+			yamlConfig: YAMLConfig{
+				Auth: struct {
+					Enabled         bool     `yaml:"enabled"`
+					Realm           string   `yaml:"realm"`
+					HTPasswd        string   `yaml:"htpasswd"`
+					PublicPaths     []string `yaml:"public_paths"`
+					ExcludePatterns []struct {
+						Pattern     string `yaml:"pattern"`
+						Description string `yaml:"description"`
+					} `yaml:"exclude_patterns"`
+				}{
+					Enabled:  true,
+					HTPasswd: "/etc/htpasswd",
+					PublicPaths: []string{
+						"*.css",
+						"/public/",
+						"/health",
+						"*.woff",
+					},
+				},
+			},
+			wantAuthFile:          "/etc/htpasswd",
+			wantAuthExcludeCount:  4,
+			wantAuthExclude:       []string{"*.css", "/public/", "/health", "*.woff"},
+			wantAuthPatternsCount: 0, // None should be compiled as regex
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser := NewConfigParser(&tt.yamlConfig)
+			config, err := parser.Parse()
+
+			if err != nil {
+				t.Fatalf("Parse() error = %v", err)
+			}
+
+			if config.Server.Authentication != tt.wantAuthFile {
+				t.Errorf("Server.Authentication = %v, want %v", config.Server.Authentication, tt.wantAuthFile)
+			}
+
+			if len(config.Server.AuthExclude) != tt.wantAuthExcludeCount {
+				t.Errorf("Server.AuthExclude count = %v, want %v", len(config.Server.AuthExclude), tt.wantAuthExcludeCount)
+			}
+
+			if tt.wantAuthExclude != nil {
+				for i, want := range tt.wantAuthExclude {
+					if i >= len(config.Server.AuthExclude) || config.Server.AuthExclude[i] != want {
+						t.Errorf("Server.AuthExclude[%d] = %v, want %v", i, config.Server.AuthExclude[i], want)
+					}
+				}
+			}
+
+			// Verify that glob patterns are NOT compiled as regex (AuthPatterns should be empty)
+			if len(config.Server.AuthPatterns) != tt.wantAuthPatternsCount {
+				t.Errorf("Server.AuthPatterns count = %v, want %v (glob patterns should not be compiled as regex)",
+					len(config.Server.AuthPatterns), tt.wantAuthPatternsCount)
+			}
+		})
+	}
+}
+
 func TestConfigParser_ParseRoutesConfig(t *testing.T) {
 	yamlConfig := YAMLConfig{
 		Routes: RoutesConfig{
