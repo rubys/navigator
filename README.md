@@ -17,7 +17,7 @@ Navigator uses YAML configuration format for:
 - **Reverse proxy**: Forwards dynamic requests to web applications with method-based exclusions and custom headers
 - **Machine idle management**: Auto-suspend or stop Fly.io machines after idle timeout with automatic wake on requests
 - **Configuration reload**: Live configuration reload with SIGHUP signal (no restart needed)
-- **WebSocket support**: Full support for WebSocket connections and standalone servers
+- **WebSocket support**: Full support for WebSocket connections via reverse proxies
 - **Intelligent routing**: Smart Fly-Replay with automatic fallback to reverse proxy for large requests
 - **High reliability**: Automatic retry with exponential backoff for proxy failures
 - **Lifecycle hooks**: Server and tenant hooks for custom integration at key lifecycle events
@@ -44,7 +44,7 @@ cd navigator
 # Build the navigator
 make build
 # Or build directly with Go
-go build -mod=readonly -o bin/navigator cmd/navigator/main.go
+go build -mod=readonly -o bin/navigator cmd/navigator-refactored/main.go
 ```
 
 ## Quick Start
@@ -172,37 +172,34 @@ applications:
             args: ["2025-boston"]
             timeout: 10s
 
-    # Tenants with pattern matching for WebSocket support
-    - path: /cable-specific
-      match_pattern: "*/cable"  # Matches any path ending with /cable
-      force_max_concurrent_requests: 0
+    # Additional tenant for specific services
+    - path: /services/
+      var:
+        database: "services"
+        owner: "Service Layer"
+        storage: "/path/to/storage/services"
+        scope: "services"
     
-    # Tenants with standalone servers (e.g., Action Cable)
-    - path: /external/
-      standalone_server: "localhost:28080"  # Proxy to standalone server instead of app
-      rewrite_path: "/"                      # Optional: rewrite request path before proxying
+    # Additional tenant examples
+    - path: /api/
+      var:
+        database: "api-service"
+        owner: "API Service"
+        storage: "/path/to/storage/api"
+        scope: "api"
 
-## Pattern Matching
+## Path Routing
 
-Navigator supports two types of pattern matching for `match_pattern`:
+Navigator uses regex patterns for flexible request routing in reverse proxy configurations:
 
-### Suffix Patterns (`*/suffix`)
-- **Format**: `"*/cable"`, `"*/api"`, etc.
-- **Behavior**: Matches any path ending with the specified suffix
+### Reverse Proxy Path Patterns
+- **Format**: Regular expressions (e.g., `"^/cable"`, `"^/api/"`)
+- **Behavior**: Uses Go's `regexp` package for pattern matching
 - **Examples**:
-  - `"*/cable"` matches `/app/2025/boston/cable`, `/showcase/event/cable`
-  - `"*/api"` matches `/service/v1/api`, `/admin/api`
-- **Use case**: Perfect for routing specific endpoints (WebSockets, APIs) to standalone servers
-
-### Glob Patterns
-- **Format**: Standard filepath glob patterns
-- **Behavior**: Uses Go's `filepath.Match()` for pattern matching
-- **Examples**:
-  - `"*.json"` matches any path ending in `.json`
-  - `"/admin/*"` matches any path starting with `/admin/`
-- **Use case**: More complex pattern matching needs
-
-**Priority**: Pattern matches take priority over prefix-based path matching.
+  - `"^/cable"` matches any path starting with `/cable`
+  - `"^/api/"` matches any path starting with `/api/`
+  - `"^/admin/.*"` matches any path starting with `/admin/`
+- **Use case**: Routing specific endpoints (WebSockets, APIs) to backend services
 
 # External process management
 managed_processes:
@@ -258,13 +255,25 @@ routes:
       status: 307
       methods: [GET, POST]  # Automatically uses reverse proxy for large POST requests
   
-  # Reverse proxy with method exclusions
+  # Reverse proxy configurations
   reverse_proxies:
-    - path: "/api/"
+    # WebSocket proxy for Action Cable
+    - name: action-cable-websocket
+      path: "^/cable"
+      target: http://localhost:28080
+      websocket: true
+      headers:
+        X-Forwarded-For: "$remote_addr"
+        X-Forwarded-Proto: "$scheme"
+        X-Forwarded-Host: "$host"
+
+    # API proxy with custom headers
+    - name: api-proxy
+      path: "^/api/"
       target: "http://api.example.com"
       headers:
         X-API-Key: "secret"
-      exclude_methods: [POST, DELETE]  # Don't proxy these methods
+        X-Forwarded-For: "$remote_addr"
 
 # Lifecycle hooks
 hooks:
@@ -330,12 +339,13 @@ maintenance:
 - **Method Filtering**: Apply replay rules only to specific HTTP methods
 - **Internal Networking**: Support for `.internal`, `.vm.app.internal`, and regional `.internal` URLs
 
-### Reverse Proxy Enhancements
+### Reverse Proxy Support
+- **WebSocket Support**: Full WebSocket proxy capabilities with proper header handling
 - **Automatic Retry**: Connection failures are retried with exponential backoff (up to 3 seconds)
-- **Method Exclusions**: Exclude specific HTTP methods from proxy routing
-- **Custom Headers**: Add headers to proxied requests
-- **Multiple Targets**: Support for multiple proxy configurations
+- **Custom Headers**: Add custom headers to proxied requests with variable substitution
+- **Multiple Targets**: Support for multiple proxy configurations with regex path matching
 - **High Reliability**: Graceful handling of backend failures with automatic recovery
+- **Modern Configuration**: Clean YAML-based proxy definitions with name, path, target, and options
 
 ### Sticky Sessions (Fly.io)
 - **Machine Affinity**: Routes requests from the same client to the same Fly.io machine
@@ -345,12 +355,6 @@ maintenance:
 - **Large Request Support**: Falls back to reverse proxy for requests >1MB
 - **Path-Specific**: Optional configuration to apply sticky sessions only to specific paths
 - **Configurable Duration**: Session duration using Go's duration format (e.g., "1h", "30m")
-
-### Standalone Server Support
-- **External Services**: Proxy to standalone servers (e.g., Action Cable)
-- **Pattern Matching**: Use wildcard patterns for location matching
-- **WebSocket Support**: Full support for WebSocket connections
-- **Path Rewriting**: Optional path rewriting before proxying to standalone server
 
 
 ### Managed Processes
@@ -420,7 +424,8 @@ curl -u username:password http://localhost:9999/showcase/2025/boston/
 ## Development
 
 ### File Structure
-- `cmd/navigator/main.go` - Main application entry point
+- `cmd/navigator-refactored/main.go` - Main application entry point (refactored version)
+- `cmd/navigator-legacy/main.go` - Legacy navigator for compatibility
 - `Makefile` - Build configuration
 - `go.mod`, `go.sum` - Go module dependencies
 - `docs/` - Documentation source files
@@ -496,7 +501,7 @@ Example JSON output:
 make build
 
 # Cross-compile for Linux
-GOOS=linux GOARCH=amd64 go build -o navigator cmd/navigator/main.go
+GOOS=linux GOARCH=amd64 go build -o navigator cmd/navigator-refactored/main.go
 
 # Install dependencies
 go mod download

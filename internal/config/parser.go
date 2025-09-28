@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -48,13 +47,11 @@ func (p *ConfigParser) Parse() (*Config, error) {
 	p.parseServerConfig()
 	p.parseAuthConfig()
 	p.parseStaticConfig()
-	p.parseLocationConfig()
+	p.parseRoutesConfig()
 	p.parseApplicationConfig()
 	p.parseManagedProcesses()
 	p.parseLoggingConfig()
 	p.parseHooksConfig()
-	p.parseRoutesConfig()
-	p.parseStandaloneServers()
 
 	return p.config, nil
 }
@@ -138,41 +135,6 @@ func (p *ConfigParser) parseStaticConfig() {
 	p.config.Static.TryFiles = p.yamlConfig.Static.TryFiles
 }
 
-// parseLocationConfig parses location blocks
-func (p *ConfigParser) parseLocationConfig() {
-	for _, yamlLoc := range p.yamlConfig.Locations {
-		loc := Location{
-			Path:               yamlLoc.Path,
-			PublicDir:          yamlLoc.PublicDir,
-			TryFiles:           yamlLoc.TryFiles,
-			ProxyPass:          yamlLoc.ProxyPass,
-			ProxyMethod:        yamlLoc.ProxyMethod,
-			ProxyExcludeMethod: yamlLoc.ProxyExcludeMethod,
-			Alias:              yamlLoc.Alias,
-		}
-
-		// Convert location rewrite rules
-		for _, rewrite := range yamlLoc.Rewrites {
-			if re, err := regexp.Compile(rewrite.Pattern); err == nil {
-				loc.RewriteRules = append(loc.RewriteRules, RewriteRule{
-					Pattern:     re,
-					Replacement: rewrite.Replacement,
-					Flag:        rewrite.Flag,
-					Methods:     rewrite.Methods,
-				})
-			}
-		}
-
-		// Validate proxy URL format
-		if loc.ProxyPass != "" {
-			if !strings.HasPrefix(loc.ProxyPass, "http://") && !strings.HasPrefix(loc.ProxyPass, "https://") {
-				slog.Warn("Invalid proxy_pass URL", "location", loc.Path, "proxy_pass", loc.ProxyPass)
-			}
-		}
-
-		p.config.Locations = append(p.config.Locations, loc)
-	}
-}
 
 // parseApplicationConfig parses application pool and tenant configuration
 func (p *ConfigParser) parseApplicationConfig() {
@@ -263,16 +225,3 @@ func (p *ConfigParser) parseRoutesConfig() {
 	}
 }
 
-// parseStandaloneServers parses standalone server proxies
-func (p *ConfigParser) parseStandaloneServers() {
-	for _, yamlServer := range p.yamlConfig.StandaloneServers {
-		server := ProxyRoute{
-			Name:      yamlServer.Name,
-			Prefix:    yamlServer.Prefix,
-			Target:    yamlServer.Target,
-			StripPath: yamlServer.StripPath,
-			Headers:   yamlServer.Headers,
-		}
-		p.config.StandaloneServers = append(p.config.StandaloneServers, server)
-	}
-}

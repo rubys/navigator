@@ -108,6 +108,13 @@ type RoutesConfig struct {
 		From string `yaml:"from"`
 		To   string `yaml:"to"`
 	} `yaml:"rewrites"`
+	ReverseProxies []ProxyRoute `yaml:"reverse_proxies"`
+	FlyReplay      []struct {
+		Path   string `yaml:"path"`
+		App    string `yaml:"app"`
+		Region string `yaml:"region"`
+		Status int    `yaml:"status"`
+	} `yaml:"fly_replay"`
 }
 
 // Config represents the main configuration
@@ -142,12 +149,10 @@ type Config struct {
 	} `yaml:"server"`
 	Static              StaticConfig           `yaml:"static"`
 	Routes              RoutesConfig           `yaml:"routes"`
-	Locations           []Location             `yaml:"locations"`
 	Applications        Applications           `yaml:"applications"`
 	ManagedProcesses    []ManagedProcessConfig `yaml:"managed_processes"`
 	Logging             LogConfig              `yaml:"logging"`
 	Hooks               ServerHooks            `yaml:"hooks"`
-	StandaloneServers   []ProxyRoute           `yaml:"standalone_servers"`
 	LocationConfigMutex sync.RWMutex
 }
 
@@ -182,24 +187,14 @@ type StaticDir struct {
 // ProxyRoute represents a proxy route configuration
 type ProxyRoute struct {
 	Name       string            `yaml:"name"`
-	Prefix     string            `yaml:"prefix"`
+	Path       string            `yaml:"path"`       // Regex pattern for matching paths
+	Prefix     string            `yaml:"prefix"`     // Alternative to Path for simple prefix matching
 	Target     string            `yaml:"target"`
 	StripPath  bool              `yaml:"strip_path"`
 	Headers    map[string]string `yaml:"headers"`
+	WebSocket  bool              `yaml:"websocket"`  // Enable WebSocket support
 }
 
-// Location represents a location block configuration
-type Location struct {
-	Path              string            `yaml:"path"`
-	PublicDir         string            `yaml:"public_dir"`
-	TryFiles          []string          `yaml:"try_files"`
-	ProxyPass         string            `yaml:"proxy_pass"`
-	ProxyMethod       []string          `yaml:"proxy_method"`
-	ProxyExcludeMethod []string          `yaml:"proxy_exclude_method"`
-	RewriteRules      []RewriteRule
-	AuthPatterns      []AuthPattern
-	Alias             string            `yaml:"alias"`
-}
 
 // WebApp represents a web application
 type WebApp struct {
@@ -292,31 +287,7 @@ type YAMLConfig struct {
 			Fallback string   `yaml:"fallback"`
 		} `yaml:"try_files"`
 	} `yaml:"static"`
-	Routes struct {
-		Redirects []struct {
-			From string `yaml:"from"`
-			To   string `yaml:"to"`
-		} `yaml:"redirects"`
-		Rewrites []struct {
-			From string `yaml:"from"`
-			To   string `yaml:"to"`
-		} `yaml:"rewrites"`
-	} `yaml:"routes"`
-	Locations []struct {
-		Path               string   `yaml:"path"`
-		PublicDir          string   `yaml:"public_dir"`
-		TryFiles           []string `yaml:"try_files"`
-		ProxyPass          string   `yaml:"proxy_pass"`
-		ProxyMethod        []string `yaml:"proxy_method"`
-		ProxyExcludeMethod []string `yaml:"proxy_exclude_method"`
-		Alias              string   `yaml:"alias"`
-		Rewrites           []struct {
-			Pattern     string   `yaml:"pattern"`
-			Replacement string   `yaml:"replacement"`
-			Flag        string   `yaml:"flag"`
-			Methods     []string `yaml:"methods"`
-		} `yaml:"rewrites"`
-	} `yaml:"locations"`
+	Routes RoutesConfig `yaml:"routes"`
 	Applications struct {
 		Pools struct {
 			MaxSize   int    `yaml:"max_size"`
@@ -355,11 +326,4 @@ type YAMLConfig struct {
 		Resume []HookConfig `yaml:"resume"`
 		Idle   []HookConfig `yaml:"idle"`
 	} `yaml:"hooks"`
-	StandaloneServers []struct {
-		Name      string            `yaml:"name"`
-		Prefix    string            `yaml:"prefix"`
-		Target    string            `yaml:"target"`
-		StripPath bool              `yaml:"strip_path"`
-		Headers   map[string]string `yaml:"headers"`
-	} `yaml:"standalone_servers"`
 }

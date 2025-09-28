@@ -83,6 +83,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle reverse proxies (including WebSockets)
+	if h.handleReverseProxies(recorder, r) {
+		return
+	}
+
 	// Check authentication
 	isPublic := auth.ShouldExcludeFromAuth(r.URL.Path, h.config)
 	needsAuth := h.auth.IsEnabled() && !isPublic
@@ -93,32 +98,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find best matching location
-	location := h.findBestLocation(r.URL.Path)
-
-	slog.Debug("Handler: about to check static file",
-		"path", r.URL.Path,
-		"hasLocation", location != nil)
-
 	// Try to serve static files
-	if h.serveStaticFile(recorder, r, location) {
+	if h.serveStaticFile(recorder, r) {
 		return
 	}
 
 	// Try files for public paths
-	if isPublic && h.tryFiles(recorder, r, location) {
-		return
-	}
-
-	// Handle standalone servers
-	if location != nil && location.ProxyPass != "" {
-		h.handleStandaloneProxy(recorder, r, location)
+	if isPublic && h.tryFiles(recorder, r) {
 		return
 	}
 
 	// Handle web application proxy
 	if len(h.config.Applications.Tenants) > 0 {
-		h.handleWebAppProxy(recorder, r, location)
+		h.handleWebAppProxy(recorder, r)
 	} else {
 		// No tenants configured - check for static fallback (maintenance mode)
 		h.handleStaticFallback(recorder, r)
@@ -200,45 +192,10 @@ func (h *Handler) handleRewrites(w http.ResponseWriter, r *http.Request) bool {
 	return false
 }
 
-// findBestLocation finds the best matching location for a request path
-func (h *Handler) findBestLocation(path string) *config.Location {
-	var bestMatch *config.Location
-	bestMatchLen := 0
-
-	// Check pattern matches first
-	for i := range h.config.Locations {
-		location := &h.config.Locations[i]
-
-		// Check suffix patterns like "*/cable"
-		if strings.HasPrefix(location.Path, "*/") {
-			suffix := location.Path[2:]
-			if strings.HasSuffix(path, suffix) {
-				return location
-			}
-		}
-
-		// Check glob patterns
-		if strings.Contains(location.Path, "*") {
-			if matched, _ := filepath.Match(location.Path, path); matched {
-				return location
-			}
-		}
-	}
-
-	// Fall back to prefix matching
-	for i := range h.config.Locations {
-		location := &h.config.Locations[i]
-		if strings.HasPrefix(path, location.Path) && len(location.Path) > bestMatchLen {
-			bestMatch = location
-			bestMatchLen = len(location.Path)
-		}
-	}
-
-	return bestMatch
-}
+// findBestLocation removed - use Routes.ReverseProxies instead
 
 // serveStaticFile attempts to serve a static file
-func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request, location *config.Location) bool {
+func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request) bool {
 	// Check if this is a request for static assets
 	path := r.URL.Path
 
@@ -277,19 +234,8 @@ func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request, locati
 		return false
 	}
 
-	// Use the best match location if available, otherwise fall back to server config
-	var fsPath string
-	if location != nil && location.PublicDir != "" {
-		// Remove the location prefix from the URL path
-		relativePath := strings.TrimPrefix(path, location.Path)
-		if relativePath == "" || relativePath[0] != '/' {
-			relativePath = "/" + relativePath
-		}
-		fsPath = filepath.Join(location.PublicDir, relativePath)
-	} else {
-		// Use server-level public directory (or default)
-		fsPath = filepath.Join(h.getPublicDir(), path)
-	}
+	// Use server-level public directory (location-based serving removed)
+	fsPath := filepath.Join(h.getPublicDir(), path)
 
 	// Check if file exists
 	slog.Debug("Checking file existence", "fsPath", fsPath, "originalPath", path)
@@ -312,7 +258,7 @@ func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request, locati
 }
 
 // tryFiles attempts to find and serve files with different extensions
-func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request, location *config.Location) bool {
+func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request) bool {
 	path := r.URL.Path
 
 	slog.Debug("tryFiles checking", "path", path)
@@ -323,11 +269,9 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request, location *con
 		return false
 	}
 
-	// Get try_files suffixes from config
+	// Get try_files suffixes from config (location-based removed)
 	var extensions []string
-	if location != nil && len(location.TryFiles) > 0 {
-		extensions = location.TryFiles
-	} else if len(h.config.Server.TryFiles) > 0 {
+	if len(h.config.Server.TryFiles) > 0 {
 		extensions = h.config.Server.TryFiles
 	} else if h.config.Static.TryFiles.Enabled && len(h.config.Static.TryFiles.Suffixes) > 0 {
 		// Use static try_files configuration (like the original navigator)
@@ -383,18 +327,8 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request, location *con
 
 	// Fallback: check location-based public directory
 	var publicDir string
-	if location != nil && location.PublicDir != "" {
-		publicDir = location.PublicDir
-		// Remove the location prefix from the URL path
-		relativePath := strings.TrimPrefix(path, location.Path)
-		if relativePath == "" {
-			relativePath = "/"
-		}
-		if relativePath[0] != '/' {
-			relativePath = "/" + relativePath
-		}
-		path = relativePath
-	} else if h.config.Server.PublicDir != "" {
+	// Location-based public directory removed
+	if h.config.Server.PublicDir != "" {
 		publicDir = h.config.Server.PublicDir
 		// Strip the root path if configured (e.g., "/showcase" prefix)
 		if h.config.Server.RootPath != "" && strings.HasPrefix(path, h.config.Server.RootPath) {
@@ -428,18 +362,10 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request, location *con
 	return false
 }
 
-// handleStandaloneProxy proxies requests to standalone servers
-func (h *Handler) handleStandaloneProxy(w http.ResponseWriter, r *http.Request, location *config.Location) {
-	recorder := w.(*ResponseRecorder)
-	recorder.SetMetadata("response_type", "proxy")
-	recorder.SetMetadata("proxy_backend", location.ProxyPass)
-
-	// Use proxy package to handle the request
-	proxy.HandleProxy(w, r, location.ProxyPass, location)
-}
+// handleStandaloneProxy removed - use Routes.ReverseProxies instead
 
 // handleWebAppProxy proxies requests to web applications
-func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request, location *config.Location) {
+func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request) {
 	recorder := w.(*ResponseRecorder)
 
 	// Extract tenant name from path
@@ -475,7 +401,7 @@ func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request, loca
 
 	// Proxy to the web app
 	targetURL := fmt.Sprintf("http://localhost:%d", app.Port)
-	proxy.HandleProxy(w, r, targetURL, location)
+	proxy.HandleProxy(w, r, targetURL)
 }
 
 // ResponseRecorder wraps http.ResponseWriter to capture response details

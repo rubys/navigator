@@ -59,12 +59,11 @@ func UpdateConfig(currentConfig *Config, newConfig *Config) {
 
 	// Update server configuration
 	currentConfig.Server = newConfig.Server
-	currentConfig.Locations = newConfig.Locations
+	currentConfig.Routes = newConfig.Routes
 	currentConfig.Applications = newConfig.Applications
 	currentConfig.ManagedProcesses = newConfig.ManagedProcesses
 	currentConfig.Logging = newConfig.Logging
 	currentConfig.Hooks = newConfig.Hooks
-	currentConfig.StandaloneServers = newConfig.StandaloneServers
 
 	slog.Info("Configuration updated successfully")
 }

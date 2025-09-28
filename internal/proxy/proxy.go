@@ -13,12 +13,10 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"github.com/rubys/navigator/internal/config"
 )
 
 // HandleProxy handles proxying requests to a target URL
-func HandleProxy(w http.ResponseWriter, r *http.Request, targetURL string, location *config.Location) {
+func HandleProxy(w http.ResponseWriter, r *http.Request, targetURL string) {
 	target, err := url.Parse(targetURL)
 	if err != nil {
 		http.Error(w, "Invalid proxy target", http.StatusInternalServerError)
@@ -42,10 +40,7 @@ func HandleProxy(w http.ResponseWriter, r *http.Request, targetURL string, locat
 			req.Header.Set("X-Forwarded-Proto", "http")
 		}
 
-		// Rewrite path if needed
-		if location != nil && location.Alias != "" {
-			req.URL.Path = location.Alias + req.URL.Path
-		}
+		// Path rewriting removed with legacy Location configuration
 	}
 
 	// Set error handler

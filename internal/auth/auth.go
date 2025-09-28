@@ -104,16 +104,7 @@ func ShouldExcludeFromAuth(path string, cfg *config.Config) bool {
 		}
 	}
 
-	// Check location-specific auth patterns
-	for _, location := range cfg.Locations {
-		if strings.HasPrefix(path, location.Path) {
-			for _, authPattern := range location.AuthPatterns {
-				if authPattern.Pattern.MatchString(path) && authPattern.Action == "off" {
-					return true
-				}
-			}
-		}
-	}
+	// Location-specific auth patterns removed - use Routes.ReverseProxies instead
 
 	return false
 }

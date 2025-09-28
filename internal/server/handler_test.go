@@ -57,54 +57,8 @@ func TestResponseRecorder(t *testing.T) {
 	}
 }
 
-func TestFindBestLocation(t *testing.T) {
-	cfg := &config.Config{
-		Locations: []config.Location{
-			{
-				Path:      "/api/*",
-				ProxyPass: "http://localhost:4001",
-			},
-			{
-				Path:      "/admin/*",
-				ProxyPass: "http://localhost:4002",
-			},
-			{
-				Path:      "/*/cable",
-				ProxyPass: "http://localhost:4003",
-			},
-		},
-	}
-
-	handler := &Handler{config: cfg}
-
-	tests := []struct {
-		path     string
-		expected string // Expected proxy pass URL
-	}{
-		{"/api/users", "http://localhost:4001"},
-		{"/admin/dashboard", "http://localhost:4002"},
-		{"/app/cable", "http://localhost:4003"},
-		{"/unknown/path", ""}, // No match
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			location := handler.findBestLocation(tt.path)
-
-			if tt.expected == "" {
-				if location != nil {
-					t.Errorf("Expected no location match, got %v", location)
-				}
-			} else {
-				if location == nil {
-					t.Errorf("Expected location match, got nil")
-				} else if location.ProxyPass != tt.expected {
-					t.Errorf("Expected proxy pass %s, got %s", tt.expected, location.ProxyPass)
-				}
-			}
-		})
-	}
-}
+// TestFindBestLocation was removed - legacy locations functionality no longer exists
+// Reverse proxy routing is now handled via Routes.ReverseProxies configuration
 
 func TestHealthCheckHandler(t *testing.T) {
 	cfg := &config.Config{}
@@ -161,44 +115,8 @@ func TestSetContentType(t *testing.T) {
 	}
 }
 
-func TestLocationMatching(t *testing.T) {
-	cfg := &config.Config{
-		Locations: []config.Location{
-			{Path: "/api/*", ProxyPass: "http://localhost:4001"},
-			{Path: "/admin/*", ProxyPass: "http://localhost:4002"},
-			{Path: "/*/cable", ProxyPass: "http://localhost:4003"},
-		},
-	}
-
-	handler := &Handler{config: cfg}
-
-	tests := []struct {
-		path     string
-		expected string
-	}{
-		{"/api/users", "/api/*"},
-		{"/admin/dashboard", "/admin/*"},
-		{"/2025/cable", "/*/cable"},
-		{"/unknown/path", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			location := handler.findBestLocation(tt.path)
-			if tt.expected == "" {
-				if location != nil {
-					t.Errorf("For path %s, expected nil location, got %s", tt.path, location.Path)
-				}
-			} else {
-				if location == nil {
-					t.Errorf("For path %s, expected location %s, got nil", tt.path, tt.expected)
-				} else if location.Path != tt.expected {
-					t.Errorf("For path %s, expected location %s, got %s", tt.path, tt.expected, location.Path)
-				}
-			}
-		})
-	}
-}
+// TestLocationMatching was removed - legacy locations functionality no longer exists
+// Reverse proxy routing is now handled via Routes.ReverseProxies configuration
 
 func TestTryFilesWithStaticDirectories(t *testing.T) {
 	// Create temporary directory structure for testing
@@ -285,7 +203,7 @@ func TestTryFilesWithStaticDirectories(t *testing.T) {
 			respRecorder := NewResponseRecorder(recorder, nil)
 
 			// Test tryFiles directly
-			found := handler.tryFiles(respRecorder, req, nil)
+			found := handler.tryFiles(respRecorder, req)
 
 			if found != tt.expectedFound {
 				t.Errorf("Expected tryFiles to return %v for %s, got %v", tt.expectedFound, tt.path, found)
@@ -395,7 +313,6 @@ func TestStaticDirectoryMatching(t *testing.T) {
 func TestTryFilesConfigurationPriority(t *testing.T) {
 	tests := []struct {
 		name            string
-		locationTryFiles []string
 		serverTryFiles   []string
 		staticTryFiles   struct {
 			Enabled  bool
@@ -404,20 +321,7 @@ func TestTryFilesConfigurationPriority(t *testing.T) {
 		expectedSuffixes []string
 	}{
 		{
-			name:             "Location try_files takes priority",
-			locationTryFiles: []string{".location"},
-			serverTryFiles:   []string{".server"},
-			staticTryFiles: struct {
-				Enabled  bool
-				Suffixes []string
-			}{
-				Enabled:  true,
-				Suffixes: []string{".static"},
-			},
-			expectedSuffixes: []string{".location"},
-		},
-		{
-			name:           "Server try_files when no location",
+			name:           "Server try_files takes priority",
 			serverTryFiles: []string{".server"},
 			staticTryFiles: struct {
 				Enabled  bool
@@ -429,7 +333,7 @@ func TestTryFilesConfigurationPriority(t *testing.T) {
 			expectedSuffixes: []string{".server"},
 		},
 		{
-			name: "Static try_files when no server or location",
+			name: "Static try_files when no server",
 			staticTryFiles: struct {
 				Enabled  bool
 				Suffixes []string
@@ -458,18 +362,9 @@ func TestTryFilesConfigurationPriority(t *testing.T) {
 			cfg.Static.TryFiles.Enabled = tt.staticTryFiles.Enabled
 			cfg.Static.TryFiles.Suffixes = tt.staticTryFiles.Suffixes
 
-			var location *config.Location
-			if len(tt.locationTryFiles) > 0 {
-				location = &config.Location{
-					TryFiles: tt.locationTryFiles,
-				}
-			}
-
 			// Test the extension priority logic from tryFiles
 			var extensions []string
-			if location != nil && len(location.TryFiles) > 0 {
-				extensions = location.TryFiles
-			} else if len(cfg.Server.TryFiles) > 0 {
+			if len(cfg.Server.TryFiles) > 0 {
 				extensions = cfg.Server.TryFiles
 			} else if cfg.Static.TryFiles.Enabled && len(cfg.Static.TryFiles.Suffixes) > 0 {
 				extensions = cfg.Static.TryFiles.Suffixes
@@ -581,7 +476,7 @@ func TestServeStaticFileWithRootPath(t *testing.T) {
 			respRecorder := NewResponseRecorder(recorder, nil)
 
 			// Test serveStaticFile
-			handled := handler.serveStaticFile(respRecorder, req, nil)
+			handled := handler.serveStaticFile(respRecorder, req)
 
 			if tt.expectedStatus == 0 {
 				// Should not be handled
@@ -634,25 +529,8 @@ func BenchmarkResponseRecorder(b *testing.B) {
 	}
 }
 
-func BenchmarkFindBestLocation(b *testing.B) {
-	cfg := &config.Config{
-		Locations: []config.Location{
-			{Path: "/api/*", ProxyPass: "http://localhost:4001"},
-			{Path: "/admin/*", ProxyPass: "http://localhost:4002"},
-			{Path: "/*/cable", ProxyPass: "http://localhost:4003"},
-			{Path: "/assets/*", ProxyPass: "http://localhost:4004"},
-			{Path: "/uploads/*", ProxyPass: "http://localhost:4005"},
-		},
-	}
-
-	handler := &Handler{config: cfg}
-	testPath := "/api/users/123"
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		handler.findBestLocation(testPath)
-	}
-}
+// BenchmarkFindBestLocation was removed - legacy locations functionality no longer exists
+// Reverse proxy routing is now handled via Routes.ReverseProxies configuration
 
 func TestCreateHandler(t *testing.T) {
 	cfg := &config.Config{}
@@ -805,12 +683,7 @@ func TestHandler_ServeHTTP_Authentication(t *testing.T) {
 }
 
 func TestHandler_ServeHTTP_Routing(t *testing.T) {
-	cfg := &config.Config{
-		Locations: []config.Location{
-			{Path: "/api/*", ProxyPass: "http://localhost:4001"},
-			{Path: "/static/*", ProxyPass: "http://localhost:4002"},
-		},
-	}
+	cfg := &config.Config{}
 
 	handler := CreateHandler(cfg, &process.AppManager{}, nil, nil)
 

@@ -45,9 +45,8 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("Loaded configuration",
-		"locations", len(cfg.Locations),
 		"tenants", len(cfg.Applications.Tenants),
-		"standaloneServers", len(cfg.StandaloneServers))
+		"reverseProxies", len(cfg.Routes.ReverseProxies))
 
 	// Setup logging format based on configuration
 	setupLogging(cfg)

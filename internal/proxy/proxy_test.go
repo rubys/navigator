@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rubys/navigator/internal/config"
 )
 
 func TestIsWebSocketRequest(t *testing.T) {
@@ -332,7 +331,6 @@ func TestHandleProxy(t *testing.T) {
 		method         string
 		path           string
 		targetURL      string
-		location       *config.Location
 		expectStatus   int
 		expectBackend  bool
 		expectError    bool
@@ -346,11 +344,10 @@ func TestHandleProxy(t *testing.T) {
 			expectBackend: true,
 		},
 		{
-			name:          "POST request with location",
+			name:          "POST request",
 			method:        "POST",
 			path:          "/api/data",
 			targetURL:     backend.URL,
-			location:      &config.Location{Alias: "/v1"},
 			expectStatus:  http.StatusOK,
 			expectBackend: true,
 		},
@@ -380,7 +377,7 @@ func TestHandleProxy(t *testing.T) {
 
 			recorder := httptest.NewRecorder()
 
-			HandleProxy(recorder, req, tt.targetURL, tt.location)
+			HandleProxy(recorder, req, tt.targetURL)
 
 			if recorder.Code != tt.expectStatus {
 				t.Errorf("Status code = %d, expected %d", recorder.Code, tt.expectStatus)
@@ -566,63 +563,7 @@ func TestProxyWithWebSocketSupport(t *testing.T) {
 	}
 }
 
-func TestHandleProxy_LocationAlias(t *testing.T) {
-	// Backend that echoes the request path
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(r.URL.Path))
-	}))
-	defer backend.Close()
-
-	tests := []struct {
-		name         string
-		requestPath  string
-		alias        string
-		expectedPath string
-	}{
-		{
-			name:         "No alias",
-			requestPath:  "/api/users",
-			alias:        "",
-			expectedPath: "/api/users",
-		},
-		{
-			name:         "With alias prefix",
-			requestPath:  "/users",
-			alias:        "/api/v1",
-			expectedPath: "/api/v1/users",
-		},
-		{
-			name:         "Root path with alias",
-			requestPath:  "/",
-			alias:        "/v2",
-			expectedPath: "/v2/",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", tt.requestPath, nil)
-			recorder := httptest.NewRecorder()
-
-			var location *config.Location
-			if tt.alias != "" {
-				location = &config.Location{Alias: tt.alias}
-			}
-
-			HandleProxy(recorder, req, backend.URL, location)
-
-			if recorder.Code != http.StatusOK {
-				t.Errorf("Status = %d, expected %d", recorder.Code, http.StatusOK)
-			}
-
-			body := recorder.Body.String()
-			if body != tt.expectedPath {
-				t.Errorf("Backend received path %q, expected %q", body, tt.expectedPath)
-			}
-		})
-	}
-}
+// TestHandleProxy_LocationAlias removed - alias functionality no longer supported
 
 func BenchmarkHandleProxy(b *testing.B) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -636,7 +577,7 @@ func BenchmarkHandleProxy(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		recorder := httptest.NewRecorder()
-		HandleProxy(recorder, req, backend.URL, nil)
+		HandleProxy(recorder, req, backend.URL)
 	}
 }
 

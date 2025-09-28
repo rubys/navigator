@@ -1,6 +1,6 @@
 # WebSockets Example Configuration
 # This configuration demonstrates running Rails with a separate Action Cable server
-# for optimal WebSocket performance and Solid Cable support
+# for optimal WebSocket performance and Solid Cable support using reverse proxies
 
 server:
   listen: 3000
@@ -16,11 +16,27 @@ static_files:
   headers:
     cache_control: "public, max-age=3600"
 
-# Standalone Action Cable server configuration
-standalone_servers:
-  - path: /cable
-    target: http://localhost:28080
-    websocket: true
+# Reverse proxy configuration for WebSocket and HTTP routing
+routes:
+  reverse_proxies:
+    # WebSocket proxy for Action Cable
+    - name: action-cable-websocket
+      path: "^/cable"
+      target: http://localhost:28080
+      websocket: true
+      headers:
+        X-Forwarded-For: "$remote_addr"
+        X-Forwarded-Proto: "$scheme"
+        X-Forwarded-Host: "$host"
+
+    # API endpoints that might need separate handling
+    - name: api-proxy
+      path: "^/api/"
+      target: http://localhost:4001
+      headers:
+        X-Forwarded-For: "$remote_addr"
+        X-Forwarded-Proto: "$scheme"
+        X-Real-IP: "$remote_addr"
 
 # Managed processes for Redis and Action Cable
 managed_processes:
@@ -59,3 +75,23 @@ applications:
         RAILS_ENV: production
         DATABASE_URL: sqlite3:db/production.sqlite3
         ACTION_CABLE_URL: ws://localhost:3000/cable
+
+# Example usage scenarios:
+#
+# 1. WebSocket connections to /cable will be proxied to Action Cable server on port 28080
+#    - Headers like X-Forwarded-For are automatically added
+#    - WebSocket upgrade is handled transparently
+#
+# 2. API requests to /api/* will be proxied to a separate API server on port 4001
+#    - Useful for microservices architecture
+#    - Request headers are preserved and enhanced
+#
+# 3. All other requests go to the main Rails application
+#    - Static files served directly by Navigator
+#    - Dynamic content served by Rails on ports 4000+
+#
+# Configuration Benefits:
+# - Better performance: WebSocket connections handled by dedicated Action Cable server
+# - Scalability: API and WebSocket traffic can be scaled independently
+# - Flexibility: Easy to add/remove proxy routes without changing application code
+# - Monitoring: Each proxy route can be monitored and configured separately

@@ -23,11 +23,16 @@ sticky_sessions:
     - "/cable"                # WebSocket connections
     - "/upload/*"             # File upload sessions
 
-# WebSocket support with sticky routing
-standalone_servers:
-  - path: /cable
-    target: http://localhost:28080
-    websocket: true
+# WebSocket support with sticky routing using reverse proxies
+routes:
+  reverse_proxies:
+    - name: action-cable-websocket
+      path: "^/cable"
+      target: http://localhost:28080
+      websocket: true
+      headers:
+        X-Forwarded-For: "$remote_addr"
+        X-Forwarded-Proto: "$scheme"
 
 # Managed process for Action Cable
 managed_processes:
