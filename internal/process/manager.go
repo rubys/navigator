@@ -24,6 +24,7 @@ type ManagedProcess struct {
 	Process     *exec.Cmd
 	Cancel      context.CancelFunc
 	Running     bool
+	Stopping    bool // Flag to prevent multiple stop attempts
 	mutex       sync.RWMutex
 }
 
@@ -135,7 +136,8 @@ func (m *Manager) startProcess(proc *ManagedProcess) error {
 	}
 
 	proc.Running = true
-	slog.Info("Started managed process", "name", proc.Name, "pid", cmd.Process.Pid)
+	proc.Stopping = false // Reset stopping flag since we're starting
+	slog.Info("Starting managed process", "name", proc.Name, "command", proc.Command, "args", proc.Args)
 
 	// Monitor process
 	m.wg.Add(1)
@@ -145,25 +147,38 @@ func (m *Manager) startProcess(proc *ManagedProcess) error {
 
 		proc.mutex.Lock()
 		proc.Running = false
+		proc.Stopping = false // Reset stopping flag on exit
 		wasAutoRestart := proc.AutoRestart
 		proc.mutex.Unlock()
 
 		if err != nil {
-			slog.Error("Managed process exited with error",
+			slog.Error("Process exited with error",
 				"name", proc.Name,
 				"error", err)
 		} else {
-			slog.Info("Managed process exited cleanly", "name", proc.Name)
+			slog.Info("Process exited normally", "name", proc.Name)
 		}
 
-		// Auto-restart if configured
-		if wasAutoRestart && err != nil {
-			slog.Info("Auto-restarting managed process", "name", proc.Name)
-			time.Sleep(2 * time.Second) // Brief delay before restart
-			if err := m.startProcess(proc); err != nil {
-				slog.Error("Failed to restart managed process",
-					"name", proc.Name,
-					"error", err)
+		// Auto-restart if configured and not being explicitly stopped
+		proc.mutex.Lock()
+		isBeingStopped := proc.Stopping
+		proc.mutex.Unlock()
+
+		if wasAutoRestart && err != nil && !isBeingStopped {
+			slog.Info("Auto-restarting process in 5 seconds", "name", proc.Name)
+			time.Sleep(5 * time.Second) // Longer delay to ensure port cleanup
+
+			// Double-check we're still supposed to restart
+			proc.mutex.Lock()
+			stillShouldRestart := proc.AutoRestart && !proc.Stopping
+			proc.mutex.Unlock()
+
+			if stillShouldRestart {
+				if err := m.startProcess(proc); err != nil {
+					slog.Error("Failed to restart managed process",
+						"name", proc.Name,
+						"error", err)
+				}
 			}
 		}
 	}()
@@ -178,12 +193,16 @@ func (m *Manager) StopManagedProcesses() {
 	copy(processesCopy, m.processes)
 	m.mutex.RUnlock()
 
+	// First pass: mark all processes as stopping and disable auto-restart
 	for _, proc := range processesCopy {
 		proc.mutex.Lock()
-		if proc.Running && proc.Cancel != nil {
-			slog.Info("Stopping managed process", "name", proc.Name)
+		if proc.Running && !proc.Stopping {
+			slog.Info("Stopping process", "name", proc.Name)
 			proc.AutoRestart = false // Prevent auto-restart
-			proc.Cancel()
+			proc.Stopping = true     // Mark as being stopped
+			if proc.Cancel != nil {
+				proc.Cancel()
+			}
 		}
 		proc.mutex.Unlock()
 	}
@@ -227,6 +246,7 @@ func (m *Manager) UpdateManagedProcesses(newConfig *config.Config) {
 			proc.mutex.Lock()
 			if proc.Running && proc.Cancel != nil {
 				proc.AutoRestart = false
+				proc.Stopping = true
 				proc.Cancel()
 			}
 			proc.mutex.Unlock()
