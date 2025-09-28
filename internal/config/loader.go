@@ -59,6 +59,7 @@ func UpdateConfig(currentConfig *Config, newConfig *Config) {
 
 	// Update server configuration
 	currentConfig.Server = newConfig.Server
+	currentConfig.Static = newConfig.Static
 	currentConfig.Routes = newConfig.Routes
 	currentConfig.Applications = newConfig.Applications
 	currentConfig.ManagedProcesses = newConfig.ManagedProcesses

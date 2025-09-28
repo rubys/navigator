@@ -442,3 +442,95 @@ func TestConfigFilePathLogic(t *testing.T) {
 		})
 	}
 }
+
+func TestStaticDirectoryConfigReload(t *testing.T) {
+	// Create a temporary config file with static directories
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "test-config.yml")
+
+	configContent := `
+server:
+  listen: "3001"
+  hostname: "test-host"
+  public_dir: "public"
+static:
+  directories:
+    - path: "/showcase/assets/"
+      dir: "assets/"
+    - path: "/showcase/studios/"
+      dir: "studios/"
+    - path: "/showcase/"
+      dir: "."
+applications:
+  tenants: []
+logging:
+  format: "text"
+`
+
+	err := ioutil.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	// Create initial config with minimal static directories (simulating maintenance config)
+	cfg := &config.Config{}
+	cfg.Server.Listen = "3000"
+	cfg.Server.Hostname = "localhost"
+	cfg.Static.Directories = []config.StaticDir{
+		{Path: "/", Dir: ""},
+	}
+
+	// Verify initial state has only 1 static directory
+	if len(cfg.Static.Directories) != 1 {
+		t.Fatalf("Expected 1 initial static directory, got %d", len(cfg.Static.Directories))
+	}
+	if cfg.Static.Directories[0].Path != "/" {
+		t.Errorf("Expected initial static directory path '/', got '%s'", cfg.Static.Directories[0].Path)
+	}
+
+	// Create real managers to avoid nil pointer issues
+	appManager := process.NewAppManager(cfg)
+	processManager := process.NewManager(cfg)
+	idleManager := idle.NewManager(cfg)
+	var currentAuth *auth.BasicAuth
+
+	// Test reload with config containing multiple static directories
+	newAuth, success := handleConfigReload(cfg, configFile, appManager, processManager, currentAuth, idleManager)
+
+	// Should succeed
+	if !success {
+		t.Error("Expected handleConfigReload to succeed with valid config file")
+	}
+
+	// Verify static directories were updated (this was the bug)
+	if len(cfg.Static.Directories) != 3 {
+		t.Errorf("Expected 3 static directories after reload, got %d", len(cfg.Static.Directories))
+	}
+
+	// Verify specific directories are present
+	expectedDirs := map[string]string{
+		"/showcase/assets/": "assets/",
+		"/showcase/studios/": "studios/",
+		"/showcase/": ".",
+	}
+
+	actualDirs := make(map[string]string)
+	for _, dir := range cfg.Static.Directories {
+		actualDirs[dir.Path] = dir.Dir
+	}
+
+	for expectedPath, expectedDir := range expectedDirs {
+		if actualDir, exists := actualDirs[expectedPath]; !exists {
+			t.Errorf("Expected static directory '%s' not found after reload", expectedPath)
+		} else if actualDir != expectedDir {
+			t.Errorf("Expected static directory '%s' to map to '%s', got '%s'", expectedPath, expectedDir, actualDir)
+		}
+	}
+
+	// newAuth should be nil because no authentication is configured
+	if newAuth != nil {
+		t.Error("Expected nil auth when no auth is configured")
+	}
+
+	t.Log("Static directory configuration reload test passed")
+}

@@ -290,8 +290,20 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request) bool {
 	// First, check static directories from config (like the original navigator)
 	var bestStaticDir *config.StaticDir
 	bestStaticDirLen := 0
-	for _, staticDir := range h.config.Static.Directories {
-		if strings.HasPrefix(path, staticDir.Path) && len(staticDir.Path) > bestStaticDirLen {
+	slog.Debug("Static directory matching", "path", path, "numDirectories", len(h.config.Static.Directories))
+	for i, staticDir := range h.config.Static.Directories {
+		hasPrefix := strings.HasPrefix(path, staticDir.Path)
+		isLonger := len(staticDir.Path) > bestStaticDirLen
+		slog.Debug("Checking static directory",
+			"index", i,
+			"staticPath", staticDir.Path,
+			"dir", staticDir.Dir,
+			"hasPrefix", hasPrefix,
+			"pathLen", len(staticDir.Path),
+			"bestLen", bestStaticDirLen,
+			"isLonger", isLonger)
+		if hasPrefix && isLonger {
+			slog.Debug("New best match found", "staticPath", staticDir.Path, "dir", staticDir.Dir)
 			bestStaticDir = &staticDir
 			bestStaticDirLen = len(staticDir.Path)
 		}
@@ -325,6 +337,7 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 
+	slog.Debug("No static directory match found, using fallback", "path", path)
 	// Fallback: check location-based public directory
 	var publicDir string
 	// Location-based public directory removed
