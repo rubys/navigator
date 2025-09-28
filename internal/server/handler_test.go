@@ -150,12 +150,12 @@ func TestTryFilesWithStaticDirectories(t *testing.T) {
 	cfg.Server.PublicDir = tempDir
 	cfg.Static.Directories = []config.StaticDir{
 		{
-			Path:   "/showcase/studios/",
-			Prefix: "studios/",
+			Path: "/showcase/studios/",
+			Dir:  "studios/",
 		},
 		{
-			Path:   "/showcase/docs/",
-			Prefix: "docs/",
+			Path: "/showcase/docs/",
+			Dir:  "docs/",
 		},
 	}
 	cfg.Static.TryFiles.Enabled = true
@@ -226,50 +226,50 @@ func TestStaticDirectoryMatching(t *testing.T) {
 		Static: config.StaticConfig{
 			Directories: []config.StaticDir{
 				{
-					Path:   "/showcase/studios/",
-					Prefix: "studios/",
+					Path: "/showcase/studios/",
+					Dir:  "studios/",
 				},
 				{
-					Path:   "/showcase/docs/",
-					Prefix: "docs/",
+					Path: "/showcase/docs/",
+					Dir:  "docs/",
 				},
 				{
-					Path:   "/showcase/",
-					Prefix: "general/",
+					Path: "/showcase/",
+					Dir:  "general/",
 				},
 			},
 		},
 	}
 
 	tests := []struct {
-		path             string
-		expectedPath     string
-		expectedPrefix   string
-		shouldMatch      bool
+		path         string
+		expectedPath string
+		expectedDir  string
+		shouldMatch  bool
 	}{
 		{
-			path:           "/showcase/studios/",
-			expectedPath:   "/showcase/studios/",
-			expectedPrefix: "studios/",
-			shouldMatch:    true,
+			path:         "/showcase/studios/",
+			expectedPath: "/showcase/studios/",
+			expectedDir:  "studios/",
+			shouldMatch:  true,
 		},
 		{
-			path:           "/showcase/studios/page",
-			expectedPath:   "/showcase/studios/",
-			expectedPrefix: "studios/",
-			shouldMatch:    true,
+			path:         "/showcase/studios/page",
+			expectedPath: "/showcase/studios/",
+			expectedDir:  "studios/",
+			shouldMatch:  true,
 		},
 		{
-			path:           "/showcase/docs/guide",
-			expectedPath:   "/showcase/docs/",
-			expectedPrefix: "docs/",
-			shouldMatch:    true,
+			path:         "/showcase/docs/guide",
+			expectedPath: "/showcase/docs/",
+			expectedDir:  "docs/",
+			shouldMatch:  true,
 		},
 		{
-			path:           "/showcase/other",
-			expectedPath:   "/showcase/",
-			expectedPrefix: "general/",
-			shouldMatch:    true,
+			path:         "/showcase/other",
+			expectedPath: "/showcase/",
+			expectedDir:  "general/",
+			shouldMatch:  true,
 		},
 		{
 			path:        "/different/path",
@@ -297,8 +297,8 @@ func TestStaticDirectoryMatching(t *testing.T) {
 					if bestStaticDir.Path != tt.expectedPath {
 						t.Errorf("Expected path %s, got %s", tt.expectedPath, bestStaticDir.Path)
 					}
-					if bestStaticDir.Prefix != tt.expectedPrefix {
-						t.Errorf("Expected prefix %s, got %s", tt.expectedPrefix, bestStaticDir.Prefix)
+					if bestStaticDir.Dir != tt.expectedDir {
+						t.Errorf("Expected dir %s, got %s", tt.expectedDir, bestStaticDir.Dir)
 					}
 				}
 			} else {

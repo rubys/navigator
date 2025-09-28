@@ -119,8 +119,8 @@ auth:
 static:
   directories:
     - path: /showcase/assets/
-      root: assets/
-      cache: 24h        # Duration format: "24h", "1h"
+      dir: assets/       # Local directory relative to public_dir
+      cache: 24h         # Duration format: "24h", "1h"
   extensions: [html, htm, css, js, png, jpg, gif, svg]
   try_files:
     enabled: true

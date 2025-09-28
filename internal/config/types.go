@@ -178,7 +178,7 @@ type Pools struct {
 // StaticDir represents static directory configuration
 type StaticDir struct {
 	Path        string   `yaml:"path"`
-	Prefix      string   `yaml:"prefix"`
+	Dir         string   `yaml:"dir"`
 	TryFiles    []string `yaml:"try_files"`
 	Cache       string   `yaml:"cache"`        // Duration format: "24h", "1h"
 	AuthExclude []string `yaml:"auth_exclude"`
@@ -277,7 +277,7 @@ type YAMLConfig struct {
 	Static struct {
 		Directories []struct {
 			Path  string `yaml:"path"`
-			Root  string `yaml:"root"`
+			Dir   string `yaml:"dir"`
 			Cache string `yaml:"cache"` // Duration format: "24h", "1h"
 		} `yaml:"directories"`
 		Extensions []string `yaml:"extensions"`

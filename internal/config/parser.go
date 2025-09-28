@@ -123,9 +123,9 @@ func (p *ConfigParser) parseStaticConfig() {
 	// Copy static directories
 	for _, yamlDir := range p.yamlConfig.Static.Directories {
 		dir := StaticDir{
-			Path:        yamlDir.Path,
-			Prefix:      yamlDir.Root, // Map Root to Prefix
-			Cache:       yamlDir.Cache,
+			Path:  yamlDir.Path,
+			Dir:   yamlDir.Dir,
+			Cache: yamlDir.Cache,
 		}
 		p.config.Static.Directories = append(p.config.Static.Directories, dir)
 	}

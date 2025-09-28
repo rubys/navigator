@@ -1,0 +1,100 @@
+# Static File Serving Example Configuration
+# This configuration demonstrates how to serve static files from different directories
+# with proper URL path to filesystem mapping using the prefix field
+
+server:
+  listen: 3000
+  hostname: localhost
+  public_dir: public
+
+# Static file serving configuration
+static:
+  directories:
+    # Serve CSS, JS, and asset files with long cache duration
+    - path: /assets/
+      dir: assets/
+      cache: 24h
+
+    # Serve documentation files without explicit cache
+    - path: /docs/
+      dir: docs/
+
+    # Serve studio pages (pre-rendered HTML files)
+    - path: /studios/
+      dir: studios/
+
+    # Serve images and media files
+    - path: /images/
+      dir: images/
+      cache: 12h
+
+    # Serve fonts with long cache duration
+    - path: /fonts/
+      dir: fonts/
+      cache: 30d
+
+    # Serve year-based content (e.g., /2024/, /2025/)
+    - path: /2024/
+      dir: 2024/
+
+    - path: /2025/
+      dir: 2025/
+
+    # Serve root-level files (favicon.ico, robots.txt, etc.)
+    - path: /
+      dir: .
+      cache: 1h
+
+  # File extensions that should be served as static files
+  extensions:
+    - html
+    - htm
+    - css
+    - js
+    - png
+    - jpg
+    - jpeg
+    - gif
+    - svg
+    - ico
+    - pdf
+    - txt
+    - xml
+    - json
+    - woff
+    - woff2
+    - ttf
+    - eot
+
+  # Try files configuration for SPA-like behavior
+  try_files:
+    enabled: true
+    suffixes:
+      - index.html
+      - .html
+      - .htm
+      - .txt
+      - .xml
+      - .json
+    fallback: /404.html
+
+# Example URL mappings this configuration creates:
+#
+# URL: /assets/application.css  → File: public/assets/application.css
+# URL: /docs/setup.html         → File: public/docs/setup.html
+# URL: /studios/raleigh         → File: public/studios/raleigh.html (via try_files)
+# URL: /images/logo.png         → File: public/images/logo.png
+# URL: /2024/events/boston.html → File: public/2024/events/boston.html
+# URL: /favicon.ico             → File: public/favicon.ico
+#
+# The dir field maps the URL path to the filesystem directory:
+# - path: The URL prefix to match (/assets/)
+# - dir: The local directory relative to public_dir (assets/)
+# - cache: Optional cache duration for Cache-Control headers
+
+applications:
+  pools:
+    max_size: 5
+    timeout: 5m
+    start_port: 4000
+  tenants: []

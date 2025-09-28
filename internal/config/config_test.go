@@ -271,10 +271,10 @@ server:
 static:
   directories:
     - path: "/showcase/studios/"
-      root: "studios/"
+      dir: "studios/"
       cache: "24h"
     - path: "/showcase/docs/"
-      root: "docs/"
+      dir: "docs/"
   extensions:
     - html
     - css
@@ -317,8 +317,8 @@ applications:
 	if dir0.Path != "/showcase/studios/" {
 		t.Errorf("Expected first directory path /showcase/studios/, got %s", dir0.Path)
 	}
-	if dir0.Prefix != "studios/" {
-		t.Errorf("Expected first directory prefix studios/, got %s", dir0.Prefix)
+	if dir0.Dir != "studios/" {
+		t.Errorf("Expected first directory dir studios/, got %s", dir0.Dir)
 	}
 	if dir0.Cache != "24h" {
 		t.Errorf("Expected first directory cache 24h, got %s", dir0.Cache)
@@ -329,8 +329,8 @@ applications:
 	if dir1.Path != "/showcase/docs/" {
 		t.Errorf("Expected second directory path /showcase/docs/, got %s", dir1.Path)
 	}
-	if dir1.Prefix != "docs/" {
-		t.Errorf("Expected second directory prefix docs/, got %s", dir1.Prefix)
+	if dir1.Dir != "docs/" {
+		t.Errorf("Expected second directory dir docs/, got %s", dir1.Dir)
 	}
 
 	// Verify try_files configuration
@@ -402,16 +402,16 @@ server:
 static:
   directories:
     - path: "/assets/"
-      root: "assets/"
+      dir: "assets/"
       cache: "24h"
     - path: "/docs/"
-      root: "docs/"
+      dir: "docs/"
       cache: "1h"
     - path: "/images/"
-      root: "images/"
+      dir: "images/"
       cache: "30m"
     - path: "/temp/"
-      root: "temp/"
+      dir: "temp/"
       cache: ""  # Empty string for no cache
   extensions:
     - html
@@ -465,8 +465,8 @@ applications:
 	if dir1.Path != "/assets/" {
 		t.Errorf("Expected path /assets/, got %s", dir1.Path)
 	}
-	if dir1.Prefix != "assets/" {
-		t.Errorf("Expected prefix assets/, got %s", dir1.Prefix)
+	if dir1.Dir != "assets/" {
+		t.Errorf("Expected dir assets/, got %s", dir1.Dir)
 	}
 	if dir1.Cache != "24h" {
 		t.Errorf("Expected cache 24h, got %s", dir1.Cache)
@@ -538,7 +538,7 @@ applications:
 static:
   directories:
     - path: /
-      root: .
+      dir: .
       cache: 0
   extensions:
     - html
@@ -652,10 +652,10 @@ server:
 static:
   directories:
     - path: "/assets/"
-      root: "assets/"
+      dir: "assets/"
       cache: "24h"
     - path: "/temp/"
-      root: "temp/"
+      dir: "temp/"
       cache: "0"  # String zero
   extensions:
     - html

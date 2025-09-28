@@ -299,7 +299,7 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request) bool {
 
 	// If we found a matching static directory, try to serve from there
 	if bestStaticDir != nil {
-		slog.Debug("Found matching static directory", "path", path, "staticPath", bestStaticDir.Path, "prefix", bestStaticDir.Prefix)
+		slog.Debug("Found matching static directory", "path", path, "staticPath", bestStaticDir.Path, "dir", bestStaticDir.Dir)
 
 		// Remove the URL prefix to get the relative path
 		relativePath := strings.TrimPrefix(path, bestStaticDir.Path)
@@ -315,8 +315,8 @@ func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request) bool {
 
 		// Try each extension
 		for _, ext := range extensions {
-			// Build the full filesystem path using static directory prefix
-			fsPath := filepath.Join(publicDir, bestStaticDir.Prefix, relativePath+ext)
+			// Build the full filesystem path using static directory dir
+			fsPath := filepath.Join(publicDir, bestStaticDir.Dir, relativePath+ext)
 			slog.Debug("tryFiles checking static", "fsPath", fsPath)
 			if info, err := os.Stat(fsPath); err == nil && !info.IsDir() {
 				return h.serveFile(w, r, fsPath, path+ext)
