@@ -1216,3 +1216,86 @@ func TestAssetServingRootPathVariations(t *testing.T) {
 		})
 	}
 }
+
+func TestJSONAccessLogging(t *testing.T) {
+	// Create a test config
+	cfg := &config.Config{}
+	cfg.Server.Listen = "3000"
+	cfg.Server.Hostname = "localhost"
+	cfg.Server.PublicDir = "public"
+
+	// Create handler
+	handler := CreateHandler(cfg, nil, nil, nil)
+
+	// Capture stdout to test JSON log output
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Create test request
+	req := httptest.NewRequest("GET", "/test-path?param=value", nil)
+	req.Header.Set("X-Forwarded-For", "203.0.113.1")
+	req.Header.Set("User-Agent", "Test-Agent/1.0")
+	req.Header.Set("Referer", "https://example.com/")
+	req.Header.Set("X-Request-Id", "test-request-123")
+	req.Header.Set("Fly-Request-Id", "test-fly-456")
+	req.RemoteAddr = "192.0.2.1:45678"
+
+	// Create response recorder
+	rr := httptest.NewRecorder()
+
+	// Make request (will return 404 but should log)
+	handler.ServeHTTP(rr, req)
+
+	// Close writer and restore stdout
+	w.Close()
+	os.Stdout = oldStdout
+
+	// Read captured output
+	output := make([]byte, 1024)
+	n, _ := r.Read(output)
+	logOutput := string(output[:n])
+
+	// Verify JSON access log was output
+	if !strings.Contains(logOutput, `"@timestamp"`) {
+		t.Error("Expected JSON access log with @timestamp field")
+	}
+	if !strings.Contains(logOutput, `"client_ip":"203.0.113.1"`) {
+		t.Error("Expected client_ip to be extracted from X-Forwarded-For header")
+	}
+	if !strings.Contains(logOutput, `"method":"GET"`) {
+		t.Error("Expected method field in JSON log")
+	}
+	if !strings.Contains(logOutput, `"uri":"/test-path?param=value"`) {
+		t.Error("Expected full URI with query parameters in JSON log")
+	}
+	if !strings.Contains(logOutput, `"protocol":"HTTP/1.1"`) {
+		t.Error("Expected protocol field in JSON log")
+	}
+	if !strings.Contains(logOutput, `"status":404`) {
+		t.Error("Expected status code in JSON log")
+	}
+	if !strings.Contains(logOutput, `"request_id":"test-request-123"`) {
+		t.Error("Expected request_id from X-Request-Id header")
+	}
+	if !strings.Contains(logOutput, `"fly_request_id":"test-fly-456"`) {
+		t.Error("Expected fly_request_id from Fly-Request-Id header")
+	}
+	if !strings.Contains(logOutput, `"user_agent":"Test-Agent/1.0"`) {
+		t.Error("Expected user_agent field in JSON log")
+	}
+	if !strings.Contains(logOutput, `"referer":"https://example.com/"`) {
+		t.Error("Expected referer field in JSON log")
+	}
+	if !strings.Contains(logOutput, `"remote_user":"-"`) {
+		t.Error("Expected remote_user field (dash for no auth) in JSON log")
+	}
+	if !strings.Contains(logOutput, `"request_time"`) {
+		t.Error("Expected request_time field in JSON log")
+	}
+
+	// Verify it's valid JSON format (basic check)
+	if !strings.HasPrefix(strings.TrimSpace(logOutput), "{") || !strings.HasSuffix(strings.TrimSpace(logOutput), "}") {
+		t.Errorf("JSON log output doesn't appear to be valid JSON format: %s", logOutput)
+	}
+}
