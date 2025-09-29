@@ -1501,3 +1501,278 @@ func TestHandler_HandleRewritesFlyReplayLargeRequest(t *testing.T) {
 		t.Error("Large request should not use fly-replay JSON response, should use fallback")
 	}
 }
+
+// TestHandler_HandleRewritesBasicRedirect tests basic redirect functionality
+func TestHandler_HandleRewritesBasicRedirect(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Server.RewriteRules = []config.RewriteRule{
+		{
+			Pattern:     regexp.MustCompile(`^/old-path/(.+)$`),
+			Replacement: "/new-path/$1",
+			Flag:        "redirect",
+		},
+	}
+
+	handler := &Handler{
+		config: cfg,
+	}
+
+	tests := []struct {
+		name             string
+		path             string
+		expectRedirect   bool
+		expectedLocation string
+	}{
+		{
+			name:             "Matching path should redirect",
+			path:             "/old-path/some-page",
+			expectRedirect:   true,
+			expectedLocation: "/new-path/some-page",
+		},
+		{
+			name:           "Non-matching path should not redirect",
+			path:           "/other-path/page",
+			expectRedirect: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.path, nil)
+			recorder := httptest.NewRecorder()
+
+			handled := handler.handleRewrites(recorder, req)
+
+			if tt.expectRedirect {
+				if !handled {
+					t.Error("Expected redirect to be handled")
+				}
+				if recorder.Code != http.StatusFound {
+					t.Errorf("Expected status %d, got %d", http.StatusFound, recorder.Code)
+				}
+				location := recorder.Header().Get("Location")
+				if location != tt.expectedLocation {
+					t.Errorf("Expected Location header %q, got %q", tt.expectedLocation, location)
+				}
+			} else {
+				if handled {
+					t.Error("Expected redirect not to be handled")
+				}
+			}
+		})
+	}
+}
+
+// TestHandler_HandleRewritesInternalRewrite tests internal rewrite functionality
+func TestHandler_HandleRewritesInternalRewrite(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Server.RewriteRules = []config.RewriteRule{
+		{
+			Pattern:     regexp.MustCompile(`^/api/v1/(.+)$`),
+			Replacement: "/api/v2/$1",
+			Flag:        "last",
+		},
+	}
+
+	handler := &Handler{
+		config: cfg,
+	}
+
+	tests := []struct {
+		name        string
+		path        string
+		expectRewrite bool
+		expectedPath  string
+	}{
+		{
+			name:          "Matching path should be rewritten",
+			path:          "/api/v1/users",
+			expectRewrite: true,
+			expectedPath:  "/api/v2/users",
+		},
+		{
+			name:          "Non-matching path should not be rewritten",
+			path:          "/other/path",
+			expectRewrite: false,
+			expectedPath:  "/other/path",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.path, nil)
+			recorder := httptest.NewRecorder()
+
+			// For "last" flag, handleRewrites should return false (continue processing)
+			handled := handler.handleRewrites(recorder, req)
+
+			if handled {
+				t.Error("Expected internal rewrite not to return true (should continue processing)")
+			}
+
+			// Check if the path was actually rewritten
+			if req.URL.Path != tt.expectedPath {
+				t.Errorf("Expected path %q, got %q", tt.expectedPath, req.URL.Path)
+			}
+		})
+	}
+}
+
+// TestHandler_HandleRewritesRegexReplacement tests complex regex patterns
+func TestHandler_HandleRewritesRegexReplacement(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Server.RewriteRules = []config.RewriteRule{
+		{
+			Pattern:     regexp.MustCompile(`^/user/(\d+)/profile/(.+)$`),
+			Replacement: "/profile/$2?user_id=$1",
+			Flag:        "redirect",
+		},
+		{
+			Pattern:     regexp.MustCompile(`^/legacy/([^/]+)/(.+)$`),
+			Replacement: "/modern/$1/$2",
+			Flag:        "last",
+		},
+	}
+
+	handler := &Handler{
+		config: cfg,
+	}
+
+	tests := []struct {
+		name           string
+		path           string
+		expectHandled  bool
+		expectedResult string // Location header for redirects, URL.Path for rewrites
+		isRedirect     bool
+	}{
+		{
+			name:           "User profile redirect with capture groups",
+			path:           "/user/123/profile/settings",
+			expectHandled:  true,
+			expectedResult: "/profile/settings?user_id=123",
+			isRedirect:     true,
+		},
+		{
+			name:           "Legacy path internal rewrite",
+			path:           "/legacy/api/users",
+			expectHandled:  false, // "last" flag doesn't return true
+			expectedResult: "/modern/api/users",
+			isRedirect:     false,
+		},
+		{
+			name:           "Non-matching path",
+			path:           "/other/path",
+			expectHandled:  false,
+			expectedResult: "/other/path",
+			isRedirect:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.path, nil)
+			recorder := httptest.NewRecorder()
+
+			handled := handler.handleRewrites(recorder, req)
+
+			if handled != tt.expectHandled {
+				t.Errorf("Expected handled=%v, got %v", tt.expectHandled, handled)
+			}
+
+			if tt.isRedirect && tt.expectHandled {
+				if recorder.Code != http.StatusFound {
+					t.Errorf("Expected status %d, got %d", http.StatusFound, recorder.Code)
+				}
+				location := recorder.Header().Get("Location")
+				if location != tt.expectedResult {
+					t.Errorf("Expected Location %q, got %q", tt.expectedResult, location)
+				}
+			} else if !tt.isRedirect {
+				// Check URL path for internal rewrites
+				if req.URL.Path != tt.expectedResult {
+					t.Errorf("Expected path %q, got %q", tt.expectedResult, req.URL.Path)
+				}
+			}
+		})
+	}
+}
+
+// TestHandler_HandleRewritesMultipleRules tests multiple rewrite rules in sequence
+func TestHandler_HandleRewritesMultipleRules(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Server.RewriteRules = []config.RewriteRule{
+		{
+			Pattern:     regexp.MustCompile(`^/step1/(.+)$`),
+			Replacement: "/step2/$1",
+			Flag:        "last",
+		},
+		{
+			Pattern:     regexp.MustCompile(`^/step2/(.+)$`),
+			Replacement: "/final/$1",
+			Flag:        "last",
+		},
+		{
+			Pattern:     regexp.MustCompile(`^/redirect-me/(.+)$`),
+			Replacement: "/redirected/$1",
+			Flag:        "redirect",
+		},
+	}
+
+	handler := &Handler{
+		config: cfg,
+	}
+
+	tests := []struct {
+		name           string
+		path           string
+		expectHandled  bool
+		expectedPath   string
+		isRedirect     bool
+	}{
+		{
+			name:          "Multiple rewrite rules should chain",
+			path:          "/step1/test",
+			expectHandled: false, // "last" doesn't return true
+			expectedPath:  "/final/test", // Both rules apply: step1->step2->final
+			isRedirect:    false,
+		},
+		{
+			name:          "Redirect rule should terminate processing",
+			path:          "/redirect-me/test",
+			expectHandled: true,
+			expectedPath:  "/redirected/test", // This will be in Location header
+			isRedirect:    true,
+		},
+		{
+			name:          "Non-matching path",
+			path:          "/no-match/test",
+			expectHandled: false,
+			expectedPath:  "/no-match/test",
+			isRedirect:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.path, nil)
+			recorder := httptest.NewRecorder()
+
+			handled := handler.handleRewrites(recorder, req)
+
+			if handled != tt.expectHandled {
+				t.Errorf("Expected handled=%v, got %v", tt.expectHandled, handled)
+			}
+
+			if tt.isRedirect && tt.expectHandled {
+				location := recorder.Header().Get("Location")
+				if location != tt.expectedPath {
+					t.Errorf("Expected Location %q, got %q", tt.expectedPath, location)
+				}
+			} else if !tt.isRedirect {
+				if req.URL.Path != tt.expectedPath {
+					t.Errorf("Expected path %q, got %q", tt.expectedPath, req.URL.Path)
+				}
+			}
+		})
+	}
+}

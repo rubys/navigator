@@ -197,7 +197,8 @@ func (h *Handler) handleRewrites(w http.ResponseWriter, r *http.Request) bool {
 		// Handle different rewrite flags
 		switch {
 		case rule.Flag == "redirect":
-			http.Redirect(w, r, rule.Replacement, http.StatusFound)
+			newPath := rule.Pattern.ReplaceAllString(r.URL.Path, rule.Replacement)
+			http.Redirect(w, r, newPath, http.StatusFound)
 			return true
 
 		case strings.HasPrefix(rule.Flag, "fly-replay:"):

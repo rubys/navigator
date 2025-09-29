@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/rubys/navigator/internal/config"
 )
 
 // HandleProxy handles proxying requests to a target URL
@@ -78,7 +80,7 @@ func HandleProxyWithRetry(w http.ResponseWriter, r *http.Request, targetURL stri
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			dialer := &net.Dialer{
-				Timeout: 500 * time.Millisecond,
+				Timeout: config.ProxyRetryMaxDelay,
 			}
 			return dialer.DialContext(ctx, network, addr)
 		},
@@ -94,8 +96,8 @@ func HandleProxyWithRetry(w http.ResponseWriter, r *http.Request, targetURL stri
 	// Implement retry logic
 	startTime := time.Now()
 	attempt := 0
-	initialDelay := 100 * time.Millisecond
-	maxDelay := 500 * time.Millisecond
+	initialDelay := config.ProxyRetryInitialDelay
+	maxDelay := config.ProxyRetryMaxDelay
 
 	for {
 		attempt++
@@ -174,7 +176,17 @@ func tryProxy(proxy *httputil.ReverseProxy, w http.ResponseWriter, r *http.Reque
 // proxyRecorder captures proxy success/failure
 type proxyRecorder struct {
 	http.ResponseWriter
-	success bool
+	success    bool
+	statusCode int
+}
+
+// WriteHeader captures the status code and marks 502 as failure
+func (pr *proxyRecorder) WriteHeader(statusCode int) {
+	pr.statusCode = statusCode
+	if statusCode == http.StatusBadGateway {
+		pr.success = false
+	}
+	pr.ResponseWriter.WriteHeader(statusCode)
 }
 
 // IsWebSocketRequest checks if request is a WebSocket upgrade
@@ -266,7 +278,7 @@ func ProxyWithWebSocketSupport(w http.ResponseWriter, r *http.Request, targetURL
 	}
 
 	// Regular HTTP proxy with retry
-	HandleProxyWithRetry(w, r, targetURL, 3*time.Second)
+	HandleProxyWithRetry(w, r, targetURL, config.ProxyRetryTimeout)
 }
 
 // RetryResponseWriter buffers responses to enable retry on failure
