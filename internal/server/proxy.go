@@ -91,10 +91,22 @@ func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route 
 		}
 
 		// Strip path if configured
-		if route.StripPath && route.Prefix != "" {
-			req.URL.Path = strings.TrimPrefix(req.URL.Path, route.Prefix)
-			if !strings.HasPrefix(req.URL.Path, "/") {
-				req.URL.Path = "/" + req.URL.Path
+		if route.StripPath {
+			if route.Prefix != "" {
+				// Simple prefix stripping
+				req.URL.Path = strings.TrimPrefix(req.URL.Path, route.Prefix)
+				if !strings.HasPrefix(req.URL.Path, "/") {
+					req.URL.Path = "/" + req.URL.Path
+				}
+			} else if route.Path != "" {
+				// Regex-based path stripping using capture groups
+				if pattern, err := regexp.Compile(route.Path); err == nil {
+					matches := pattern.FindStringSubmatch(req.URL.Path)
+					if len(matches) > 1 {
+						// Use first capture group as the new path
+						req.URL.Path = "/" + matches[1]
+					}
+				}
 			}
 		}
 
