@@ -223,5 +223,32 @@ func (p *ConfigParser) parseRoutesConfig() {
 			})
 		}
 	}
+
+	// Convert fly-replay routes to rewrite rules
+	for _, flyReplay := range p.config.Routes.FlyReplay {
+		if pattern, err := regexp.Compile(flyReplay.Path); err == nil {
+			// Determine target format for fly-replay
+			var target string
+			if flyReplay.App != "" {
+				target = fmt.Sprintf("app=%s", flyReplay.App)
+			} else if flyReplay.Region != "" {
+				target = flyReplay.Region
+			} else {
+				continue // Skip if no target specified
+			}
+
+			// Default status to 307 if not specified
+			status := flyReplay.Status
+			if status == 0 {
+				status = 307
+			}
+
+			p.config.Server.RewriteRules = append(p.config.Server.RewriteRules, RewriteRule{
+				Pattern:     pattern,
+				Replacement: flyReplay.Path, // Keep original path for fly-replay
+				Flag:        fmt.Sprintf("fly-replay:%s:%d", target, status),
+			})
+		}
+	}
 }
 

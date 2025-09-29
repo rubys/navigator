@@ -1299,3 +1299,205 @@ func TestJSONAccessLogging(t *testing.T) {
 		t.Errorf("JSON log output doesn't appear to be valid JSON format: %s", logOutput)
 	}
 }
+
+func TestHandler_HandleRewritesFlyReplay(t *testing.T) {
+	tests := []struct {
+		name               string
+		path               string
+		rewriteRules       []config.RewriteRule
+		expectHandled      bool
+		expectFlyReplay    bool
+		expectStatus       int
+		expectContentType  string
+		flyAppName         string
+	}{
+		{
+			name: "Region-based fly-replay",
+			path: "/showcase/2025/coquitlam/medal-ball/",
+			rewriteRules: []config.RewriteRule{
+				{
+					Pattern:     regexp.MustCompile(`^/showcase/(?:2023|2024|2025|2026)/(?:bellevue|coquitlam|edmonton|everett|folsom|fremont|honolulu|livermore|millbrae|montclair|monterey|petaluma|reno|salem|sanjose|slc|stockton|vegas)(?:/.*)?$`),
+					Replacement: "/showcase/2025/coquitlam/medal-ball/",
+					Flag:        "fly-replay:sjc:307",
+				},
+			},
+			expectHandled:     true,
+			expectFlyReplay:   true,
+			expectStatus:      307,
+			expectContentType: "application/vnd.fly.replay+json",
+			flyAppName:        "smooth-nav",
+		},
+		{
+			name: "App-based fly-replay",
+			path: "/showcase/documents/test.pdf",
+			rewriteRules: []config.RewriteRule{
+				{
+					Pattern:     regexp.MustCompile(`^/showcase/.+\.pdf$`),
+					Replacement: "/showcase/documents/test.pdf",
+					Flag:        "fly-replay:app=smooth-pdf:307",
+				},
+			},
+			expectHandled:     true,
+			expectFlyReplay:   true,
+			expectStatus:      307,
+			expectContentType: "application/vnd.fly.replay+json",
+			flyAppName:        "smooth-nav",
+		},
+		{
+			name: "Regular redirect (non-fly-replay)",
+			path: "/old-path",
+			rewriteRules: []config.RewriteRule{
+				{
+					Pattern:     regexp.MustCompile(`^/old-path$`),
+					Replacement: "/new-path",
+					Flag:        "redirect",
+				},
+			},
+			expectHandled:   true,
+			expectFlyReplay: false,
+			expectStatus:    302,
+		},
+		{
+			name: "No matching rewrite rule",
+			path: "/no-match",
+			rewriteRules: []config.RewriteRule{
+				{
+					Pattern:     regexp.MustCompile(`^/other-path$`),
+					Replacement: "/replacement",
+					Flag:        "redirect",
+				},
+			},
+			expectHandled:   false,
+			expectFlyReplay: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set up environment
+			if tt.flyAppName != "" {
+				os.Setenv("FLY_APP_NAME", tt.flyAppName)
+				defer os.Unsetenv("FLY_APP_NAME")
+			}
+
+			// Create handler with test configuration
+			cfg := &config.Config{}
+			cfg.Server.RewriteRules = tt.rewriteRules
+
+			handler := &Handler{
+				config: cfg,
+			}
+
+			// Create test request
+			req := httptest.NewRequest("GET", tt.path, nil)
+			recorder := httptest.NewRecorder()
+
+			// Test the handleRewrites method
+			handled := handler.handleRewrites(recorder, req)
+
+			if handled != tt.expectHandled {
+				t.Errorf("handleRewrites() returned %v, expected %v", handled, tt.expectHandled)
+			}
+
+			if !tt.expectHandled {
+				return
+			}
+
+			// Check status code
+			if recorder.Code != tt.expectStatus {
+				t.Errorf("Status code = %d, expected %d", recorder.Code, tt.expectStatus)
+			}
+
+			// Check for fly-replay specific responses
+			if tt.expectFlyReplay {
+				if recorder.Header().Get("Content-Type") != tt.expectContentType {
+					t.Errorf("Content-Type = %q, expected %q",
+						recorder.Header().Get("Content-Type"), tt.expectContentType)
+				}
+
+				// Verify JSON response structure for fly-replay
+				body := recorder.Body.String()
+				if !strings.Contains(body, `"region"`) && !strings.Contains(body, `"app"`) {
+					t.Error("Fly-replay response should contain either 'region' or 'app' field")
+				}
+			}
+		})
+	}
+}
+
+func TestHandler_HandleRewritesFlyReplayWithMethods(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Server.RewriteRules = []config.RewriteRule{
+		{
+			Pattern:     regexp.MustCompile(`^/api/`),
+			Replacement: "/api/",
+			Flag:        "fly-replay:us-west:307",
+			Methods:     []string{"GET", "HEAD"}, // Only allow safe methods
+		},
+	}
+
+	handler := &Handler{
+		config: cfg,
+	}
+
+	tests := []struct {
+		name          string
+		method        string
+		expectHandled bool
+	}{
+		{"GET allowed", "GET", true},
+		{"HEAD allowed", "HEAD", true},
+		{"POST not allowed", "POST", false},
+		{"PUT not allowed", "PUT", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, "/api/endpoint", nil)
+			recorder := httptest.NewRecorder()
+
+			handled := handler.handleRewrites(recorder, req)
+
+			if handled != tt.expectHandled {
+				t.Errorf("handleRewrites() returned %v, expected %v for method %s",
+					handled, tt.expectHandled, tt.method)
+			}
+		})
+	}
+}
+
+func TestHandler_HandleRewritesFlyReplayLargeRequest(t *testing.T) {
+	os.Setenv("FLY_APP_NAME", "testapp")
+	defer os.Unsetenv("FLY_APP_NAME")
+
+	cfg := &config.Config{}
+	cfg.Server.Listen = "3000"
+	cfg.Server.RewriteRules = []config.RewriteRule{
+		{
+			Pattern:     regexp.MustCompile(`^/upload/`),
+			Replacement: "/upload/",
+			Flag:        "fly-replay:us-west:307",
+		},
+	}
+
+	handler := &Handler{
+		config: cfg,
+	}
+
+	// Create a POST request with large content that should trigger fallback
+	req := httptest.NewRequest("POST", "/upload/large-file", strings.NewReader("large content"))
+	req.ContentLength = MaxFlyReplaySize + 1 // Exceeds limit
+	recorder := httptest.NewRecorder()
+
+	handled := handler.handleRewrites(recorder, req)
+
+	if !handled {
+		t.Error("handleRewrites() should have handled large request via fallback")
+	}
+
+	// Should not be a fly-replay JSON response
+	contentType := recorder.Header().Get("Content-Type")
+	if contentType == "application/vnd.fly.replay+json" {
+		t.Error("Large request should not use fly-replay JSON response, should use fallback")
+	}
+}
