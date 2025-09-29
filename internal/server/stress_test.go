@@ -1,3 +1,6 @@
+//go:build integration || stress
+// +build integration stress
+
 package server
 
 import (
