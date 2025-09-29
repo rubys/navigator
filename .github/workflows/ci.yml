@@ -66,7 +66,7 @@ jobs:
       run: go mod download
 
     - name: Run fast tests
-      run: go test -race -cover ./...
+      run: go test -race -cover -timeout=3m ./...
 
   # Integration tests for thorough validation
   integration-tests:
@@ -91,7 +91,9 @@ jobs:
       run: go mod download
 
     - name: Run integration tests
-      run: go test -race -cover -tags="integration" ./...
+      env:
+        LOG_LEVEL: error
+      run: go test -race -cover -tags="integration" -timeout=10m ./...
 
   # Stress tests for performance validation
   stress-tests:
@@ -116,7 +118,9 @@ jobs:
       run: go mod download
 
     - name: Run stress tests
-      run: go test -race -cover -tags="stress" ./...
+      env:
+        LOG_LEVEL: error
+      run: go test -race -cover -tags="stress" -timeout=10m ./...
 
   # Build and test binaries
   build-test:
