@@ -2,11 +2,8 @@ package server
 
 import (
 	"fmt"
-	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -50,7 +47,7 @@ func TestSecurityHeaders(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name          string
@@ -201,7 +198,7 @@ func TestPathTraversalPrevention(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name        string
@@ -349,7 +346,7 @@ func TestInputSanitization(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name   string
@@ -431,17 +428,6 @@ func TestDenialOfServicePrevention(t *testing.T) {
 		t.Skip("Skipping DoS prevention test in short mode")
 	}
 
-	// In CI environments, disable output to prevent overwhelming logs
-	if os.Getenv("CI") == "true" {
-		// Redirect stdout to discard to prevent massive JSON logs
-		oldStdout := os.Stdout
-		os.Stdout, _ = os.Open(os.DevNull)
-		defer func() { os.Stdout = oldStdout }()
-
-		// Set slog to discard output
-		slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
-	}
-
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
@@ -462,7 +448,7 @@ func TestDenialOfServicePrevention(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name        string
@@ -596,7 +582,7 @@ func TestInformationDisclosure(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name        string
@@ -672,7 +658,7 @@ func TestAuthenticationBypass(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name        string
@@ -744,7 +730,7 @@ func TestRateLimitingBehavior(t *testing.T) {
 	cfg := &config.Config{}
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	// Make rapid requests to test rate limiting
 	const numRequests = 100

@@ -20,21 +20,10 @@ import (
 
 // TestEdgeCaseRequests tests various edge case HTTP requests
 func TestEdgeCaseRequests(t *testing.T) {
-	// In CI environments, disable output to prevent overwhelming logs
-	if os.Getenv("CI") == "true" {
-		// Redirect stdout to discard to prevent massive JSON logs
-		oldStdout := os.Stdout
-		os.Stdout, _ = os.Open(os.DevNull)
-		defer func() { os.Stdout = oldStdout }()
-
-		// Set slog to discard output
-		slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
-	}
-
 	cfg := &config.Config{}
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name           string
@@ -194,11 +183,6 @@ func TestEdgeCaseRequests(t *testing.T) {
 
 // TestConcurrentRequests tests handling of concurrent requests
 func TestConcurrentRequests(t *testing.T) {
-	// Skip in CI environments to prevent overwhelming logs
-	if os.Getenv("CI") == "true" {
-		t.Skip("Skipping concurrent requests test in CI environment")
-	}
-
 	cfg := &config.Config{
 		Routes: config.RoutesConfig{
 			ReverseProxies: []config.ProxyRoute{
@@ -213,7 +197,7 @@ func TestConcurrentRequests(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	// Test concurrent requests to various endpoints
 	tests := []struct {
@@ -323,11 +307,6 @@ func TestMemoryLeaks(t *testing.T) {
 		t.Skip("Skipping memory leak test in short mode")
 	}
 
-	// Skip in CI environments to prevent overwhelming logs
-	if os.Getenv("CI") == "true" {
-		t.Skip("Skipping memory leak test in CI environment")
-	}
-
 	// Create a simple backend server
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -349,7 +328,7 @@ func TestMemoryLeaks(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	// Make many requests to check for memory growth
 	numRequests := 1000
@@ -387,7 +366,7 @@ func TestErrorRecovery(t *testing.T) {
 	cfg := &config.Config{}
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name string
@@ -461,7 +440,7 @@ func TestResourceExhaustion(t *testing.T) {
 	cfg := &config.Config{}
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name        string
@@ -579,7 +558,7 @@ func TestSlowRequests(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name        string
@@ -652,7 +631,7 @@ func TestLoggingUnderStress(t *testing.T) {
 	cfg := &config.Config{}
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	// Generate many requests rapidly to stress the logging system
 	numRequests := 500
