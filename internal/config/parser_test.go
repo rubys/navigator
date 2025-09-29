@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -620,6 +621,113 @@ func TestParseFlyReplay(t *testing.T) {
 	}
 	if regionRoute.Status != 302 {
 		t.Errorf("Expected status 302, got %d", regionRoute.Status)
+	}
+}
+
+func TestParseFlyReplayToRewriteRules(t *testing.T) {
+	yamlConfig := &YAMLConfig{
+		Routes: RoutesConfig{
+			FlyReplay: []struct {
+				Path   string `yaml:"path"`
+				App    string `yaml:"app"`
+				Region string `yaml:"region"`
+				Status int    `yaml:"status"`
+			}{
+				{
+					Path:   "^/pdf/",
+					App:    "pdf-generator",
+					Status: 307,
+				},
+				{
+					Path:   "^/region-specific/",
+					Region: "iad",
+					Status: 302,
+				},
+				{
+					Path:   "^/coquitlam/",
+					Region: "sjc",
+					Status: 0, // Should default to 307
+				},
+			},
+		},
+	}
+
+	parser := NewConfigParser(yamlConfig)
+	config, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	// Check that fly_replay routes were converted to rewrite rules
+	var flyReplayRules []RewriteRule
+	for _, rule := range config.Server.RewriteRules {
+		if strings.HasPrefix(rule.Flag, "fly-replay:") {
+			flyReplayRules = append(flyReplayRules, rule)
+		}
+	}
+
+	if len(flyReplayRules) != 3 {
+		t.Errorf("Expected 3 fly-replay rewrite rules, got %d", len(flyReplayRules))
+	}
+
+	// Test app-based fly-replay rule
+	appRule := flyReplayRules[0]
+	if appRule.Pattern.String() != "^/pdf/" {
+		t.Errorf("Expected pattern '^/pdf/', got %s", appRule.Pattern.String())
+	}
+	if appRule.Flag != "fly-replay:app=pdf-generator:307" {
+		t.Errorf("Expected flag 'fly-replay:app=pdf-generator:307', got %s", appRule.Flag)
+	}
+
+	// Test region-based fly-replay rule
+	regionRule := flyReplayRules[1]
+	if regionRule.Pattern.String() != "^/region-specific/" {
+		t.Errorf("Expected pattern '^/region-specific/', got %s", regionRule.Pattern.String())
+	}
+	if regionRule.Flag != "fly-replay:iad:302" {
+		t.Errorf("Expected flag 'fly-replay:iad:302', got %s", regionRule.Flag)
+	}
+
+	// Test default status (should be 307)
+	defaultRule := flyReplayRules[2]
+	if defaultRule.Flag != "fly-replay:sjc:307" {
+		t.Errorf("Expected flag 'fly-replay:sjc:307' (default status), got %s", defaultRule.Flag)
+	}
+
+	// Test pattern matching
+	testPaths := []struct {
+		path      string
+		shouldMatch int // index of rule that should match, -1 if no match
+	}{
+		{"/pdf/document.pdf", 0},
+		{"/region-specific/test", 1},
+		{"/coquitlam/medal-ball/", 2},
+		{"/other/path", -1},
+	}
+
+	for _, test := range testPaths {
+		matchFound := false
+		matchedRuleIndex := -1
+
+		for i, rule := range flyReplayRules {
+			if rule.Pattern.MatchString(test.path) {
+				matchFound = true
+				matchedRuleIndex = i
+				break
+			}
+		}
+
+		if test.shouldMatch == -1 {
+			if matchFound {
+				t.Errorf("Path %s should not match any fly-replay rule, but matched rule %d", test.path, matchedRuleIndex)
+			}
+		} else {
+			if !matchFound {
+				t.Errorf("Path %s should match fly-replay rule %d, but didn't match any", test.path, test.shouldMatch)
+			} else if matchedRuleIndex != test.shouldMatch {
+				t.Errorf("Path %s should match rule %d, but matched rule %d", test.path, test.shouldMatch, matchedRuleIndex)
+			}
+		}
 	}
 }
 

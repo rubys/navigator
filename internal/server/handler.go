@@ -200,11 +200,17 @@ func (h *Handler) handleRewrites(w http.ResponseWriter, r *http.Request) bool {
 			http.Redirect(w, r, rule.Replacement, http.StatusFound)
 			return true
 
-		case strings.HasPrefix(rule.Flag, "fly-replay"):
-			// Handle Fly-Replay
-			w.Header().Set("Fly-Replay", rule.Replacement)
-			w.WriteHeader(http.StatusAccepted)
-			return true
+		case strings.HasPrefix(rule.Flag, "fly-replay:"):
+			// Parse fly-replay flag: fly-replay:target:status
+			parts := strings.Split(rule.Flag, ":")
+			if len(parts) == 3 {
+				target := parts[1]
+				status := parts[2]
+
+				// Use the full fly-replay implementation
+				return HandleFlyReplay(w, r, target, status, h.config)
+			}
+			return false
 
 		case rule.Flag == "last":
 			// Internal rewrite
