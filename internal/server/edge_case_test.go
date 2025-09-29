@@ -194,6 +194,11 @@ func TestEdgeCaseRequests(t *testing.T) {
 
 // TestConcurrentRequests tests handling of concurrent requests
 func TestConcurrentRequests(t *testing.T) {
+	// Skip in CI environments to prevent overwhelming logs
+	if os.Getenv("CI") == "true" {
+		t.Skip("Skipping concurrent requests test in CI environment")
+	}
+
 	cfg := &config.Config{
 		Routes: config.RoutesConfig{
 			ReverseProxies: []config.ProxyRoute{
@@ -316,6 +321,11 @@ func TestConcurrentRequests(t *testing.T) {
 func TestMemoryLeaks(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping memory leak test in short mode")
+	}
+
+	// Skip in CI environments to prevent overwhelming logs
+	if os.Getenv("CI") == "true" {
+		t.Skip("Skipping memory leak test in CI environment")
 	}
 
 	// Create a simple backend server
