@@ -71,13 +71,18 @@ func TestHighLoadScenarios(t *testing.T) {
 					Target:    backends[2].URL,
 					WebSocket: true,
 				},
+				{
+					Name:   "static-backend",
+					Path:   "^/static/",
+					Target: backends[0].URL,
+				},
 			},
 		},
 	}
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	scenarios := []struct {
 		name        string
@@ -266,7 +271,7 @@ func TestConcurrencyLimits(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	// Test different concurrency levels
 	concurrencyLevels := []int{10, 50, 100, 500, 1000}
@@ -364,7 +369,7 @@ func TestMemoryUsageUnderLoad(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	// Phase 1: Light load
 	const lightRequests = 1000
@@ -455,7 +460,7 @@ func TestResourceLeaks(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	// Make many requests
 	const numRequests = 2000
@@ -576,7 +581,7 @@ func TestFailureRecovery(t *testing.T) {
 
 			appManager := &process.AppManager{}
 			idleManager := &idle.Manager{}
-			handler := CreateHandler(cfg, appManager, nil, idleManager)
+			handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 			t.Logf("Testing failure recovery: %s", scenario.description)
 

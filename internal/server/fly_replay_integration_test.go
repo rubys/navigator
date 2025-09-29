@@ -43,7 +43,7 @@ func TestFlyReplayIntegration_EndToEnd(t *testing.T) {
 	// Create handler
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name                string
@@ -164,7 +164,7 @@ func TestFlyReplayIntegration_LargeRequestFallback(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	// Create a large POST request that should trigger fallback
 	req := httptest.NewRequest("POST", "/upload/large-file", strings.NewReader("large body content"))
@@ -196,7 +196,7 @@ func TestFlyReplayIntegration_RetryHandling(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	// Test request with retry header
 	req := httptest.NewRequest("GET", "/retry-test/endpoint", nil)
@@ -229,7 +229,7 @@ func TestFlyReplayIntegration_MethodFiltering(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		method          string

@@ -68,11 +68,30 @@ jobs:
     - name: Run fast tests
       run: go test -race -cover -timeout=3m ./...
 
-  # Integration tests are disabled in CI due to output volume issues
-  # Run locally with: go test -tags="integration" ./...
+  # Integration and stress tests
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
 
-  # Stress tests are disabled in CI due to output volume issues
-  # Run locally with: go test -tags="stress" ./...
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-integration-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run integration tests
+      run: make test-integration
 
   # Build and test binaries
   build-test:
@@ -145,7 +164,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [lint, fast-tests, build-test]
+    needs: [lint, fast-tests, integration-tests, build-test]
     if: github.ref == 'refs/heads/main'
 
     steps:

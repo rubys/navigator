@@ -53,12 +53,24 @@ func CreateHandler(cfg *config.Config, appManager *process.AppManager, basicAuth
 	}
 }
 
+// CreateTestHandler creates a handler with logging disabled for tests
+func CreateTestHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager) http.Handler {
+	return &Handler{
+		config:      cfg,
+		appManager:  appManager,
+		auth:        basicAuth,
+		idleManager: idleManager,
+		disableLog:  true,
+	}
+}
+
 // Handler is the main HTTP handler for Navigator
 type Handler struct {
 	config      *config.Config
 	appManager  *process.AppManager
 	auth        *auth.BasicAuth
 	idleManager *idle.Manager
+	disableLog  bool // When true, suppresses access log output (for tests)
 }
 
 // getPublicDir returns the configured public directory or the default
@@ -80,6 +92,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Create response recorder for logging and tracking
 	recorder := NewResponseRecorder(w, h.idleManager)
+	recorder.disableLog = h.disableLog
 	defer recorder.Finish(r)
 
 	// Start idle tracking
@@ -457,6 +470,7 @@ type ResponseRecorder struct {
 	metadata    map[string]interface{}
 	idleManager *idle.Manager
 	tracked     bool
+	disableLog  bool // When true, suppresses access log output
 }
 
 // NewResponseRecorder creates a new response recorder
@@ -468,6 +482,13 @@ func NewResponseRecorder(w http.ResponseWriter, idleManager *idle.Manager) *Resp
 		metadata:       make(map[string]interface{}),
 		idleManager:    idleManager,
 	}
+}
+
+// NewTestResponseRecorder creates a response recorder with logging disabled for tests
+func NewTestResponseRecorder(w http.ResponseWriter, idleManager *idle.Manager) *ResponseRecorder {
+	recorder := NewResponseRecorder(w, idleManager)
+	recorder.disableLog = true
+	return recorder
 }
 
 // WriteHeader captures the status code
@@ -530,6 +551,11 @@ func (r *ResponseRecorder) Finish(req *http.Request) {
 
 // logNavigatorRequest logs the request in JSON format matching nginx/legacy navigator format
 func (r *ResponseRecorder) logNavigatorRequest(req *http.Request) {
+	// Skip logging if disabled (e.g., during tests)
+	if r.disableLog {
+		return
+	}
+
 	// Get client IP (prefer X-Forwarded-For if available)
 	clientIP := req.Header.Get("X-Forwarded-For")
 	if clientIP == "" {

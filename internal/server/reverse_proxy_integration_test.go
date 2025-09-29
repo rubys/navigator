@@ -68,7 +68,7 @@ func TestReverseProxyYAMLConfigIntegration(t *testing.T) {
 	// Create handler
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name              string
@@ -190,7 +190,7 @@ func TestReverseProxyCustomHeaders(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	// Make request with specific values to test variable substitution
 	req := httptest.NewRequest("GET", "/test/endpoint", nil)
@@ -293,7 +293,7 @@ func TestReverseProxyMultipleConfigs(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name           string
@@ -380,7 +380,7 @@ func TestReverseProxyPathStripping(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name         string
@@ -450,7 +450,7 @@ func TestReverseProxyErrorHandling(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name           string
@@ -548,7 +548,7 @@ func TestWebSocketProxyConfiguration(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name               string
@@ -649,7 +649,7 @@ func TestWebSocketProxyHeaders(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	// Test with non-WebSocket request to verify header injection works
 	req := httptest.NewRequest("GET", "/wstest/room/123", nil)
@@ -712,7 +712,7 @@ func TestWebSocketProxyFallback(t *testing.T) {
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
-	handler := CreateHandler(cfg, appManager, nil, idleManager)
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
 		name         string
