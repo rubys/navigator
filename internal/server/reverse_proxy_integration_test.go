@@ -71,13 +71,13 @@ func TestReverseProxyYAMLConfigIntegration(t *testing.T) {
 	handler := CreateHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
-		name               string
-		path               string
-		expectProxy        bool
-		expectedService    string
-		expectStripPath    bool
-		expectedHeaders    map[string]string
-		expectContentType  string
+		name              string
+		path              string
+		expectProxy       bool
+		expectedService   string
+		expectStripPath   bool
+		expectedHeaders   map[string]string
+		expectContentType string
 	}{
 		{
 			name:              "API path should route to API server",
@@ -95,13 +95,13 @@ func TestReverseProxyYAMLConfigIntegration(t *testing.T) {
 			expectContentType: "text/html",
 		},
 		{
-			name:               "Strip path should work",
-			path:               "/old-api/v1/users",
-			expectProxy:        true,
-			expectedService:    "api",
-			expectStripPath:    true,
-			expectedHeaders:    map[string]string{"X-Path-Stripped": "true"},
-			expectContentType:  "application/json",
+			name:              "Strip path should work",
+			path:              "/old-api/v1/users",
+			expectProxy:       true,
+			expectedService:   "api",
+			expectStripPath:   true,
+			expectedHeaders:   map[string]string{"X-Path-Stripped": "true"},
+			expectContentType: "application/json",
 		},
 		{
 			name:        "Non-matching path should not proxy",
@@ -176,12 +176,12 @@ func TestReverseProxyCustomHeaders(t *testing.T) {
 					Path:   "^/test/",
 					Target: testServer.URL,
 					Headers: map[string]string{
-						"X-Forwarded-Proto":  "$scheme",
-						"X-Forwarded-Host":   "$host",
-						"X-Real-IP":          "$remote_addr",
-						"X-Custom-Header":    "custom-value",
-						"X-Static-Header":    "static-value",
-						"X-Complex-Header":   "proto=$scheme,host=$host,ip=$remote_addr",
+						"X-Forwarded-Proto": "$scheme",
+						"X-Forwarded-Host":  "$host",
+						"X-Real-IP":         "$remote_addr",
+						"X-Custom-Header":   "custom-value",
+						"X-Static-Header":   "static-value",
+						"X-Complex-Header":  "proto=$scheme,host=$host,ip=$remote_addr",
 					},
 				},
 			},
@@ -195,7 +195,7 @@ func TestReverseProxyCustomHeaders(t *testing.T) {
 	// Make request with specific values to test variable substitution
 	req := httptest.NewRequest("GET", "/test/endpoint", nil)
 	req.Host = "navigator.example.com"
-	req.RemoteAddr = "203.0.113.45:54321"  // Use documentation IP
+	req.RemoteAddr = "203.0.113.45:54321"        // Use documentation IP
 	req.Header.Set("X-Forwarded-Proto", "https") // Set scheme via header since TLS isn't available in test
 
 	recorder := httptest.NewRecorder()
@@ -208,33 +208,33 @@ func TestReverseProxyCustomHeaders(t *testing.T) {
 
 	// Test variable substitution
 	tests := []struct {
-		name         string
-		headerName   string
+		name          string
+		headerName    string
 		expectedValue string
 	}{
 		{
-			name:         "Scheme variable substitution",
-			headerName:   "X-Forwarded-Proto",
+			name:          "Scheme variable substitution",
+			headerName:    "X-Forwarded-Proto",
 			expectedValue: "https",
 		},
 		{
-			name:         "Host variable substitution",
-			headerName:   "X-Forwarded-Host",
+			name:          "Host variable substitution",
+			headerName:    "X-Forwarded-Host",
 			expectedValue: "navigator.example.com",
 		},
 		{
-			name:         "Remote address variable substitution",
-			headerName:   "X-Real-IP",
+			name:          "Remote address variable substitution",
+			headerName:    "X-Real-IP",
 			expectedValue: "203.0.113.45", // Port is stripped by getClientIP
 		},
 		{
-			name:         "Static header value",
-			headerName:   "X-Static-Header",
+			name:          "Static header value",
+			headerName:    "X-Static-Header",
 			expectedValue: "static-value",
 		},
 		{
-			name:         "Complex header with multiple variables",
-			headerName:   "X-Complex-Header",
+			name:          "Complex header with multiple variables",
+			headerName:    "X-Complex-Header",
 			expectedValue: "proto=https,host=navigator.example.com,ip=203.0.113.45", // Port is stripped
 		},
 	}
@@ -279,7 +279,7 @@ func TestReverseProxyMultipleConfigs(t *testing.T) {
 				},
 				{
 					Name:   "general-api",
-					Path:   "^/api/",          // Less specific pattern
+					Path:   "^/api/", // Less specific pattern
 					Target: server2.URL,
 				},
 				{
@@ -481,7 +481,7 @@ func TestReverseProxyErrorHandling(t *testing.T) {
 
 			// Allow some flexibility in error status codes
 			if recorder.Code != tt.expectedStatus &&
-			   !(tt.expectedStatus == http.StatusInternalServerError && recorder.Code == http.StatusBadGateway) {
+				!(tt.expectedStatus == http.StatusInternalServerError && recorder.Code == http.StatusBadGateway) {
 				t.Errorf("%s: expected status %d, got %d", tt.description, tt.expectedStatus, recorder.Code)
 			}
 
@@ -559,11 +559,11 @@ func TestWebSocketProxyConfiguration(t *testing.T) {
 		expectHeader       string
 	}{
 		{
-			name:               "Non-WebSocket request to WebSocket-configured route should use HTTP proxy",
-			path:               "/ws/info",
-			headers:            map[string]string{},
-			expectStatus:       http.StatusBadRequest, // Our test server returns 400 for /ws/ paths without Upgrade header
-			expectHeader:       "X-Received-WebSocket-Header",
+			name:         "Non-WebSocket request to WebSocket-configured route should use HTTP proxy",
+			path:         "/ws/info",
+			headers:      map[string]string{},
+			expectStatus: http.StatusBadRequest, // Our test server returns 400 for /ws/ paths without Upgrade header
+			expectHeader: "X-Received-WebSocket-Header",
 		},
 		{
 			name:               "HTTP request should route to HTTP proxy",

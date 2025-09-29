@@ -104,8 +104,8 @@ applications:
 			expectError: false, // Regex compilation happens later
 		},
 		{
-			name: "empty configuration file",
-			config: ``,
+			name:        "empty configuration file",
+			config:      ``,
 			expectError: false, // Should use defaults
 		},
 		{

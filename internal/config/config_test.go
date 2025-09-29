@@ -1097,7 +1097,7 @@ applications:
 		t.Fatalf("Expected 3 tenants, got %d", len(config.Applications.Tenants))
 	}
 
-	expectedTenants := []struct{
+	expectedTenants := []struct {
 		name string
 		root string
 	}{

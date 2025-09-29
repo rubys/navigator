@@ -120,25 +120,25 @@ type RoutesConfig struct {
 // Config represents the main configuration
 type Config struct {
 	Server struct {
-		Listen           string   `yaml:"listen"`
-		Hostname         string   `yaml:"hostname"`
-		PublicDir        string   `yaml:"public_dir"`
-		RootPath         string   `yaml:"root_path"`
-		NamedHosts       []string `yaml:"named_hosts"`
-		Root             string   `yaml:"root"`
-		TryFiles         []string `yaml:"try_files"`
-		Authentication   string   `yaml:"authentication"`
-		AuthExclude      []string `yaml:"auth_exclude"`
-		RewriteRules     []RewriteRule
-		AuthPatterns     []AuthPattern
-		Idle             struct {
+		Listen         string   `yaml:"listen"`
+		Hostname       string   `yaml:"hostname"`
+		PublicDir      string   `yaml:"public_dir"`
+		RootPath       string   `yaml:"root_path"`
+		NamedHosts     []string `yaml:"named_hosts"`
+		Root           string   `yaml:"root"`
+		TryFiles       []string `yaml:"try_files"`
+		Authentication string   `yaml:"authentication"`
+		AuthExclude    []string `yaml:"auth_exclude"`
+		RewriteRules   []RewriteRule
+		AuthPatterns   []AuthPattern
+		Idle           struct {
 			Action  string `yaml:"action"`  // "suspend" or "stop"
 			Timeout string `yaml:"timeout"` // Duration string like "30s", "5m"
 		} `yaml:"idle"`
 		StickySession struct {
 			Enabled        bool     `yaml:"enabled"`
 			CookieName     string   `yaml:"cookie_name"`
-			CookieMaxAge   string   `yaml:"cookie_max_age"`   // Duration format: "1h", "30m", etc.
+			CookieMaxAge   string   `yaml:"cookie_max_age"` // Duration format: "1h", "30m", etc.
 			CookieSecure   bool     `yaml:"cookie_secure"`
 			CookieHTTPOnly bool     `yaml:"cookie_httponly"`
 			CookieSameSite string   `yaml:"cookie_samesite"`
@@ -163,9 +163,9 @@ type Applications struct {
 	Env      map[string]string   `yaml:"env"`
 	Hooks    TenantHooks         `yaml:"hooks"`
 	Defaults map[string]Tenant   // For framework-specific defaults
-	Runtime  map[string]string   `yaml:"runtime"`  // Framework runtime commands
-	Server   map[string]string   `yaml:"server"`   // Framework server commands
-	Args     map[string][]string `yaml:"args"`     // Framework command arguments
+	Runtime  map[string]string   `yaml:"runtime"` // Framework runtime commands
+	Server   map[string]string   `yaml:"server"`  // Framework server commands
+	Args     map[string][]string `yaml:"args"`    // Framework command arguments
 }
 
 // Pools represents application pool configuration
@@ -180,21 +180,20 @@ type StaticDir struct {
 	Path        string   `yaml:"path"`
 	Dir         string   `yaml:"dir"`
 	TryFiles    []string `yaml:"try_files"`
-	Cache       string   `yaml:"cache"`        // Duration format: "24h", "1h"
+	Cache       string   `yaml:"cache"` // Duration format: "24h", "1h"
 	AuthExclude []string `yaml:"auth_exclude"`
 }
 
 // ProxyRoute represents a proxy route configuration
 type ProxyRoute struct {
-	Name       string            `yaml:"name"`
-	Path       string            `yaml:"path"`       // Regex pattern for matching paths
-	Prefix     string            `yaml:"prefix"`     // Alternative to Path for simple prefix matching
-	Target     string            `yaml:"target"`
-	StripPath  bool              `yaml:"strip_path"`
-	Headers    map[string]string `yaml:"headers"`
-	WebSocket  bool              `yaml:"websocket"`  // Enable WebSocket support
+	Name      string            `yaml:"name"`
+	Path      string            `yaml:"path"`   // Regex pattern for matching paths
+	Prefix    string            `yaml:"prefix"` // Alternative to Path for simple prefix matching
+	Target    string            `yaml:"target"`
+	StripPath bool              `yaml:"strip_path"`
+	Headers   map[string]string `yaml:"headers"`
+	WebSocket bool              `yaml:"websocket"` // Enable WebSocket support
 }
-
 
 // WebApp represents a web application
 type WebApp struct {
@@ -287,7 +286,7 @@ type YAMLConfig struct {
 			Fallback string   `yaml:"fallback"`
 		} `yaml:"try_files"`
 	} `yaml:"static"`
-	Routes RoutesConfig `yaml:"routes"`
+	Routes       RoutesConfig `yaml:"routes"`
 	Applications struct {
 		Pools struct {
 			MaxSize   int    `yaml:"max_size"`

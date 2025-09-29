@@ -46,13 +46,13 @@ func TestFlyReplayIntegration_EndToEnd(t *testing.T) {
 	handler := CreateHandler(cfg, appManager, nil, idleManager)
 
 	tests := []struct {
-		name                  string
-		path                  string
-		expectFlyReplay       bool
-		expectedRegion        string
-		expectedApp           string
-		expectedStatus        int
-		expectedContentType   string
+		name                string
+		path                string
+		expectFlyReplay     bool
+		expectedRegion      string
+		expectedApp         string
+		expectedStatus      int
+		expectedContentType string
 	}{
 		{
 			name:                "Coquitlam should route to SJC region",

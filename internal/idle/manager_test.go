@@ -18,7 +18,7 @@ func TestNewManager(t *testing.T) {
 		{"Valid stop config", "stop", "30m", true},
 		{"Empty action", "", "20m", false},
 		{"Invalid timeout", "suspend", "invalid", true}, // Falls back to default timeout
-		{"Empty timeout", "suspend", "", true},         // Falls back to default timeout
+		{"Empty timeout", "suspend", "", true},          // Falls back to default timeout
 		{"Invalid action", "invalid", "20m", false},
 	}
 

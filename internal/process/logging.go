@@ -17,8 +17,8 @@ import (
 
 // LogWriter wraps output streams to add source identification
 type LogWriter struct {
-	source string     // app name or process name
-	stream string     // "stdout" or "stderr"
+	source string // app name or process name
+	stream string // "stdout" or "stderr"
 	output io.Writer
 }
 

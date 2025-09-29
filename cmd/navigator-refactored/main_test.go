@@ -518,9 +518,9 @@ logging:
 
 	// Verify specific directories are present
 	expectedDirs := map[string]string{
-		"/showcase/assets/": "assets/",
+		"/showcase/assets/":  "assets/",
 		"/showcase/studios/": "studios/",
-		"/showcase/": ".",
+		"/showcase/":         ".",
 	}
 
 	actualDirs := make(map[string]string)

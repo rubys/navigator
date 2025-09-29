@@ -63,7 +63,7 @@ func TestCheckAuth(t *testing.T) {
 		{
 			name:        "Basic auth with credentials",
 			authHeader:  "Basic dXNlcjpwYXNz", // user:pass in base64
-			expectAuth:  true,                   // No auth configured, so allow access
+			expectAuth:  true,                 // No auth configured, so allow access
 			description: "Valid format but no auth file",
 		},
 	}

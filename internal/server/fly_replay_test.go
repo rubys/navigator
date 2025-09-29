@@ -59,14 +59,14 @@ func TestShouldUseFlyReplay(t *testing.T) {
 
 func TestHandleFlyReplay(t *testing.T) {
 	tests := []struct {
-		name                 string
-		target               string
-		status               string
-		currentApp           string
-		retryHeader          string
-		expectHandled        bool
-		expectStatus         int
-		expectContentType    string
+		name                  string
+		target                string
+		status                string
+		currentApp            string
+		retryHeader           string
+		expectHandled         bool
+		expectStatus          int
+		expectContentType     string
 		expectMaintenancePage bool
 	}{
 		{

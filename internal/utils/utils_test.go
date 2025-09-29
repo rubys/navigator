@@ -29,8 +29,8 @@ func TestGenerateRequestID(t *testing.T) {
 
 func TestExtractTenantName(t *testing.T) {
 	tests := []struct {
-		path     string
-		expected string
+		path        string
+		expected    string
 		description string
 	}{
 		{"/2025/boston/users", "boston-users", "Standard tenant path - skips year, joins tenant parts"},

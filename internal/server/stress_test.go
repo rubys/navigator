@@ -66,9 +66,9 @@ func TestHighLoadScenarios(t *testing.T) {
 					},
 				},
 				{
-					Name:   "backend-2",
-					Path:   "^/websocket/",
-					Target: backends[2].URL,
+					Name:      "backend-2",
+					Path:      "^/websocket/",
+					Target:    backends[2].URL,
 					WebSocket: true,
 				},
 			},
@@ -80,12 +80,12 @@ func TestHighLoadScenarios(t *testing.T) {
 	handler := CreateHandler(cfg, appManager, nil, idleManager)
 
 	scenarios := []struct {
-		name         string
-		duration     time.Duration
-		concurrency  int
-		requestRate  int // requests per second per goroutine
-		paths        []string
-		description  string
+		name        string
+		duration    time.Duration
+		concurrency int
+		requestRate int // requests per second per goroutine
+		paths       []string
+		description string
 	}{
 		{
 			name:        "sustained_load",
@@ -123,12 +123,12 @@ func TestHighLoadScenarios(t *testing.T) {
 			t.Logf("Running stress scenario: %s", scenario.description)
 
 			var (
-				totalRequests  int64
-				successCount   int64
-				errorCount     int64
-				totalLatency   int64
-				maxLatency     int64
-				minLatency     int64 = 999999999 // Initialize to high value
+				totalRequests int64
+				successCount  int64
+				errorCount    int64
+				totalLatency  int64
+				maxLatency    int64
+				minLatency    int64 = 999999999 // Initialize to high value
 			)
 
 			var wg sync.WaitGroup

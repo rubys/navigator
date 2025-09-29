@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/rubys/navigator/internal/config"
 	"github.com/gorilla/websocket"
+	"github.com/rubys/navigator/internal/config"
 )
 
 var upgrader = websocket.Upgrader{
@@ -62,7 +62,6 @@ func (h *Handler) handleReverseProxies(w http.ResponseWriter, r *http.Request) b
 
 	return false
 }
-
 
 // handleHTTPProxy handles regular HTTP reverse proxy
 func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route *config.ProxyRoute) {

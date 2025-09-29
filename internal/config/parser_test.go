@@ -696,7 +696,7 @@ func TestParseFlyReplayToRewriteRules(t *testing.T) {
 
 	// Test pattern matching
 	testPaths := []struct {
-		path      string
+		path        string
 		shouldMatch int // index of rule that should match, -1 if no match
 	}{
 		{"/pdf/document.pdf", 0},

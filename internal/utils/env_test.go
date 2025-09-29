@@ -13,7 +13,7 @@ func TestSetCommandEnvironment(t *testing.T) {
 		envMap map[string]string
 	}{
 		{
-			name: "empty environment map",
+			name:   "empty environment map",
 			envMap: map[string]string{},
 		},
 		{
@@ -33,7 +33,7 @@ func TestSetCommandEnvironment(t *testing.T) {
 		{
 			name: "environment with special characters",
 			envMap: map[string]string{
-				"PATH_VAR": "/usr/local/bin:/usr/bin",
+				"PATH_VAR":  "/usr/local/bin:/usr/bin",
 				"QUOTE_VAR": "value with spaces",
 				"EQUAL_VAR": "key=value",
 			},
@@ -88,8 +88,8 @@ func TestMergeEnvironment(t *testing.T) {
 			},
 		},
 		{
-			name: "merge with empty overrides",
-			base: []string{"EXISTING=value"},
+			name:      "merge with empty overrides",
+			base:      []string{"EXISTING=value"},
 			overrides: map[string]string{},
 			want: map[string]string{
 				"EXISTING": "value",
@@ -115,8 +115,8 @@ func TestMergeEnvironment(t *testing.T) {
 			},
 			want: map[string]string{
 				"EXISTING": "value",
-				"NEW1": "value1",
-				"NEW2": "value2",
+				"NEW1":     "value1",
+				"NEW2":     "value2",
 			},
 		},
 		{
@@ -126,9 +126,9 @@ func TestMergeEnvironment(t *testing.T) {
 				"NEW": "new_value",
 			},
 			want: map[string]string{
-				"VALID": "value",
+				"VALID":      "value",
 				"ALSO_VALID": "ok",
-				"NEW": "new_value",
+				"NEW":        "new_value",
 			},
 		},
 	}
@@ -202,8 +202,8 @@ func TestExpandVariables(t *testing.T) {
 		{
 			name: "multiple variable expansion",
 			env: map[string]string{
-				"DB_NAME": "${app}_${env}",
-				"DB_USER": "${app}_user",
+				"DB_NAME":  "${app}_${env}",
+				"DB_USER":  "${app}_user",
 				"LOG_PATH": "/var/log/${app}/${env}.log",
 			},
 			vars: map[string]string{
@@ -211,8 +211,8 @@ func TestExpandVariables(t *testing.T) {
 				"env": "staging",
 			},
 			want: map[string]string{
-				"DB_NAME": "myapp_staging",
-				"DB_USER": "myapp_user",
+				"DB_NAME":  "myapp_staging",
+				"DB_USER":  "myapp_user",
 				"LOG_PATH": "/var/log/myapp/staging.log",
 			},
 		},
@@ -232,7 +232,7 @@ func TestExpandVariables(t *testing.T) {
 			name: "same variable used multiple times",
 			env: map[string]string{
 				"CONNECTION": "${host}:${port}",
-				"URL": "http://${host}:${port}/api",
+				"URL":        "http://${host}:${port}/api",
 			},
 			vars: map[string]string{
 				"host": "localhost",
@@ -240,7 +240,7 @@ func TestExpandVariables(t *testing.T) {
 			},
 			want: map[string]string{
 				"CONNECTION": "localhost:8080",
-				"URL": "http://localhost:8080/api",
+				"URL":        "http://localhost:8080/api",
 			},
 		},
 		{

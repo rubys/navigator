@@ -649,7 +649,7 @@ func TestStartWebApp(t *testing.T) {
 				{
 					Name:      "test-webapp",
 					Root:      "/tmp",
-					Runtime:   "echo",  // Use echo to avoid actually starting a web server
+					Runtime:   "echo", // Use echo to avoid actually starting a web server
 					Server:    "test",
 					Args:      []string{"testing", "{{port}}"},
 					Framework: "test",

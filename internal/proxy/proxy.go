@@ -285,10 +285,10 @@ func ProxyWithWebSocketSupport(w http.ResponseWriter, r *http.Request, targetURL
 // Note: Only buffers responses up to MaxRetryBufferSize to prevent memory issues
 type RetryResponseWriter struct {
 	http.ResponseWriter
-	statusCode    int
-	body          *bytes.Buffer
-	headers       http.Header
-	written       bool
+	statusCode     int
+	body           *bytes.Buffer
+	headers        http.Header
+	written        bool
 	bufferLimitHit bool
 }
 

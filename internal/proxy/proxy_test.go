@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 )
 
 func TestIsWebSocketRequest(t *testing.T) {
@@ -161,8 +160,8 @@ func TestMaxRequestSize(t *testing.T) {
 	const maxSize = 1024 * 1024 // 1MB
 
 	tests := []struct {
-		name          string
-		contentLength int64
+		name           string
+		contentLength  int64
 		shouldUseProxy bool
 	}{
 		{"Small request", 1000, false},
@@ -229,7 +228,7 @@ type mockConn struct {
 	closed bool
 }
 
-func (m *mockConn) Read(b []byte) (n int, err error)   { return 0, nil }
+func (m *mockConn) Read(b []byte) (n int, err error)  { return 0, nil }
 func (m *mockConn) Write(b []byte) (n int, err error) { return len(b), nil }
 func (m *mockConn) Close() error {
 	m.closed = true
@@ -327,13 +326,13 @@ func TestHandleProxy(t *testing.T) {
 	defer backend.Close()
 
 	tests := []struct {
-		name           string
-		method         string
-		path           string
-		targetURL      string
-		expectStatus   int
-		expectBackend  bool
-		expectError    bool
+		name          string
+		method        string
+		path          string
+		targetURL     string
+		expectStatus  int
+		expectBackend bool
+		expectError   bool
 	}{
 		{
 			name:          "Basic GET request",
@@ -352,20 +351,20 @@ func TestHandleProxy(t *testing.T) {
 			expectBackend: true,
 		},
 		{
-			name:          "Invalid target URL",
-			method:        "GET",
-			path:          "/test",
-			targetURL:     "://invalid-url",
-			expectStatus:  http.StatusInternalServerError,
-			expectError:   true,
+			name:         "Invalid target URL",
+			method:       "GET",
+			path:         "/test",
+			targetURL:    "://invalid-url",
+			expectStatus: http.StatusInternalServerError,
+			expectError:  true,
 		},
 		{
-			name:          "Connection refused",
-			method:        "GET",
-			path:          "/test",
-			targetURL:     "http://localhost:99999",
-			expectStatus:  http.StatusBadGateway,
-			expectError:   true,
+			name:         "Connection refused",
+			method:       "GET",
+			path:         "/test",
+			targetURL:    "http://localhost:99999",
+			expectStatus: http.StatusBadGateway,
+			expectError:  true,
 		},
 	}
 
@@ -480,12 +479,12 @@ func TestProxyWithWebSocketSupport(t *testing.T) {
 	defer wsBackend.Close()
 
 	tests := []struct {
-		name                string
-		headers             map[string]string
-		targetURL           string
-		expectWebSocket     bool
-		expectStatus        int
-		trackWebSockets     bool
+		name            string
+		headers         map[string]string
+		targetURL       string
+		expectWebSocket bool
+		expectStatus    int
+		trackWebSockets bool
 	}{
 		{
 			name: "WebSocket upgrade request",

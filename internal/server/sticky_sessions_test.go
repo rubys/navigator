@@ -12,100 +12,100 @@ import (
 
 func TestHandleStickySession(t *testing.T) {
 	tests := []struct {
-		name               string
-		stickyEnabled      bool
-		paths              []string
-		requestPath        string
-		currentMachineID   string
-		appName            string
-		existingCookie     string
-		retryHeader        string
-		expectHandled      bool
-		expectCookieSet    bool
-		expectFlyReplay    bool
-		expectMaintenance  bool
+		name              string
+		stickyEnabled     bool
+		paths             []string
+		requestPath       string
+		currentMachineID  string
+		appName           string
+		existingCookie    string
+		retryHeader       string
+		expectHandled     bool
+		expectCookieSet   bool
+		expectFlyReplay   bool
+		expectMaintenance bool
 	}{
 		{
-			name:            "Sticky disabled",
-			stickyEnabled:   false,
-			requestPath:     "/app/dashboard",
-			expectHandled:   false,
+			name:          "Sticky disabled",
+			stickyEnabled: false,
+			requestPath:   "/app/dashboard",
+			expectHandled: false,
 		},
 		{
-			name:            "Path doesn't match pattern",
-			stickyEnabled:   true,
-			paths:           []string{"/app/*"},
-			requestPath:     "/other/page",
-			expectHandled:   false,
+			name:          "Path doesn't match pattern",
+			stickyEnabled: true,
+			paths:         []string{"/app/*"},
+			requestPath:   "/other/page",
+			expectHandled: false,
 		},
 		{
-			name:               "Missing environment variables",
-			stickyEnabled:      true,
-			requestPath:        "/app/dashboard",
-			currentMachineID:   "", // Missing
-			appName:            "testapp",
-			expectHandled:      false,
+			name:             "Missing environment variables",
+			stickyEnabled:    true,
+			requestPath:      "/app/dashboard",
+			currentMachineID: "", // Missing
+			appName:          "testapp",
+			expectHandled:    false,
 		},
 		{
-			name:               "No existing cookie - set cookie and continue",
-			stickyEnabled:      true,
-			requestPath:        "/app/dashboard",
-			currentMachineID:   "machine123",
-			appName:            "testapp",
-			expectHandled:      false,
-			expectCookieSet:    true,
+			name:             "No existing cookie - set cookie and continue",
+			stickyEnabled:    true,
+			requestPath:      "/app/dashboard",
+			currentMachineID: "machine123",
+			appName:          "testapp",
+			expectHandled:    false,
+			expectCookieSet:  true,
 		},
 		{
-			name:               "Cookie matches current machine - continue",
-			stickyEnabled:      true,
-			requestPath:        "/app/dashboard",
-			currentMachineID:   "machine123",
-			appName:            "testapp",
-			existingCookie:     "machine123",
-			expectHandled:      false,
-			expectCookieSet:    true,
+			name:             "Cookie matches current machine - continue",
+			stickyEnabled:    true,
+			requestPath:      "/app/dashboard",
+			currentMachineID: "machine123",
+			appName:          "testapp",
+			existingCookie:   "machine123",
+			expectHandled:    false,
+			expectCookieSet:  true,
 		},
 		{
-			name:               "Cookie for different machine - fly-replay",
-			stickyEnabled:      true,
-			requestPath:        "/app/dashboard",
-			currentMachineID:   "machine123",
-			appName:            "testapp",
-			existingCookie:     "machine456",
-			expectHandled:      true,
-			expectFlyReplay:    true,
+			name:             "Cookie for different machine - fly-replay",
+			stickyEnabled:    true,
+			requestPath:      "/app/dashboard",
+			currentMachineID: "machine123",
+			appName:          "testapp",
+			existingCookie:   "machine456",
+			expectHandled:    true,
+			expectFlyReplay:  true,
 		},
 		{
-			name:               "Cookie for different machine with retry - maintenance",
-			stickyEnabled:      true,
-			requestPath:        "/app/dashboard",
-			currentMachineID:   "machine123",
-			appName:            "testapp",
-			existingCookie:     "machine456",
-			retryHeader:        "true",
-			expectHandled:      true,
-			expectMaintenance:  true,
-			expectCookieSet:    true, // Should reset to current machine
+			name:              "Cookie for different machine with retry - maintenance",
+			stickyEnabled:     true,
+			requestPath:       "/app/dashboard",
+			currentMachineID:  "machine123",
+			appName:           "testapp",
+			existingCookie:    "machine456",
+			retryHeader:       "true",
+			expectHandled:     true,
+			expectMaintenance: true,
+			expectCookieSet:   true, // Should reset to current machine
 		},
 		{
-			name:               "Path pattern matching",
-			stickyEnabled:      true,
-			paths:              []string{"/app/*", "/admin/*"},
-			requestPath:        "/admin/users",
-			currentMachineID:   "machine123",
-			appName:            "testapp",
-			expectHandled:      false,
-			expectCookieSet:    true,
+			name:             "Path pattern matching",
+			stickyEnabled:    true,
+			paths:            []string{"/app/*", "/admin/*"},
+			requestPath:      "/admin/users",
+			currentMachineID: "machine123",
+			appName:          "testapp",
+			expectHandled:    false,
+			expectCookieSet:  true,
 		},
 		{
-			name:               "Large request uses fallback",
-			stickyEnabled:      true,
-			requestPath:        "/app/upload",
-			currentMachineID:   "machine123",
-			appName:            "testapp",
-			existingCookie:     "machine456",
-			expectHandled:      true,
-			expectFlyReplay:    true, // Will still be handled, but via fallback
+			name:             "Large request uses fallback",
+			stickyEnabled:    true,
+			requestPath:      "/app/upload",
+			currentMachineID: "machine123",
+			appName:          "testapp",
+			existingCookie:   "machine456",
+			expectHandled:    true,
+			expectFlyReplay:  true, // Will still be handled, but via fallback
 		},
 	}
 
@@ -189,21 +189,21 @@ func TestHandleStickySession(t *testing.T) {
 
 func TestSetStickySessionCookie(t *testing.T) {
 	tests := []struct {
-		name              string
-		machineID         string
-		cookieName        string
-		maxAge            string
-		secure            bool
-		httpOnly          bool
-		sameSite          string
-		expectMaxAge      int
-		expectSameSite    http.SameSite
+		name           string
+		machineID      string
+		cookieName     string
+		maxAge         string
+		secure         bool
+		httpOnly       bool
+		sameSite       string
+		expectMaxAge   int
+		expectSameSite http.SameSite
 	}{
 		{
 			name:           "Basic cookie",
 			machineID:      "machine123",
 			cookieName:     "_nav_machine",
-			expectMaxAge:   3600, // Default 1 hour
+			expectMaxAge:   3600,                 // Default 1 hour
 			expectSameSite: http.SameSiteLaxMode, // Default
 		},
 		{

@@ -135,7 +135,6 @@ func (p *ConfigParser) parseStaticConfig() {
 	p.config.Static.TryFiles = p.yamlConfig.Static.TryFiles
 }
 
-
 // parseApplicationConfig parses application pool and tenant configuration
 func (p *ConfigParser) parseApplicationConfig() {
 	apps := &p.config.Applications
@@ -251,4 +250,3 @@ func (p *ConfigParser) parseRoutesConfig() {
 		}
 	}
 }
-

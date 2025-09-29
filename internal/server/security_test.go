@@ -128,7 +128,7 @@ func TestSecurityHeaders(t *testing.T) {
 			name: "unicode_normalization",
 			headers: map[string]string{
 				"X-Unicode": "café", // Contains Unicode characters
-				"X-Emoji":   "🔥💯🚀", // Emoji characters
+				"X-Emoji":   "🔥💯🚀",  // Emoji characters
 			},
 			expectedBlock: false,
 			description:   "Unicode characters should be handled properly",
@@ -287,10 +287,10 @@ func TestPathTraversalPrevention(t *testing.T) {
 func TestRegexInjectionPrevention(t *testing.T) {
 	// Test regex patterns that could be vulnerable
 	vulnerablePatterns := []string{
-		"(a+)+$",           // ReDoS: exponential backtracking
-		"(a|a)*$",          // ReDoS: alternation
-		"a*a*a*a*a*a*a*$",  // ReDoS: nested quantifiers
-		"^(a+)+b$",         // ReDoS: catastrophic backtracking
+		"(a+)+$",          // ReDoS: exponential backtracking
+		"(a|a)*$",         // ReDoS: alternation
+		"a*a*a*a*a*a*a*$", // ReDoS: nested quantifiers
+		"^(a+)+b$",        // ReDoS: catastrophic backtracking
 	}
 
 	for _, pattern := range vulnerablePatterns {

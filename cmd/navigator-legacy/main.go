@@ -124,7 +124,7 @@ type Config struct {
 	ProxyRoutes      map[string]*ProxyRoute
 	Locations        map[string]*Location
 	GlobalEnvVars    map[string]string
-	Framework        FrameworkConfig // Framework-specific configuration
+	Framework        FrameworkConfig        // Framework-specific configuration
 	IdleTimeout      time.Duration          // Idle timeout for app processes
 	StartPort        int                    // Starting port for web apps
 	StaticDirs       []*StaticDir           // Static directory mappings
@@ -138,7 +138,7 @@ type Config struct {
 	// Machine idle configuration
 	MachineIdleAction  string        // "suspend", "stop", or empty
 	MachineIdleTimeout time.Duration // Duration before machine idle action
-	
+
 	// Sticky sessions configuration
 	StickySessions struct {
 		Enabled        bool     // Enable sticky sessions
@@ -150,7 +150,7 @@ type Config struct {
 		CookieSameSite string   // SameSite setting: "lax", "strict", "none"
 		Paths          []string // Optional paths to apply sticky sessions
 	}
-	
+
 	// Hooks configuration
 	ServerHooks        ServerHooks // Server lifecycle hooks
 	DefaultTenantHooks TenantHooks // Default hooks for all tenants
@@ -206,15 +206,15 @@ type FrameworkConfig struct {
 
 // Tenant represents a tenant configuration with optional framework overrides
 type Tenant struct {
-	Path                       string            `yaml:"path"`
-	Root                       string            `yaml:"root"`
-	MatchPattern               string            `yaml:"match_pattern"`
-	StandaloneServer           string            `yaml:"standalone_server"`
-	RewritePath                string            `yaml:"rewrite_path"`  // Path to rewrite to when proxying to standalone server
+	Path                       string                 `yaml:"path"`
+	Root                       string                 `yaml:"root"`
+	MatchPattern               string                 `yaml:"match_pattern"`
+	StandaloneServer           string                 `yaml:"standalone_server"`
+	RewritePath                string                 `yaml:"rewrite_path"` // Path to rewrite to when proxying to standalone server
 	Env                        map[string]interface{} `yaml:"env"`
-	Var                        map[string]string `yaml:"var"`
-	ForceMaxConcurrentRequests int               `yaml:"force_max_concurrent_requests"`
-	Hooks                      TenantHooks       `yaml:"hooks"` // Tenant-specific hooks
+	Var                        map[string]string      `yaml:"var"`
+	ForceMaxConcurrentRequests int                    `yaml:"force_max_concurrent_requests"`
+	Hooks                      TenantHooks            `yaml:"hooks"` // Tenant-specific hooks
 }
 
 // YAMLConfig represents the unified YAML configuration format
@@ -259,10 +259,10 @@ type YAMLConfig struct {
 
 	// Application management
 	Applications struct {
-		Framework FrameworkConfig   `yaml:"framework"`
+		Framework FrameworkConfig `yaml:"framework"`
 		Pools     struct {
 			MaxSize   int    `yaml:"max_size"`
-			Timeout   string `yaml:"timeout"`    // Duration format: "5m", "30s" - app idle timeout
+			Timeout   string `yaml:"timeout"` // Duration format: "5m", "30s" - app idle timeout
 			StartPort int    `yaml:"start_port"`
 		} `yaml:"pools"`
 		Env     map[string]string `yaml:"env"`
@@ -311,12 +311,12 @@ type YAMLConfig struct {
 	Maintenance struct {
 		Page string `yaml:"page"` // Path to custom maintenance page (e.g., "/503.html")
 	} `yaml:"maintenance"`
-	
+
 	// Sticky sessions configuration
 	StickySessions struct {
 		Enabled        bool     `yaml:"enabled"`
 		CookieName     string   `yaml:"cookie_name"`
-		CookieMaxAge   string   `yaml:"cookie_max_age"`  // Duration format: "1h", "30m"
+		CookieMaxAge   string   `yaml:"cookie_max_age"` // Duration format: "1h", "30m"
 		CookiePath     string   `yaml:"cookie_path"`
 		CookieSecure   bool     `yaml:"cookie_secure"`
 		CookieHTTPOnly bool     `yaml:"cookie_httponly"`
@@ -351,16 +351,16 @@ type ProcessManager struct {
 // IdleManager tracks active requests and handles machine idle actions (suspend/stop)
 type IdleManager struct {
 	enabled        bool
-	action         string        // "suspend" or "stop"
+	action         string // "suspend" or "stop"
 	idleTimeout    time.Duration
 	activeRequests int64
 	lastActivity   time.Time
 	mutex          sync.RWMutex
 	timer          *time.Timer
 	config         *Config
-	idleActioned   bool          // Track if idle action was performed
-	resuming       bool          // Track if resume hooks are currently running
-	resumeCond     *sync.Cond    // Condition variable to wait for resume completion
+	idleActioned   bool       // Track if idle action was performed
+	resuming       bool       // Track if resume hooks are currently running
+	resumeCond     *sync.Cond // Condition variable to wait for resume completion
 }
 
 // AppManager manages web application processes
@@ -375,8 +375,8 @@ type AppManager struct {
 
 // LogWriter wraps output streams to add source identification
 type LogWriter struct {
-	source string     // app name or process name
-	stream string     // "stdout" or "stderr"
+	source string // app name or process name
+	stream string // "stdout" or "stderr"
 	output io.Writer
 }
 
@@ -469,19 +469,19 @@ func (m *MultiLogWriter) Write(p []byte) (n int, err error) {
 func createFileWriter(path string, appName string) (io.Writer, error) {
 	// Replace {{app}} template with actual app name
 	logPath := strings.ReplaceAll(path, "{{app}}", appName)
-	
+
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(logPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create log directory %s: %w", dir, err)
 	}
-	
+
 	// Open file for append (create if doesn't exist)
 	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file %s: %w", logPath, err)
 	}
-	
+
 	return file, nil
 }
 
@@ -555,25 +555,25 @@ func (r *responseRecorder) finishTracking() {
 
 // AccessLogEntry represents a structured access log entry matching nginx format
 type AccessLogEntry struct {
-	Timestamp       string `json:"@timestamp"`
-	ClientIP        string `json:"client_ip"`
-	RemoteUser      string `json:"remote_user"`
-	Method          string `json:"method"`
-	URI             string `json:"uri"`
-	Protocol        string `json:"protocol"`
-	Status          int    `json:"status"`
-	BodyBytesSent   int    `json:"body_bytes_sent"`
-	RequestID       string `json:"request_id"`
-	RequestTime     string `json:"request_time"`
-	Referer         string `json:"referer"`
-	UserAgent       string `json:"user_agent"`
-	FlyRequestID    string `json:"fly_request_id"`
-	Tenant          string `json:"tenant,omitempty"`
-	ResponseType    string `json:"response_type,omitempty"`    // Type of response: proxy, static, redirect, fly-replay, auth-failure, error
-	Destination     string `json:"destination,omitempty"`     // For fly-replay or redirect responses
-	ProxyBackend    string `json:"proxy_backend,omitempty"`   // For proxy responses
-	FilePath        string `json:"file_path,omitempty"`       // For static file responses
-	ErrorMessage    string `json:"error_message,omitempty"`   // For error responses
+	Timestamp     string `json:"@timestamp"`
+	ClientIP      string `json:"client_ip"`
+	RemoteUser    string `json:"remote_user"`
+	Method        string `json:"method"`
+	URI           string `json:"uri"`
+	Protocol      string `json:"protocol"`
+	Status        int    `json:"status"`
+	BodyBytesSent int    `json:"body_bytes_sent"`
+	RequestID     string `json:"request_id"`
+	RequestTime   string `json:"request_time"`
+	Referer       string `json:"referer"`
+	UserAgent     string `json:"user_agent"`
+	FlyRequestID  string `json:"fly_request_id"`
+	Tenant        string `json:"tenant,omitempty"`
+	ResponseType  string `json:"response_type,omitempty"` // Type of response: proxy, static, redirect, fly-replay, auth-failure, error
+	Destination   string `json:"destination,omitempty"`   // For fly-replay or redirect responses
+	ProxyBackend  string `json:"proxy_backend,omitempty"` // For proxy responses
+	FilePath      string `json:"file_path,omitempty"`     // For static file responses
+	ErrorMessage  string `json:"error_message,omitempty"` // For error responses
 }
 
 // logNavigatorRequest logs any Navigator request with consistent formatting and metadata
@@ -650,10 +650,10 @@ func logNavigatorRequest(r *http.Request, recorder *responseRecorder, metadata m
 	fmt.Fprintln(os.Stdout, string(data))
 }
 
-
 // extractTenantName extracts the tenant name from a URL path
 // Examples: "/showcase/2025/livermore/district-showcase/" -> "livermore-district-showcase"
-//           "/2025/adelaide/adelaide-combined/" -> "adelaide-combined"
+//
+//	"/2025/adelaide/adelaide-combined/" -> "adelaide-combined"
 func extractTenantName(path string) string {
 	// Remove leading/trailing slashes and split by '/'
 	path = strings.Trim(path, "/")
@@ -699,7 +699,6 @@ func generateRequestID() string {
 	return hex.EncodeToString(bytes)
 }
 
-
 // NewVectorWriter creates a new Vector writer
 func NewVectorWriter(socket string) *VectorWriter {
 	return &VectorWriter{socket: socket}
@@ -709,7 +708,7 @@ func NewVectorWriter(socket string) *VectorWriter {
 func (v *VectorWriter) Write(p []byte) (n int, err error) {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
-	
+
 	// Lazy connection - connect on first write
 	if v.conn == nil {
 		v.conn, err = net.Dial("unix", v.socket)
@@ -718,7 +717,7 @@ func (v *VectorWriter) Write(p []byte) (n int, err error) {
 			return len(p), nil
 		}
 	}
-	
+
 	// Try to write to Vector
 	n, err = v.conn.Write(p)
 	if err != nil {
@@ -728,7 +727,7 @@ func (v *VectorWriter) Write(p []byte) (n int, err error) {
 		// Return success to avoid breaking the log pipeline
 		return len(p), nil
 	}
-	
+
 	return n, nil
 }
 
@@ -736,7 +735,7 @@ func (v *VectorWriter) Write(p []byte) (n int, err error) {
 func (v *VectorWriter) Close() error {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
-	
+
 	if v.conn != nil {
 		err := v.conn.Close()
 		v.conn = nil
@@ -910,7 +909,7 @@ func (pm *ProcessManager) StartProcess(mp *ManagedProcess) error {
 
 	// Set up output destinations
 	outputs := []io.Writer{os.Stdout}
-	
+
 	// Add file output if configured
 	if pm.config != nil && pm.config.Logging.File != "" {
 		if fileWriter, err := createFileWriter(pm.config.Logging.File, mp.Name); err == nil {
@@ -922,14 +921,14 @@ func (pm *ProcessManager) StartProcess(mp *ManagedProcess) error {
 				"error", err)
 		}
 	}
-	
+
 	// Add Vector output if configured (but not for Vector itself to avoid loop)
-	if pm.config != nil && pm.config.Logging.Vector.Enabled && 
-	   pm.config.Logging.Vector.Socket != "" && mp.Name != "vector" {
+	if pm.config != nil && pm.config.Logging.Vector.Enabled &&
+		pm.config.Logging.Vector.Socket != "" && mp.Name != "vector" {
 		vectorWriter := NewVectorWriter(pm.config.Logging.Vector.Socket)
 		outputs = append(outputs, vectorWriter)
 	}
-	
+
 	// Create the appropriate output writer
 	var outputWriter io.Writer
 	if len(outputs) > 1 {
@@ -937,7 +936,7 @@ func (pm *ProcessManager) StartProcess(mp *ManagedProcess) error {
 	} else {
 		outputWriter = outputs[0]
 	}
-	
+
 	// Set up output with source identification
 	if pm.config != nil && pm.config.Logging.Format == "json" {
 		cmd.Stdout = &JSONLogWriter{source: mp.Name, stream: "stdout", output: outputWriter}
@@ -995,16 +994,16 @@ func (pm *ProcessManager) StartAll(processes []ManagedProcessConfig) {
 		var startDelay time.Duration
 		if proc.StartDelay != "" {
 			if parsed, err := time.ParseDuration(proc.StartDelay); err != nil {
-				slog.Warn("Invalid managed process start_delay format, using default", 
-					"name", proc.Name, 
-					"startDelay", proc.StartDelay, 
+				slog.Warn("Invalid managed process start_delay format, using default",
+					"name", proc.Name,
+					"startDelay", proc.StartDelay,
 					"error", err)
 				startDelay = 0 // No delay on error
 			} else {
 				startDelay = parsed
 			}
 		}
-		
+
 		mp := &ManagedProcess{
 			Name:        proc.Name,
 			Command:     proc.Command,
@@ -1294,19 +1293,19 @@ func executeHooks(hooks []HookConfig, env map[string]string, hookType string) er
 		if hook.Command == "" {
 			continue
 		}
-		
+
 		slog.Info("Executing hook", "type", hookType, "index", i, "command", hook.Command)
-		
+
 		// Create command with timeout if specified
 		var cmd *exec.Cmd
 		var ctx context.Context
 		var cancel context.CancelFunc
-		
+
 		if hook.Timeout != "" {
 			if timeout, err := time.ParseDuration(hook.Timeout); err != nil {
-				slog.Warn("Invalid hook timeout format, running without timeout", 
-					"hookType", hookType, 
-					"timeout", hook.Timeout, 
+				slog.Warn("Invalid hook timeout format, running without timeout",
+					"hookType", hookType,
+					"timeout", hook.Timeout,
 					"error", err)
 				cmd = exec.Command(hook.Command, hook.Args...)
 			} else {
@@ -1317,7 +1316,7 @@ func executeHooks(hooks []HookConfig, env map[string]string, hookType string) er
 		} else {
 			cmd = exec.Command(hook.Command, hook.Args...)
 		}
-		
+
 		// Set environment variables if provided
 		if env != nil {
 			cmd.Env = os.Environ()
@@ -1325,19 +1324,19 @@ func executeHooks(hooks []HookConfig, env map[string]string, hookType string) er
 				cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 			}
 		}
-		
+
 		// Capture output
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			slog.Error("Hook failed", "type", hookType, "index", i, "error", err, "output", string(output))
 			return fmt.Errorf("hook %s[%d] failed: %w", hookType, i, err)
 		}
-		
+
 		if len(output) > 0 {
 			slog.Info("Hook output", "type", hookType, "index", i, "output", string(output))
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1352,12 +1351,12 @@ func executeTenantHooks(defaultHooks, specificHooks []HookConfig, env map[string
 	if err := executeHooks(defaultHooks, env, fmt.Sprintf("tenant.default.%s", hookType)); err != nil {
 		return err
 	}
-	
+
 	// Then execute tenant-specific hooks
 	if err := executeHooks(specificHooks, env, fmt.Sprintf("tenant.%s.%s", tenantName, hookType)); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -1530,10 +1529,10 @@ func main() {
 
 	// Create and start process manager for managed processes
 	processManager := NewProcessManager(config)
-	
+
 	// Add Vector as a managed process if configured
 	managedProcs := make([]ManagedProcessConfig, 0, len(config.ManagedProcesses)+1)
-	
+
 	// If Vector is enabled, add it as the first managed process (highest priority)
 	if config.Logging.Vector.Enabled {
 		if config.Logging.Vector.Config == "" {
@@ -1547,15 +1546,15 @@ func main() {
 				StartDelay:  "", // Start immediately (no delay)
 			}
 			managedProcs = append(managedProcs, vectorProc)
-			slog.Info("Vector integration enabled", 
+			slog.Info("Vector integration enabled",
 				"socket", config.Logging.Vector.Socket,
 				"config", config.Logging.Vector.Config)
 		}
 	}
-	
+
 	// Add configured managed processes
 	managedProcs = append(managedProcs, config.ManagedProcesses...)
-	
+
 	if len(managedProcs) > 0 {
 		slog.Info("Starting managed processes", "count", len(managedProcs))
 		processManager.StartAll(managedProcs)
@@ -1654,22 +1653,22 @@ func main() {
 		Addr:    addr,
 		Handler: mainHandler,
 	}
-	
+
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("Server failed", "error", err)
 			os.Exit(1)
 		}
 	}()
-	
+
 	// Wait a moment for the server to start
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Execute server.ready hooks after server starts accepting requests
 	if err := executeServerHooks(config.ServerHooks.Ready, "ready"); err != nil {
 		slog.Error("Server ready hooks failed", "error", err)
 	}
-	
+
 	// Block forever (signal handler will manage shutdown)
 	select {}
 }
@@ -1938,10 +1937,10 @@ func ParseYAML(content []byte) (*Config, error) {
 	} else {
 		config.MaintenancePage = DefaultMaintenancePage
 	}
-	
+
 	// Set sticky sessions configuration
 	config.StickySessions.Enabled = yamlConfig.StickySessions.Enabled
-	
+
 	if config.StickySessions.Enabled {
 		// Set cookie name with default
 		if yamlConfig.StickySessions.CookieName != "" {
@@ -1949,7 +1948,7 @@ func ParseYAML(content []byte) (*Config, error) {
 		} else {
 			config.StickySessions.CookieName = "_navigator_machine"
 		}
-		
+
 		// Set and validate max age with default
 		if yamlConfig.StickySessions.CookieMaxAge != "" {
 			if _, err := time.ParseDuration(yamlConfig.StickySessions.CookieMaxAge); err != nil {
@@ -1963,25 +1962,25 @@ func ParseYAML(content []byte) (*Config, error) {
 		} else {
 			config.StickySessions.CookieMaxAge = "1h"
 		}
-		
+
 		// Set cookie path with default
 		if yamlConfig.StickySessions.CookiePath != "" {
 			config.StickySessions.CookiePath = yamlConfig.StickySessions.CookiePath
 		} else {
 			config.StickySessions.CookiePath = "/"
 		}
-		
+
 		// Set other cookie settings
 		config.StickySessions.CookieSecure = yamlConfig.StickySessions.CookieSecure
 		config.StickySessions.CookieHTTPOnly = yamlConfig.StickySessions.CookieHTTPOnly
-		
+
 		// Set SameSite with default
 		if yamlConfig.StickySessions.CookieSameSite != "" {
 			config.StickySessions.CookieSameSite = yamlConfig.StickySessions.CookieSameSite
 		} else {
 			config.StickySessions.CookieSameSite = "lax"
 		}
-		
+
 		// Set paths if specified
 		config.StickySessions.Paths = yamlConfig.StickySessions.Paths
 	}
@@ -2153,7 +2152,7 @@ func (m *AppManager) startApp(app *WebApp) {
 	}
 
 	// Log the framework configuration being used
-	slog.Info("Starting application with framework config", 
+	slog.Info("Starting application with framework config",
 		"path", app.Location.Path,
 		"command", framework.Command,
 		"args", framework.Args,
@@ -2171,7 +2170,7 @@ func (m *AppManager) startApp(app *WebApp) {
 	}
 
 	// Log the final command that will be executed
-	slog.Info("Executing command", 
+	slog.Info("Executing command",
 		"path", app.Location.Path,
 		"command", framework.Command,
 		"expandedArgs", args,
@@ -2187,7 +2186,7 @@ func (m *AppManager) startApp(app *WebApp) {
 	if appName == "" {
 		appName = "root"
 	}
-	
+
 	// Extract tenant from environment if available
 	tenant := ""
 	for _, envVar := range env {
@@ -2196,10 +2195,10 @@ func (m *AppManager) startApp(app *WebApp) {
 			break
 		}
 	}
-	
+
 	// Set up output destinations
 	outputs := []io.Writer{os.Stdout}
-	
+
 	// Add file output if configured
 	if m.config.Logging.File != "" {
 		if fileWriter, err := createFileWriter(m.config.Logging.File, appName); err == nil {
@@ -2211,13 +2210,13 @@ func (m *AppManager) startApp(app *WebApp) {
 				"error", err)
 		}
 	}
-	
+
 	// Add Vector output if configured
 	if m.config.Logging.Vector.Enabled && m.config.Logging.Vector.Socket != "" {
 		vectorWriter := NewVectorWriter(m.config.Logging.Vector.Socket)
 		outputs = append(outputs, vectorWriter)
 	}
-	
+
 	// Create the appropriate output writer
 	var outputWriter io.Writer
 	if len(outputs) > 1 {
@@ -2225,7 +2224,7 @@ func (m *AppManager) startApp(app *WebApp) {
 	} else {
 		outputWriter = outputs[0]
 	}
-	
+
 	// Set up output with appropriate format
 	if m.config.Logging.Format == "json" {
 		cmd.Stdout = &JSONLogWriter{source: appName, stream: "stdout", tenant: tenant, output: outputWriter}
@@ -2245,14 +2244,14 @@ func (m *AppManager) startApp(app *WebApp) {
 		"directory", appDir)
 
 	if err := cmd.Start(); err != nil {
-		slog.Error("Failed to start web app", 
-			"path", app.Location.Path, 
+		slog.Error("Failed to start web app",
+			"path", app.Location.Path,
 			"command", framework.Command,
 			"args", args,
 			"workingDir", appDir,
 			"port", app.Port,
 			"error", err)
-		
+
 		// Check if the command executable exists
 		if _, statErr := os.Stat(framework.Command); statErr != nil {
 			slog.Error("Command executable not found",
@@ -2260,7 +2259,7 @@ func (m *AppManager) startApp(app *WebApp) {
 				"command", framework.Command,
 				"statError", statErr)
 		}
-		
+
 		// Check if working directory exists
 		if _, statErr := os.Stat(appDir); statErr != nil {
 			slog.Error("Working directory not found",
@@ -2268,7 +2267,7 @@ func (m *AppManager) startApp(app *WebApp) {
 				"workingDir", appDir,
 				"statError", statErr)
 		}
-		
+
 		app.mutex.Lock()
 		app.Starting = false
 		app.mutex.Unlock()
@@ -2279,9 +2278,9 @@ func (m *AppManager) startApp(app *WebApp) {
 	var startupDelay time.Duration
 	if framework.StartDelay != "" {
 		if parsed, err := time.ParseDuration(framework.StartDelay); err != nil {
-			slog.Warn("Invalid framework start_delay format, using default", 
-				"path", app.Location.Path, 
-				"startDelay", framework.StartDelay, 
+			slog.Warn("Invalid framework start_delay format, using default",
+				"path", app.Location.Path,
+				"startDelay", framework.StartDelay,
 				"error", err)
 			startupDelay = RailsStartupDelay
 		} else {
@@ -2301,7 +2300,7 @@ func (m *AppManager) startApp(app *WebApp) {
 	if tenantName == "" {
 		tenantName = "default"
 	}
-	
+
 	// Build environment map for hooks (same env as the app)
 	envMap := make(map[string]string)
 	for _, e := range env {
@@ -2310,7 +2309,7 @@ func (m *AppManager) startApp(app *WebApp) {
 			envMap[parts[0]] = parts[1]
 		}
 	}
-	
+
 	// Execute hooks (default hooks first, then tenant-specific from location)
 	if err := executeTenantHooks(m.config.DefaultTenantHooks.Start, app.Location.Hooks.Start, envMap, tenantName, "start"); err != nil {
 		slog.Error("Tenant start hooks failed", "tenant", tenantName, "error", err)
@@ -2352,7 +2351,7 @@ func (m *AppManager) StopApp(path string) {
 	if tenantName == "" {
 		tenantName = "default"
 	}
-	
+
 	// Build environment map for hooks (same env as the app would have)
 	envMap := make(map[string]string)
 	// Add global env vars
@@ -2369,7 +2368,7 @@ func (m *AppManager) StopApp(path string) {
 		portEnvVar = "PORT"
 	}
 	envMap[portEnvVar] = fmt.Sprintf("%d", app.Port)
-	
+
 	// Execute hooks (default hooks first, then tenant-specific from location)
 	if err := executeTenantHooks(m.config.DefaultTenantHooks.Stop, app.Location.Hooks.Stop, envMap, tenantName, "stop"); err != nil {
 		slog.Error("Tenant stop hooks failed", "tenant", tenantName, "error", err)
@@ -2602,7 +2601,7 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 					if !excluded {
 						// Perform regex substitution in target URL using capture groups from path
 						targetURL := route.ProxyPass
-						
+
 						// Find capture groups from the path match
 						matches := re.FindStringSubmatch(r.URL.Path)
 						if len(matches) > 1 {
@@ -2612,7 +2611,7 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 								targetURL = strings.ReplaceAll(targetURL, placeholder, matches[i])
 							}
 						}
-						
+
 						proxyRequestWithTarget(w, r, route, targetURL)
 						return
 					}
@@ -2918,7 +2917,7 @@ func handleStickySession(w http.ResponseWriter, r *http.Request, config *Config)
 	if !config.StickySessions.Enabled {
 		return false
 	}
-	
+
 	// Check if path requires sticky sessions
 	if len(config.StickySessions.Paths) > 0 {
 		matched := false
@@ -2931,21 +2930,21 @@ func handleStickySession(w http.ResponseWriter, r *http.Request, config *Config)
 			return false
 		}
 	}
-	
+
 	currentMachineID := os.Getenv("FLY_MACHINE_ID")
 	appName := os.Getenv("FLY_APP_NAME")
-	
+
 	if currentMachineID == "" || appName == "" {
 		slog.Debug("Sticky sessions require FLY_MACHINE_ID and FLY_APP_NAME")
 		return false
 	}
-	
+
 	// Check for existing sticky cookie
 	cookie, err := r.Cookie(config.StickySessions.CookieName)
-	
+
 	if err == nil && cookie.Value != "" && cookie.Value != currentMachineID {
 		targetMachine := cookie.Value
-		
+
 		// Check if this is a retry (machine was unavailable)
 		if r.Header.Get("X-Navigator-Retry") == "true" {
 			// Machine unavailable, serve maintenance page
@@ -2953,27 +2952,27 @@ func handleStickySession(w http.ResponseWriter, r *http.Request, config *Config)
 				"target_machine", targetMachine,
 				"current_machine", currentMachineID,
 				"path", r.URL.Path)
-			
+
 			serveMaintenancePage(w, r, config)
 			return true
 		}
-		
+
 		// Use Fly-Replay for cross-region routing
 		if shouldUseFlyReplay(r) {
 			// Set retry header for detection if machine is down
 			w.Header().Set("fly-replay", fmt.Sprintf("instance=%s", targetMachine))
 			w.Header().Set("X-Navigator-Retry", "true")
-			
+
 			statusCode := http.StatusTemporaryRedirect
 			w.WriteHeader(statusCode)
-			
+
 			response := map[string]interface{}{
 				"message": "Routing to sticky session machine",
 				"machine": targetMachine,
 				"app":     appName,
 				"path":    r.URL.Path,
 			}
-			
+
 			responseBytes, _ := json.Marshal(response)
 			w.Write(responseBytes)
 
@@ -2995,7 +2994,7 @@ func handleStickySession(w http.ResponseWriter, r *http.Request, config *Config)
 			// Large request, use reverse proxy
 			targetURL := fmt.Sprintf("http://%s.vm.%s.internal:%d%s",
 				targetMachine, appName, config.ListenPort, r.URL.Path)
-			
+
 			target, err := url.Parse(targetURL)
 			if err != nil {
 				slog.Error("Failed to parse sticky session target URL",
@@ -3003,16 +3002,16 @@ func handleStickySession(w http.ResponseWriter, r *http.Request, config *Config)
 					"error", err)
 				return false
 			}
-			
+
 			// Use existing proxy function
 			proxyWithRetry(w, r, target, ProxyRetryTimeout)
 			return true
 		}
 	}
-	
+
 	// Set sticky cookie for current machine
 	setStickySessionCookie(w, currentMachineID, config)
-	
+
 	return false
 }
 
@@ -3029,7 +3028,7 @@ func setStickySessionCookie(w http.ResponseWriter, machineID string, config *Con
 			maxAge = int(duration.Seconds())
 		}
 	}
-	
+
 	sameSite := http.SameSiteLaxMode
 	switch config.StickySessions.CookieSameSite {
 	case "strict":
@@ -3037,7 +3036,7 @@ func setStickySessionCookie(w http.ResponseWriter, machineID string, config *Con
 	case "none":
 		sameSite = http.SameSiteNoneMode
 	}
-	
+
 	cookie := &http.Cookie{
 		Name:     config.StickySessions.CookieName,
 		Value:    machineID,
@@ -3047,9 +3046,9 @@ func setStickySessionCookie(w http.ResponseWriter, machineID string, config *Con
 		HttpOnly: config.StickySessions.CookieHTTPOnly,
 		SameSite: sameSite,
 	}
-	
+
 	http.SetCookie(w, cookie)
-	
+
 	slog.Debug("Set sticky session cookie",
 		"machine_id", machineID,
 		"cookie_name", cookie.Name,
@@ -3245,9 +3244,9 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, config *Config, bes
 				// Set cache headers if configured
 				if staticDir.CacheTTL != "" {
 					if duration, err := time.ParseDuration(staticDir.CacheTTL); err != nil {
-						slog.Warn("Invalid cache TTL format, no cache headers set", 
-							"path", staticDir.URLPath, 
-							"cacheTTL", staticDir.CacheTTL, 
+						slog.Warn("Invalid cache TTL format, no cache headers set",
+							"path", staticDir.URLPath,
+							"cacheTTL", staticDir.CacheTTL,
 							"error", err)
 					} else {
 						seconds := int(duration.Seconds())
@@ -3597,8 +3596,8 @@ func proxyWithRetryForApp(w http.ResponseWriter, r *http.Request, target *url.UR
 			originalWriter := w
 			w = &webSocketTracker{
 				ResponseWriter: originalWriter,
-				app:           app,
-				cleaned:       false,
+				app:            app,
+				cleaned:        false,
 			}
 		}
 
@@ -3771,13 +3770,13 @@ func proxyRequestWithTarget(w http.ResponseWriter, r *http.Request, route *Proxy
 	originalPath := r.URL.Path
 	r.URL.Path = target.Path
 	r.URL.RawQuery = target.RawQuery
-	
+
 	// Create target with only scheme and host for proxy
 	baseTarget := &url.URL{
 		Scheme: target.Scheme,
 		Host:   target.Host,
 	}
-	
+
 	slog.Debug("Modified request for complete URL replacement",
 		"original_path", originalPath,
 		"new_path", r.URL.Path,

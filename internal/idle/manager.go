@@ -15,7 +15,7 @@ import (
 // Manager tracks active requests and handles machine idle actions
 type Manager struct {
 	enabled        bool
-	action         string        // "suspend" or "stop"
+	action         string // "suspend" or "stop"
 	idleTimeout    time.Duration
 	activeRequests int64
 	lastActivity   time.Time

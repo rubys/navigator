@@ -86,8 +86,8 @@ func TestHealthCheckHandler(t *testing.T) {
 
 func TestSetContentType(t *testing.T) {
 	tests := []struct {
-		filename    string
-		expected    string
+		filename string
+		expected string
 	}{
 		{"test.html", "text/html; charset=utf-8"},
 		{"test.css", "text/css"},
@@ -167,10 +167,10 @@ func TestTryFilesWithStaticDirectories(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		path           string
-		expectedFound  bool
-		shouldContain  string
+		name          string
+		path          string
+		expectedFound bool
+		shouldContain string
 	}{
 		{
 			name:          "Studios directory with index.html",
@@ -312,9 +312,9 @@ func TestStaticDirectoryMatching(t *testing.T) {
 
 func TestTryFilesConfigurationPriority(t *testing.T) {
 	tests := []struct {
-		name            string
-		serverTryFiles   []string
-		staticTryFiles   struct {
+		name           string
+		serverTryFiles []string
+		staticTryFiles struct {
 			Enabled  bool
 			Suffixes []string
 		}
@@ -740,11 +740,11 @@ func TestHandler_handleHealthCheck(t *testing.T) {
 
 func TestHandler_handleStickySession(t *testing.T) {
 	tests := []struct {
-		name           string
-		stickyEnabled  bool
-		paths          []string
-		requestPath    string
-		expectHandled  bool
+		name          string
+		stickyEnabled bool
+		paths         []string
+		requestPath   string
+		expectHandled bool
 	}{
 		{"Sticky disabled", false, nil, "/any/path", false},
 		{"Sticky enabled, no paths configured", true, nil, "/any/path", false},
@@ -1302,14 +1302,14 @@ func TestJSONAccessLogging(t *testing.T) {
 
 func TestHandler_HandleRewritesFlyReplay(t *testing.T) {
 	tests := []struct {
-		name               string
-		path               string
-		rewriteRules       []config.RewriteRule
-		expectHandled      bool
-		expectFlyReplay    bool
-		expectStatus       int
-		expectContentType  string
-		flyAppName         string
+		name              string
+		path              string
+		rewriteRules      []config.RewriteRule
+		expectHandled     bool
+		expectFlyReplay   bool
+		expectStatus      int
+		expectContentType string
+		flyAppName        string
 	}{
 		{
 			name: "Region-based fly-replay",
@@ -1579,8 +1579,8 @@ func TestHandler_HandleRewritesInternalRewrite(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		path        string
+		name          string
+		path          string
 		expectRewrite bool
 		expectedPath  string
 	}{
@@ -1723,16 +1723,16 @@ func TestHandler_HandleRewritesMultipleRules(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		path           string
-		expectHandled  bool
-		expectedPath   string
-		isRedirect     bool
+		name          string
+		path          string
+		expectHandled bool
+		expectedPath  string
+		isRedirect    bool
 	}{
 		{
 			name:          "Multiple rewrite rules should chain",
 			path:          "/step1/test",
-			expectHandled: false, // "last" doesn't return true
+			expectHandled: false,         // "last" doesn't return true
 			expectedPath:  "/final/test", // Both rules apply: step1->step2->final
 			isRedirect:    false,
 		},
