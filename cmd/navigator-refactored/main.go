@@ -126,10 +126,12 @@ func main() {
 			switch sig {
 			case syscall.SIGHUP:
 				slog.Info("Received SIGHUP, reloading configuration")
-				newBasicAuth, reloadSuccess := handleConfigReload(cfg, configFile, appManager, processManager, basicAuth, idleManager)
+				newConfig, newBasicAuth, reloadSuccess := handleConfigReload(configFile, appManager, processManager, basicAuth, idleManager)
 				if reloadSuccess {
-					// Update handler after successful config reload (auth may have changed)
+					// Replace the old config with the new one
+					cfg = newConfig
 					basicAuth = newBasicAuth
+					// Create new handler with the new configuration
 					newHandler := server.CreateHandler(cfg, appManager, basicAuth, idleManager)
 					srv.Handler = newHandler
 				}
@@ -253,17 +255,18 @@ func printHelp() {
 	fmt.Println("  SIGINT   Immediate shutdown")
 }
 
-func handleConfigReload(oldConfig *config.Config, configFile string, appManager *process.AppManager, processManager *process.Manager, currentAuth *auth.BasicAuth, idleManager *idle.Manager) (*auth.BasicAuth, bool) {
-	// Reload configuration
+func handleConfigReload(configFile string, appManager *process.AppManager, processManager *process.Manager, currentAuth *auth.BasicAuth, idleManager *idle.Manager) (*config.Config, *auth.BasicAuth, bool) {
+	// Load new configuration
 	newConfig, err := config.LoadConfig(configFile)
 	if err != nil {
 		slog.Error("Failed to reload configuration", "error", err)
-		return nil, false
+		return nil, nil, false
 	}
 
-	// Update configuration in managers
+	// Update configuration in all managers with the new config
 	appManager.UpdateConfig(newConfig)
 	processManager.UpdateManagedProcesses(newConfig)
+	idleManager.UpdateConfig(newConfig)
 
 	// Reload auth if configured
 	var newAuth *auth.BasicAuth
@@ -285,12 +288,9 @@ func handleConfigReload(oldConfig *config.Config, configFile string, appManager 
 		newAuth = nil
 	}
 
-	// Update the main config
-	config.UpdateConfig(oldConfig, newConfig)
-
 	// Update logging format if changed
 	setupLogging(newConfig)
 
 	slog.Info("Configuration reloaded successfully")
-	return newAuth, true
+	return newConfig, newAuth, true
 }

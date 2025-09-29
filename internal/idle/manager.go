@@ -244,6 +244,42 @@ func (m *Manager) GetStats() (activeRequests int64, lastActivity time.Time) {
 	return m.activeRequests, m.lastActivity
 }
 
+// UpdateConfig updates the idle manager configuration after a reload
+func (m *Manager) UpdateConfig(newConfig *config.Config) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.config = newConfig
+
+	// Re-configure idle settings from new config
+	if newConfig.Server.Idle.Action != "" && (newConfig.Server.Idle.Action == "suspend" || newConfig.Server.Idle.Action == "stop") {
+		m.enabled = true
+		m.action = newConfig.Server.Idle.Action
+
+		// Parse idle timeout
+		if newConfig.Server.Idle.Timeout != "" {
+			if duration, err := time.ParseDuration(newConfig.Server.Idle.Timeout); err == nil {
+				m.idleTimeout = duration
+			} else {
+				m.idleTimeout = config.DefaultIdleTimeout
+			}
+		} else {
+			m.idleTimeout = config.DefaultIdleTimeout
+		}
+
+		slog.Debug("Updated idle manager configuration",
+			"action", m.action,
+			"timeout", m.idleTimeout)
+	} else {
+		m.enabled = false
+		// Cancel any pending idle timer if idle management is disabled
+		if m.timer != nil {
+			m.timer.Stop()
+			m.timer = nil
+		}
+	}
+}
+
 // EnableTestMode prevents actual signal sending for testing
 func (m *Manager) EnableTestMode() {
 	m.testMode = true
