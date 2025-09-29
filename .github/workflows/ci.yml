@@ -93,6 +93,7 @@ jobs:
     - name: Run integration tests
       env:
         LOG_LEVEL: error
+        CI: true
       run: go test -race -cover -tags="integration" -timeout=10m ./...
 
   # Stress tests for performance validation
@@ -120,6 +121,7 @@ jobs:
     - name: Run stress tests
       env:
         LOG_LEVEL: error
+        CI: true
       run: go test -race -cover -tags="stress" -timeout=10m ./...
 
   # Build and test binaries

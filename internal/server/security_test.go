@@ -2,8 +2,11 @@ package server
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -426,6 +429,17 @@ func TestInputSanitization(t *testing.T) {
 func TestDenialOfServicePrevention(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping DoS prevention test in short mode")
+	}
+
+	// In CI environments, disable output to prevent overwhelming logs
+	if os.Getenv("CI") == "true" {
+		// Redirect stdout to discard to prevent massive JSON logs
+		oldStdout := os.Stdout
+		os.Stdout, _ = os.Open(os.DevNull)
+		defer func() { os.Stdout = oldStdout }()
+
+		// Set slog to discard output
+		slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 	}
 
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

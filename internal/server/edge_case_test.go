@@ -20,6 +20,17 @@ import (
 
 // TestEdgeCaseRequests tests various edge case HTTP requests
 func TestEdgeCaseRequests(t *testing.T) {
+	// In CI environments, disable output to prevent overwhelming logs
+	if os.Getenv("CI") == "true" {
+		// Redirect stdout to discard to prevent massive JSON logs
+		oldStdout := os.Stdout
+		os.Stdout, _ = os.Open(os.DevNull)
+		defer func() { os.Stdout = oldStdout }()
+
+		// Set slog to discard output
+		slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	}
+
 	cfg := &config.Config{}
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}
