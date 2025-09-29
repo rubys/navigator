@@ -268,11 +268,14 @@ func TestHandleConfigReload(t *testing.T) {
 	var idleManager *idle.Manager
 
 	// Test failed reload with nonexistent config file
-	newAuth, success := handleConfigReload(cfg, "nonexistent-config.yml", appManager, processManager, currentAuth, idleManager)
+	newConfig, newAuth, success := handleConfigReload("nonexistent-config.yml", appManager, processManager, currentAuth, idleManager)
 
 	// Should fail because the config file doesn't exist
 	if success {
 		t.Error("Expected handleConfigReload to fail with nonexistent config file")
+	}
+	if newConfig != nil {
+		t.Error("Expected nil config when reload fails")
 	}
 	if newAuth != nil {
 		t.Error("Expected nil auth when reload fails")
@@ -313,11 +316,14 @@ logging:
 	var currentAuth *auth.BasicAuth
 
 	// Test successful reload with valid config file
-	newAuth, success := handleConfigReload(cfg, configFile, appManager, processManager, currentAuth, idleManager)
+	newConfig, newAuth, success := handleConfigReload(configFile, appManager, processManager, currentAuth, idleManager)
 
 	// Should succeed because the config file exists and is valid
 	if !success {
 		t.Error("Expected handleConfigReload to succeed with valid config file")
+	}
+	if newConfig == nil {
+		t.Error("Expected non-nil config when reload succeeds")
 	}
 
 	// newAuth should be nil because no authentication is configured
@@ -326,11 +332,11 @@ logging:
 	}
 
 	// Config should be updated
-	if cfg.Server.Listen != "3001" {
-		t.Errorf("Expected config to be updated with listen port 3001, got %s", cfg.Server.Listen)
+	if newConfig.Server.Listen != "3001" {
+		t.Errorf("Expected config to be updated with listen port 3001, got %s", newConfig.Server.Listen)
 	}
-	if cfg.Server.Hostname != "test-host" {
-		t.Errorf("Expected config to be updated with hostname 'test-host', got %s", cfg.Server.Hostname)
+	if newConfig.Server.Hostname != "test-host" {
+		t.Errorf("Expected config to be updated with hostname 'test-host', got %s", newConfig.Server.Hostname)
 	}
 }
 
@@ -495,16 +501,19 @@ logging:
 	var currentAuth *auth.BasicAuth
 
 	// Test reload with config containing multiple static directories
-	newAuth, success := handleConfigReload(cfg, configFile, appManager, processManager, currentAuth, idleManager)
+	newConfig, newAuth, success := handleConfigReload(configFile, appManager, processManager, currentAuth, idleManager)
 
 	// Should succeed
 	if !success {
 		t.Error("Expected handleConfigReload to succeed with valid config file")
 	}
+	if newConfig == nil {
+		t.Error("Expected non-nil config when reload succeeds")
+	}
 
 	// Verify static directories were updated (this was the bug)
-	if len(cfg.Static.Directories) != 3 {
-		t.Errorf("Expected 3 static directories after reload, got %d", len(cfg.Static.Directories))
+	if len(newConfig.Static.Directories) != 3 {
+		t.Errorf("Expected 3 static directories after reload, got %d", len(newConfig.Static.Directories))
 	}
 
 	// Verify specific directories are present
@@ -515,7 +524,7 @@ logging:
 	}
 
 	actualDirs := make(map[string]string)
-	for _, dir := range cfg.Static.Directories {
+	for _, dir := range newConfig.Static.Directories {
 		actualDirs[dir.Path] = dir.Dir
 	}
 
