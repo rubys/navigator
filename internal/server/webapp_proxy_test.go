@@ -151,9 +151,9 @@ func TestProxyRetryTimeout(t *testing.T) {
 		t.Errorf("Expected multiple retry attempts, got %d", finalAttempts)
 	}
 
-	// Should respect timeout (default is 3 seconds for proxy retry)
-	if elapsed > 5*time.Second {
-		t.Errorf("Retry took too long: %v (expected < 5s)", elapsed)
+	// Should respect timeout (default is 10 seconds for proxy retry)
+	if elapsed > 12*time.Second {
+		t.Errorf("Retry took too long: %v (expected < 12s)", elapsed)
 	}
 
 	// Should eventually give up with 502
