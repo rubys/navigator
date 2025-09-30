@@ -151,11 +151,24 @@ This document tracks the ongoing refactoring effort to improve code maintainabil
 - ✅ All tests passing (100+ tests)
 - ✅ No behavioral changes
 
+#### ✅ Initial Adoption Complete
+
+**Logging helpers adopted in**:
+- `internal/process/process_starter.go` (2 calls replaced)
+- `internal/process/webapp.go` (4 calls replaced)
+- **Result**: 5 multi-line slog calls → 5 single-line helper calls (-6 LOC)
+
+**Benefits observed**:
+- More concise and readable code
+- Consistent logging format across modules
+- Easier to maintain and update logging patterns
+- No behavioral changes, all tests passing
+
 #### 🔄 Pending Adoption
 
 **Next steps** (optional, based on need):
-1. Gradually adopt `internal/errors` constructors across codebase
-2. Gradually adopt `internal/logging` helpers to reduce verbosity
+1. Gradually adopt more `internal/logging` helpers (266 remaining sites)
+2. Gradually adopt `internal/errors` constructors (43 identified sites)
 3. Extract HTTP utilities (client IP, metadata extraction)
 4. Extract test utilities (temp directory helpers)
 5. Extract Fly.io context helpers
@@ -263,7 +276,14 @@ This document tracks the ongoing refactoring effort to improve code maintainabil
 
 ### September 30, 2025
 
-**Phase 2: Code Duplication Extraction** (Commit: TBD)
+**Phase 2: Logging Helpers Adoption** (Commit: TBD)
+- Adopted logging helpers in `process_starter.go` and `webapp.go`
+- Replaced 5 multi-line slog calls with single-line helper functions
+- Reduced code by 6 lines while improving consistency
+- Functions used: LogWebAppStart, LogWebAppReady, LogWebAppIdle, LogWebAppStop, LogCleanup, LogCleanupComplete
+- All tests passing, no behavioral changes
+
+**Phase 2: Code Duplication Extraction** (Commit: `420016c`)
 - Created `internal/errors/` package with domain-specific error constructors
 - Created `internal/logging/` package with structured logging helpers
 - Enhanced `internal/utils/time.go` with logging and context support

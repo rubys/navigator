@@ -30,13 +30,25 @@ Navigator is a Go-based web server for multi-tenant web applications. It provide
 
 ## Architecture
 
-### Single-File Implementation
+### Modular Package Structure
 
-The entire Navigator implementation is contained in `cmd/navigator/main.go`. This design provides:
-- **Simplicity**: No complex internal package structure
+Navigator is organized into focused internal packages for maintainability:
+- **internal/server/**: HTTP handling, routing, static files, proxying
+- **internal/process/**: Web app and managed process lifecycle
+- **internal/config/**: Configuration loading and validation
+- **internal/auth/**: Authentication (htpasswd)
+- **internal/proxy/**: Reverse proxy and Fly-Replay logic
+- **internal/idle/**: Fly.io machine idle management
+- **internal/errors/**: Domain-specific error constructors
+- **internal/logging/**: Structured logging helpers
+- **internal/utils/**: Common utilities (duration parsing, environment, etc.)
+
+**Design principles**:
+- **Focused modules**: Each package has a single, clear responsibility
 - **Easy deployment**: Single binary with minimal dependencies
 - **Clear dependencies**: Only essential external Go packages
-- **Maintainability**: All logic in one place for this focused use case
+- **Maintainability**: Well-organized code with good separation of concerns
+- **Testability**: Each module can be tested independently
 
 ### Key Components
 
@@ -513,19 +525,78 @@ Navigator aims to simplify deployment of multi-tenant web applications by provid
 - **SSL termination**: Optional HTTPS support for development
 - **Docker Hub releases**: Easy inclusion via COPY --from=rubys/navigator
 
+## Utility Packages
+
+Navigator provides reusable utility packages to reduce code duplication:
+
+### internal/errors/
+
+Domain-specific error constructors with proper error wrapping:
+```go
+import "github.com/rubys/navigator/internal/errors"
+
+// Use standardized error constructors
+return errors.ErrTenantNotFound(tenantName)
+return errors.ErrConfigLoad(path, err)
+return errors.ErrProxyConnection(target, err)
+```
+
+**Benefits**: Consistent error messages, proper error chaining with `%w`, better debugging context.
+
+### internal/logging/
+
+Structured logging helpers for common patterns:
+```go
+import "github.com/rubys/navigator/internal/logging"
+
+// Instead of multi-line slog calls
+logging.LogWebAppStart(tenant, port, runtime, server, args)
+logging.LogProcessExit(name, err)
+logging.LogConfigReload()
+```
+
+**Benefits**: Concise one-line calls, consistent structured logging format, easier maintenance.
+
+### internal/utils/
+
+Common utilities including enhanced duration parsing:
+```go
+import "github.com/rubys/navigator/internal/utils"
+
+// Duration parsing with automatic logging of errors
+timeout := utils.ParseDurationWithDefault(cfg.Timeout, 5*time.Minute)
+
+// Duration parsing with contextual logging
+delay := utils.ParseDurationWithContext(cfg.Delay, 0, map[string]interface{}{
+    "process": procName,
+})
+```
+
+**Benefits**: Eliminates duplicate duration parsing code, provides helpful error logging.
+
 ## Contributing Guidelines
 
-1. **Single file approach**: Keep all logic in `cmd/navigator/main.go`
-2. **Minimal dependencies**: Only add essential external packages
-3. **YAML configuration**: Create clear, maintainable YAML configuration examples
-4. **Testing**: Verify YAML configuration and all features work
-5. **Documentation**: Update README.md, CLAUDE.md, and Roadmap.md as needed
+1. **Modular design**: Place new functionality in appropriate internal packages
+2. **Use utility packages**: Adopt error constructors and logging helpers for consistency
+3. **Minimal dependencies**: Only add essential external packages
+4. **Testing**: Write tests for new functionality, ensure all tests pass
+5. **Documentation**: Update README.md, CLAUDE.md, REFACTORING.md, and docs/ as needed
 6. **Release process**: Use annotated tags for GitHub Actions releases
+
+## Refactoring Guidelines
+
+See `REFACTORING.md` for detailed refactoring status and guidelines. Key principles:
+
+1. **Safety first**: All tests must pass before and after refactoring
+2. **Incremental progress**: Small, focused refactorings with clear commits
+3. **Clear separation**: Each module has a single, well-defined responsibility
+4. **Maintainability**: Code should be easier to read, test, and modify
+5. **No behavioral changes**: Refactoring should not change functionality
 
 ## Important Notes
 
 - **YAML configuration**: YAML is the only supported configuration format
-- **Single file design**: All logic in one Go file for simplicity
+- **Modular architecture**: Well-organized internal packages for maintainability
 - **Process management**: Navigator handles both web apps and external processes
 - **Graceful shutdown**: All processes cleaned up properly on termination
 - **Configuration reload**: Update configuration without restart using SIGHUP

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/logging"
 )
 
 // ProcessStarter handles starting web application processes
@@ -56,13 +57,7 @@ func (ps *ProcessStarter) StartWebApp(app *WebApp, tenant *config.Tenant) error 
 
 	app.Process = cmd
 
-	slog.Info("Starting web app",
-		"tenant", tenantName,
-		"port", app.Port,
-		"runtime", runtime,
-		"server", server,
-		"args", args,
-		"dir", cmd.Dir)
+	logging.LogWebAppStart(tenantName, app.Port, runtime, server, args)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start web app: %w", err)
@@ -179,7 +174,7 @@ func (ps *ProcessStarter) waitForReady(app *WebApp, tenantName, runtime string) 
 			conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", app.Port), 100*time.Millisecond)
 			if err == nil {
 				conn.Close()
-				slog.Info("Web app is ready", "tenant", tenantName, "port", app.Port)
+				logging.LogWebAppReady(tenantName, app.Port)
 				return nil
 			}
 		}

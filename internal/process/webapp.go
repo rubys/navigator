@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/logging"
 	"github.com/rubys/navigator/internal/utils"
 )
 
@@ -149,9 +150,7 @@ func (m *AppManager) monitorAppIdleTimeout(tenantName string) {
 		}
 
 		if idleTime > m.idleTimeout {
-			slog.Info("Stopping idle web app",
-				"tenant", tenantName,
-				"idleTime", idleTime.Round(time.Second))
+			logging.LogWebAppIdle(tenantName, idleTime.Round(time.Second).String())
 
 			m.mutex.Lock()
 			delete(m.apps, tenantName)
@@ -231,14 +230,14 @@ func (m *AppManager) CleanupWithContext(ctx context.Context) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	slog.Info("Cleaning up all web applications")
+	logging.LogCleanup("web applications")
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 
 		for tenantName, app := range m.apps {
-			slog.Info("Stopping web app", "tenant", tenantName)
+			logging.LogWebAppStop(tenantName)
 
 			// Execute tenant stop hooks
 			if app.Tenant != nil {
@@ -270,7 +269,7 @@ func (m *AppManager) CleanupWithContext(ctx context.Context) {
 	// Wait for cleanup or context timeout
 	select {
 	case <-done:
-		slog.Info("All web applications stopped")
+		logging.LogCleanupComplete("web applications")
 	case <-ctx.Done():
 		slog.Warn("Context deadline exceeded during web app cleanup")
 	}
