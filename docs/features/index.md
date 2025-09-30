@@ -22,7 +22,7 @@ Navigator provides a comprehensive set of features designed specifically for Rai
 ### :file_folder: Static File Serving
 - **Direct filesystem serving** - Bypass Rails for static content
 - **Configurable caching** - Set cache headers for different content types
-- **Try files behavior** - nginx-style file resolution
+- **Try files behavior** - Flexible file resolution with fallbacks
 - **MIME type detection** - Automatic content type headers
 - **Performance optimization** - 10-40x faster than Rails serving
 
@@ -32,7 +32,7 @@ Navigator provides a comprehensive set of features designed specifically for Rai
 - **Multiple hash formats** - APR1, bcrypt, SHA support
 - **Pattern-based exclusions** - Flexible public path configuration
 - **Per-application auth** - Different authentication per app
-- **htpasswd compatibility** - Drop-in replacement for nginx auth
+- **htpasswd files** - Standard htpasswd format support
 
 [Learn more about Authentication](../configuration/authentication.md)
 
@@ -63,7 +63,7 @@ Navigator provides a comprehensive set of features designed specifically for Rai
 [Learn more about Machine Suspension](machine-suspend.md)
 
 ### :link: Try Files Behavior
-- **nginx compatibility** - Same behavior as nginx try_files
+- **Flexible resolution** - Try multiple file paths and extensions
 - **Multiple suffixes** - Try different file extensions
 - **Index file support** - Automatic index.html resolution
 - **Rails fallback** - Proxy to Rails when no file found
@@ -77,39 +77,6 @@ Navigator provides a comprehensive set of features designed specifically for Rai
 - **Performance metrics** - Response times and process information
 
 [Learn more about Logging](logging.md)
-
-## Feature Comparison
-
-### vs nginx + Passenger
-
-| Feature | Navigator | nginx + Passenger |
-|---------|-----------|------------------|
-| **Configuration** | Single YAML file | Multiple config files |
-| **Process management** | Built-in | Requires Passenger |
-| **Hot reload** | ✅ SIGHUP | ❌ Restart required |
-| **Multi-tenant** | ✅ Native support | ⚠️ Complex setup |
-| **Memory usage** | ~20MB base | ~100MB+ base |
-| **Setup complexity** | Simple | Complex |
-
-### vs Standalone Puma
-
-| Feature | Navigator | Standalone Puma |
-|---------|-----------|----------------|
-| **Static files** | ✅ Optimized serving | ❌ Rails overhead |
-| **Process pooling** | ✅ Multiple processes | ⚠️ Single process |
-| **Authentication** | ✅ Built-in | ❌ Application level |
-| **Load balancing** | ✅ Automatic | ❌ External required |
-| **Zero-downtime deploys** | ✅ Process rotation | ⚠️ Manual setup |
-
-### vs Docker + Kubernetes
-
-| Feature | Navigator | Docker + K8s |
-|---------|-----------|-------------|
-| **Resource usage** | ✅ Lightweight | ❌ Heavy overhead |
-| **Deployment complexity** | ✅ Single binary | ❌ Complex orchestration |
-| **Local development** | ✅ Same as production | ❌ Different environment |
-| **Scaling** | ⚠️ Single server | ✅ Multi-server |
-| **Service discovery** | ✅ Built-in routing | ✅ Native K8s |
 
 ## Performance Features
 

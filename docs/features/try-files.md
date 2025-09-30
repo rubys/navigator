@@ -1,6 +1,6 @@
 # Try Files Feature
 
-Navigator's try files feature allows serving static content directly from the filesystem with flexible file resolution, similar to nginx's `try_files` directive.
+Navigator's try files feature allows serving static content directly from the filesystem with flexible file resolution.
 
 ## How It Works
 
