@@ -1,43 +1,20 @@
 # Navigator
 
-A lightweight, fast Go-based web server for multi-tenant web applications with on-demand process management. Framework-independent with built-in support for Rails, Django, Node.js, and other frameworks.
+A lightweight web server for multi-tenant applications with on-demand process management. Deploy multiple customers or projects from a single configuration file.
 
 !!! success "Latest Release: v0.11.0"
-    **Major refactoring release** with modular architecture, enhanced test coverage (81.2%), and full cross-platform support (Linux, macOS, Windows).
+    Enhanced test coverage (81.2%) and full cross-platform support (Linux, macOS, Windows).
 
     [View Release Notes](https://github.com/rubys/navigator/releases/tag/v0.11.0)
 
-## What is Navigator?
+## What Can Navigator Do For You?
 
-Navigator is a modern alternative to nginx + Passenger, designed for multi-tenant web applications across different frameworks. It provides intelligent request routing, dynamic process management, and built-in support for modern deployment patterns like Fly.io, Azure Deployment Stamps, and container orchestration.
+**Serve multiple tenants** - Each customer gets their own database and isolated process
+**Save on hosting costs** - Automatic machine suspension when idle (Fly.io)
+**Simplify WebSocket deployments** - Built-in support for Rails Action Cable
+**Deploy globally** - Smart regional routing with automatic fallback
 
-<div class="grid cards" markdown>
-
--   :rocket: **Fast & Lightweight**
-
-    ---
-
-    Single binary with minimal dependencies. Lower memory footprint than nginx/Passenger.
-
--   :gear: **Process Management**
-
-    ---
-
-    Starts web apps on-demand, manages Redis/Sidekiq, automatic cleanup of stale processes. Framework-agnostic with configurable commands.
-
--   :shield: **Production Ready**
-
-    ---
-
-    Used in production serving 75+ dance studios across 8 countries.
-
--   :arrows_counterclockwise: **Hot Reload**
-
-    ---
-
-    Update configuration without restart using SIGHUP signal.
-
-</div>
+Trusted in production serving 75+ customers across 8 countries.
 
 ## Quick Start
 
@@ -89,127 +66,73 @@ applications:
       working_dir: /path/to/rails/app
 ```
 
-## Key Features
+## Common Use Cases
 
-### :zap: Intelligent Routing
-- URL rewriting with redirects and rewrites
-- Try-files behavior for static content
-- WebSocket and Action Cable support
-- Fly-Replay for regional routing
+**Multi-tenant SaaS** - Serve multiple customers with isolated databases
+[See configuration →](use-cases.md#use-case-1-multi-tenant-and-monorepos)
 
-### :lock: Authentication
-- Full htpasswd support (APR1, bcrypt, SHA)
-- Pattern-based exclusions for public paths
-- Per-path authentication realms
+**Cost optimization** - Auto-suspend idle machines on Fly.io
+[Learn more →](use-cases.md#use-case-2-machine-auto-suspend-flyio)
 
-### :file_folder: Static File Serving
-- Direct filesystem serving bypasses Rails
-- Configurable cache headers
-- Automatic MIME type detection
-- Try multiple file extensions
+**WebSocket support** - Standalone Action Cable with Rails 8
+[View example →](use-cases.md#use-case-3-websocket-support)
 
-### :cloud: Cloud Native
-- Fly.io machine auto-suspend
-- Multi-region deployment support
-- Health check endpoints
-- Graceful shutdown handling
+**Sticky sessions** - Route users to the same machine
+[Read guide →](use-cases.md#use-case-4-sticky-sessions)
 
-## Why Navigator?
+**Regional routing** - Deploy closer to your users
+[Explore Fly-Replay →](use-cases.md#use-case-5-dynamic-routing-with-fly-replay)
 
-### Compared to nginx + Passenger
-
-| Feature | Navigator | nginx + Passenger |
-|---------|-----------|------------------|
-| Configuration | Simple YAML | Complex nginx.conf |
-| Memory Usage | ~20MB base | ~100MB+ base |
-| Process Management | Built-in | Requires Passenger |
-| Hot Reload | ✅ Native | ❌ Restart required |
-| Multi-tenant | ✅ Native | ⚠️ Complex setup |
-
-### Perfect For
-
-- **Multi-tenant SaaS** - Each customer gets isolated database/instance
-- **Regional deployments** - Deploy closer to users with Fly.io
-- **Development environments** - Replace complex nginx setups
-- **Resource-constrained servers** - Lower memory footprint
-
-## Architecture
-
-Navigator v0.11.0+ uses a **modular package structure** for improved maintainability and testing:
-
-- **internal/server/** - HTTP handling, routing, static files, proxying
-- **internal/process/** - Web app and managed process lifecycle
-- **internal/config/** - Configuration loading and validation
-- **internal/auth/** - Authentication (htpasswd)
-- **internal/proxy/** - Reverse proxy and Fly-Replay logic
-- **internal/idle/** - Fly.io machine idle management
-- **internal/errors/** - Domain-specific error constructors
-- **internal/logging/** - Structured logging helpers
-- **internal/utils/** - Common utilities (duration parsing, environment)
-
-**Benefits of the refactored architecture**:
-
-- ✅ **81.2% test coverage** - Comprehensive testing of all components
-- ✅ **Cross-platform** - Native support for Linux, macOS, and Windows
-- ✅ **Maintainable** - Clear separation of concerns, focused modules
-- ✅ **Single binary** - Still deploys as one self-contained executable
-
-See [REFACTORING.md](https://github.com/rubys/navigator/blob/main/REFACTORING.md) for technical details.
-
-## Use Cases
-
-Navigator excels at solving specific architectural challenges:
-
-- **Multi-Tenant SaaS** - Isolated databases with template variables and process isolation
-- **Machine Auto-Suspend** - Fly.io cost optimization with lifecycle hooks
-- **WebSocket Applications** - Standalone Cable support with Rails 8 Solid Cable
-- **Sticky Sessions** - Cookie-based machine affinity for stateful connections
-- **Dynamic Routing** - Smart request routing with Fly-Replay and fallback
-- **Log Aggregation** - Built-in Vector integration for centralized logging
-
-[Explore Detailed Use Cases →](use-cases.md)
-
-### Real-World Deployments
-
-Navigator powers production applications including:
-
-- Dance studio management systems with 75+ tenants across 8 countries
-- Regional PDF generation services
-- Multi-database Rails applications
-- WebSocket-enabled real-time apps
-
-## Next Steps
+## Learn More
 
 <div class="grid cards" markdown>
 
--   :books: **[Getting Started](getting-started/index.md)**
+-   :books: **[Use Cases](use-cases.md)**
 
     ---
 
-    Install Navigator and deploy your first Rails app in 5 minutes
+    Real-world examples and configuration patterns
 
--   :wrench: **[Configuration Guide](configuration/index.md)**
+-   :building_construction: **[Architecture](architecture.md)**
 
     ---
 
-    Learn about YAML configuration options and best practices
+    Technical details and design decisions
+
+-   :mag: **[Features](features/index.md)**
+
+    ---
+
+    Complete feature documentation
+
+</div>
+
+## Get Started
+
+<div class="grid cards" markdown>
+
+-   :rocket: **[Getting Started](getting-started/index.md)**
+
+    ---
+
+    Install and deploy your first app in 5 minutes
 
 -   :bulb: **[Examples](examples/index.md)**
 
     ---
 
-    Copy-paste ready configurations for common scenarios
+    Copy-paste ready configurations
 
--   :question: **[Reference](reference/index.md)**
+-   :wrench: **[Configuration](configuration/index.md)**
 
     ---
 
-    Complete CLI options, environment variables, and signals
+    YAML configuration reference
+
+-   :question: **[CLI Reference](reference/index.md)**
+
+    ---
+
+    Command-line options and signals
 
 </div>
-
-## Community
-
-- [GitHub Issues](https://github.com/rubys/navigator/issues) - Report bugs or request features
-- [Discussions](https://github.com/rubys/navigator/discussions) - Ask questions and share experiences
-- [Releases](https://github.com/rubys/navigator/releases) - Download binaries and view changelog
