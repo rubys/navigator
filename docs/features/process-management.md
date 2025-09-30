@@ -28,6 +28,8 @@ graph TD
     G --> H[Return Response]
 ```
 
+**Steps:**
+
 1. **Request arrives** for a Rails application
 2. **Check if process exists** in the pool
 3. **If no process**: Start new Rails process
