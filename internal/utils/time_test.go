@@ -111,3 +111,57 @@ func TestMustParseDuration(t *testing.T) {
 		})
 	}
 }
+
+func TestParseDurationWithContext(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		def      time.Duration
+		context  map[string]interface{}
+		expected time.Duration
+	}{
+		{
+			name:  "Valid duration with context",
+			input: "2h",
+			def:   1 * time.Hour,
+			context: map[string]interface{}{
+				"process": "test-process",
+			},
+			expected: 2 * time.Hour,
+		},
+		{
+			name:  "Invalid duration with context",
+			input: "bad-duration",
+			def:   5 * time.Minute,
+			context: map[string]interface{}{
+				"process": "failing-process",
+				"field":   "timeout",
+			},
+			expected: 5 * time.Minute,
+		},
+		{
+			name:     "Empty context",
+			input:    "10m",
+			def:      1 * time.Minute,
+			context:  map[string]interface{}{},
+			expected: 10 * time.Minute,
+		},
+		{
+			name:     "Nil context",
+			input:    "15s",
+			def:      30 * time.Second,
+			context:  nil,
+			expected: 15 * time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ParseDurationWithContext(tt.input, tt.def, tt.context)
+			if result != tt.expected {
+				t.Errorf("ParseDurationWithContext(%q, %v, %v) = %v, want %v",
+					tt.input, tt.def, tt.context, result, tt.expected)
+			}
+		})
+	}
+}

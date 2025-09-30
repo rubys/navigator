@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"time"
 
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/utils"
 )
 
 // ExecuteHooks executes a list of hook commands with the given environment
@@ -19,19 +19,10 @@ func ExecuteHooks(hooks []config.HookConfig, env map[string]string, hookType str
 		}
 
 		// Parse timeout
-		var timeout time.Duration
-		if hook.Timeout != "" {
-			var err error
-			timeout, err = time.ParseDuration(hook.Timeout)
-			if err != nil {
-				slog.Warn("Invalid hook timeout, using no timeout",
-					"hookType", hookType,
-					"index", i,
-					"timeout", hook.Timeout,
-					"error", err)
-				timeout = 0
-			}
-		}
+		timeout := utils.ParseDurationWithContext(hook.Timeout, 0, map[string]interface{}{
+			"hookType": hookType,
+			"index":    i,
+		})
 
 		// Create command with or without timeout
 		var cmd *exec.Cmd

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/utils"
 )
 
 // WebApp represents a web application instance
@@ -42,14 +43,8 @@ type AppManager struct {
 
 // NewAppManager creates a new application manager
 func NewAppManager(cfg *config.Config) *AppManager {
-	idleTimeout := config.DefaultIdleTimeout
-
 	// Parse idle timeout from config
-	if cfg.Applications.Pools.Timeout != "" {
-		if duration, err := time.ParseDuration(cfg.Applications.Pools.Timeout); err == nil {
-			idleTimeout = duration
-		}
-	}
+	idleTimeout := utils.ParseDurationWithDefault(cfg.Applications.Pools.Timeout, config.DefaultIdleTimeout)
 
 	startPort := cfg.Applications.Pools.StartPort
 	if startPort == 0 {
@@ -212,13 +207,7 @@ func (m *AppManager) UpdateConfig(newConfig *config.Config) {
 	m.processStarter = NewProcessStarter(newConfig)
 
 	// Update idle timeout if changed
-	idleTimeout := config.DefaultIdleTimeout
-	if newConfig.Applications.Pools.Timeout != "" {
-		if duration, err := time.ParseDuration(newConfig.Applications.Pools.Timeout); err == nil {
-			idleTimeout = duration
-		}
-	}
-	m.idleTimeout = idleTimeout
+	m.idleTimeout = utils.ParseDurationWithDefault(newConfig.Applications.Pools.Timeout, config.DefaultIdleTimeout)
 
 	// Update port range if changed
 	startPort := newConfig.Applications.Pools.StartPort

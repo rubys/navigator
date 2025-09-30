@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/utils"
 )
 
 // ManagedProcess represents a managed external process
@@ -51,18 +52,9 @@ func (m *Manager) StartManagedProcesses() error {
 
 	for _, procConfig := range m.config.ManagedProcesses {
 		// Parse start delay
-		var startDelay time.Duration
-		if procConfig.StartDelay != "" {
-			var err error
-			startDelay, err = time.ParseDuration(procConfig.StartDelay)
-			if err != nil {
-				slog.Warn("Invalid start_delay format, using 0",
-					"process", procConfig.Name,
-					"delay", procConfig.StartDelay,
-					"error", err)
-				startDelay = 0
-			}
-		}
+		startDelay := utils.ParseDurationWithContext(procConfig.StartDelay, 0, map[string]interface{}{
+			"process": procConfig.Name,
+		})
 
 		process := &ManagedProcess{
 			Name:        procConfig.Name,
