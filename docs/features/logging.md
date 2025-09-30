@@ -590,8 +590,96 @@ Rails.logger.info({
 # Use appropriate log levels for security events
 ```
 
+## Log Aggregation with Vector
+
+Modern applications generate logs from multiple sources: web servers, background workers, databases, and the application itself. When running across multiple machines or regions, centralizing these logs becomes essential for debugging and monitoring.
+
+[Vector](https://vector.dev/) is a high-performance observability data pipeline that can collect, transform, and route logs to various destinations like Elasticsearch, S3, Datadog, or any other Vector-supported sink.
+
+### Built-in Vector Integration
+
+Navigator includes built-in Vector integration that provides:
+
+- **Automatic Process Management**: Starts and manages Vector as a high-priority process
+- **Unix Socket Streaming**: Efficient log transfer via Unix sockets without file I/O overhead
+- **Structured Logging**: JSON format support for rich metadata and easy parsing
+- **Source Identification**: Automatically tags logs with source (tenant, process name, stream)
+- **Graceful Degradation**: Continues operating if Vector is unavailable
+- **Multiple Destinations**: Route logs to files, Elasticsearch, S3, or any Vector-supported sink
+
+This integration eliminates the need for complex log collection setups and provides a unified logging pipeline for all Navigator-managed processes.
+
+### Configuration Example
+
+```yaml
+# Enable Vector integration in Navigator
+logging:
+  format: json  # Vector works best with JSON logs
+  vector:
+    enabled: true
+    socket: /tmp/navigator.sock
+    config: /etc/vector/vector.toml
+
+# Vector will be automatically managed as a high-priority process
+managed_processes:
+  - name: vector
+    command: vector
+    args: [--config, /etc/vector/vector.toml]
+    priority: high
+    auto_restart: true
+```
+
+### Vector Configuration
+
+```toml
+# /etc/vector/vector.toml
+[sources.navigator]
+type = "socket"
+mode = "unix"
+path = "/tmp/navigator.sock"
+max_length = 102400
+
+[transforms.parse_json]
+type = "remap"
+inputs = ["navigator"]
+source = '''
+  . = parse_json!(string!(.message))
+'''
+
+[sinks.elasticsearch]
+type = "elasticsearch"
+inputs = ["parse_json"]
+endpoint = "http://elasticsearch:9200"
+index = "navigator-logs-%Y.%m.%d"
+
+[sinks.file]
+type = "file"
+inputs = ["parse_json"]
+path = "/var/log/navigator/aggregated-%Y-%m-%d.log"
+encoding.codec = "json"
+```
+
+### Benefits
+
+- **Centralized logging**: All logs in one place across machines
+- **Real-time processing**: Transform and route logs as they arrive
+- **Multiple outputs**: Send to multiple destinations simultaneously
+- **Performance**: Unix socket streaming is faster than file-based collection
+- **Reliability**: Vector handles backpressure and retry logic
+
+### Example Workflow
+
+1. Navigator processes send logs to Unix socket
+2. Vector receives logs via socket source
+3. Vector transforms logs (parse JSON, add metadata, filter)
+4. Vector routes to multiple destinations (Elasticsearch, S3, files)
+5. Logs available for search, analysis, alerting
+
+See [navigator-with-vector.yml](https://github.com/rubys/navigator/blob/main/examples/navigator-with-vector.yml) and [vector.toml](https://github.com/rubys/navigator/blob/main/examples/vector.toml) for complete configuration examples.
+
 ## See Also
 
 - [Monitoring Setup](../deployment/monitoring.md)
 - [Production Deployment](../deployment/production.md)
 - [Configuration Reference](../configuration/yaml-reference.md)
+- [Use Cases: Log Aggregation](../use-cases.md#future-use-case-ideas)

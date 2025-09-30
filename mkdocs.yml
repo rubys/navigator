@@ -68,6 +68,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Architecture: architecture.md
+  - Use Cases: use-cases.md
   - Getting Started:
     - getting-started/index.md
     - Installation: getting-started/installation.md
@@ -98,6 +99,7 @@ nav:
     - Process Management: features/process-management.md
     - Try Files: features/try-files.md
     - Fly-Replay: features/fly-replay.md
+    - Sticky Sessions: features/sticky-sessions.md
     - Hot Reload: features/hot-reload.md
     - Machine Suspend: features/machine-suspend.md
     - WebSocket Support: features/websocket-support.md

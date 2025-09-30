@@ -156,11 +156,24 @@ Navigator v0.11.0+ uses a **modular package structure** for improved maintainabi
 
 See [REFACTORING.md](https://github.com/rubys/navigator/blob/main/REFACTORING.md) for technical details.
 
-## Real-World Use Cases
+## Use Cases
+
+Navigator excels at solving specific architectural challenges:
+
+- **Multi-Tenant SaaS** - Isolated databases with template variables and process isolation
+- **Machine Auto-Suspend** - Fly.io cost optimization with lifecycle hooks
+- **WebSocket Applications** - Standalone Cable support with Rails 8 Solid Cable
+- **Sticky Sessions** - Cookie-based machine affinity for stateful connections
+- **Dynamic Routing** - Smart request routing with Fly-Replay and fallback
+- **Log Aggregation** - Built-in Vector integration for centralized logging
+
+[Explore Detailed Use Cases →](use-cases.md)
+
+### Real-World Deployments
 
 Navigator powers production applications including:
 
-- Dance studio management systems with 75+ tenants
+- Dance studio management systems with 75+ tenants across 8 countries
 - Regional PDF generation services
 - Multi-database Rails applications
 - WebSocket-enabled real-time apps
