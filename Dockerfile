@@ -3,7 +3,7 @@ FROM golang:1.24-alpine AS builder
 WORKDIR /build
 COPY . .
 RUN go mod download && \
-    GOOS=linux GOARCH=amd64 go build -mod=readonly -o navigator cmd/navigator/main.go
+    GOOS=linux GOARCH=amd64 go build -mod=readonly -o navigator cmd/navigator-refactored/main.go
 
 # Final stage - minimal image with just the binary
 FROM scratch
