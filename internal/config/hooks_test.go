@@ -1,8 +1,8 @@
 package config_test
 
 import (
-	"testing"
 	"github.com/rubys/navigator/internal/config"
+	"testing"
 )
 
 func TestHooksConfigParsing(t *testing.T) {
