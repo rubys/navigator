@@ -9,10 +9,10 @@ A lightweight web server for multi-tenant applications with on-demand process ma
 
 ## What Can Navigator Do For You?
 
-**Serve multiple tenants** - Each customer gets their own database and isolated process
-**Save on hosting costs** - Automatic machine suspension when idle (Fly.io)
-**Simplify WebSocket deployments** - Built-in support for Rails Action Cable
-**Deploy globally** - Smart regional routing with automatic fallback
+- **Serve multiple tenants** - Each customer gets their own database and isolated process
+- **Save on hosting costs** - Automatic machine suspension when idle (Fly.io)
+- **Simplify WebSocket deployments** - Built-in support for Rails Action Cable
+- **Deploy globally** - Smart regional routing with automatic fallback
 
 Trusted in production serving 75+ customers across 8 countries.
 
@@ -68,20 +68,20 @@ applications:
 
 ## Common Use Cases
 
-**Multi-tenant SaaS** - Serve multiple customers with isolated databases
-[See configuration →](use-cases.md#use-case-1-multi-tenant-and-monorepos)
+- **Multi-tenant SaaS** - Serve multiple customers with isolated databases
+  [See configuration →](use-cases.md#use-case-1-multi-tenant-and-monorepos)
 
-**Cost optimization** - Auto-suspend idle machines on Fly.io
-[Learn more →](use-cases.md#use-case-2-machine-auto-suspend-flyio)
+- **Cost optimization** - Auto-suspend idle machines on Fly.io
+  [Learn more →](use-cases.md#use-case-2-machine-auto-suspend-flyio)
 
-**WebSocket support** - Standalone Action Cable with Rails 8
-[View example →](use-cases.md#use-case-3-websocket-support)
+- **WebSocket support** - Standalone Action Cable with Rails 8
+  [View example →](use-cases.md#use-case-3-websocket-support)
 
-**Sticky sessions** - Route users to the same machine
-[Read guide →](use-cases.md#use-case-4-sticky-sessions)
+- **Sticky sessions** - Route users to the same machine
+  [Read guide →](use-cases.md#use-case-4-sticky-sessions)
 
-**Regional routing** - Deploy closer to your users
-[Explore Fly-Replay →](use-cases.md#use-case-5-dynamic-routing-with-fly-replay)
+- **Regional routing** - Deploy closer to your users
+  [Explore Fly-Replay →](use-cases.md#use-case-5-dynamic-routing-with-fly-replay)
 
 ## Learn More
 
