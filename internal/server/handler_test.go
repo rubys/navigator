@@ -525,7 +525,7 @@ func BenchmarkResponseRecorder(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		respRecorder := NewResponseRecorder(recorder, nil)
 		respRecorder.WriteHeader(http.StatusOK)
-		respRecorder.Write(testData)
+		_, _ = respRecorder.Write(testData)
 		respRecorder.SetMetadata("test", "value")
 	}
 }

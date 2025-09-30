@@ -18,14 +18,14 @@ func TestReverseProxyYAMLConfigIntegration(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"service":"api","path":"` + r.URL.Path + `","headers":` + fmt.Sprintf("%q", r.Header) + `}`))
+		_, _ = w.Write([]byte(`{"service":"api","path":"` + r.URL.Path + `","headers":` + fmt.Sprintf("%q", r.Header) + `}`))
 	}))
 	defer apiServer.Close()
 
 	webServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<html><body><h1>Web Service</h1><p>Path: ` + r.URL.Path + `</p></body></html>`))
+		_, _ = w.Write([]byte(`<html><body><h1>Web Service</h1><p>Path: ` + r.URL.Path + `</p></body></html>`))
 	}))
 	defer webServer.Close()
 
@@ -164,7 +164,7 @@ func TestReverseProxyCustomHeaders(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedHeaders = r.Header.Clone()
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 	defer testServer.Close()
 
@@ -255,17 +255,17 @@ func TestReverseProxyCustomHeaders(t *testing.T) {
 func TestReverseProxyMultipleConfigs(t *testing.T) {
 	// Create different backend servers
 	server1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("server1"))
+		_, _ = w.Write([]byte("server1"))
 	}))
 	defer server1.Close()
 
 	server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("server2"))
+		_, _ = w.Write([]byte("server2"))
 	}))
 	defer server2.Close()
 
 	server3 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("server3"))
+		_, _ = w.Write([]byte("server3"))
 	}))
 	defer server3.Close()
 
@@ -355,7 +355,7 @@ func TestReverseProxyPathStripping(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedPath = r.URL.Path
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("path:" + r.URL.Path))
+		_, _ = w.Write([]byte("path:" + r.URL.Path))
 	}))
 	defer testServer.Close()
 
@@ -510,14 +510,14 @@ func TestWebSocketProxyConfiguration(t *testing.T) {
 			if r.Header.Get("Upgrade") == "websocket" {
 				// Simulate successful routing to WebSocket server
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("WebSocket route matched"))
+				_, _ = w.Write([]byte("WebSocket route matched"))
 			} else {
 				// Non-WebSocket request to WebSocket path
 				w.WriteHeader(http.StatusBadRequest)
 			}
 		} else {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("HTTP response"))
+			_, _ = w.Write([]byte("HTTP response"))
 		}
 	}))
 	defer testServer.Close()
@@ -625,7 +625,7 @@ func TestWebSocketProxyHeaders(t *testing.T) {
 
 		// Return success for both WebSocket and HTTP requests
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Headers received"))
+		_, _ = w.Write([]byte("Headers received"))
 	}))
 	defer testServer.Close()
 
@@ -688,11 +688,11 @@ func TestWebSocketProxyFallback(t *testing.T) {
 		if r.Header.Get("Upgrade") == "websocket" {
 			// For WebSocket requests, return success to show routing worked
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("WebSocket route handled"))
+			_, _ = w.Write([]byte("WebSocket route handled"))
 		} else {
 			// Regular HTTP
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("HTTP fallback response"))
+			_, _ = w.Write([]byte("HTTP fallback response"))
 		}
 	}))
 	defer testServer.Close()

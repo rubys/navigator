@@ -24,7 +24,7 @@ func TestSecurityHeaders(t *testing.T) {
 			}
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Backend response"))
+		_, _ = w.Write([]byte("Backend response"))
 	}))
 	defer backend.Close()
 
@@ -179,7 +179,7 @@ func TestPathTraversalPrevention(t *testing.T) {
 		// Echo the received path for analysis
 		w.Header().Set("Received-Path", r.URL.Path)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprintf("Path: %s", r.URL.Path)))
+		_, _ = w.Write([]byte(fmt.Sprintf("Path: %s", r.URL.Path)))
 	}))
 	defer backend.Close()
 
@@ -328,7 +328,7 @@ func TestRegexInjectionPrevention(t *testing.T) {
 func TestInputSanitization(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 	defer backend.Close()
 
@@ -430,7 +430,7 @@ func TestDenialOfServicePrevention(t *testing.T) {
 
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 	defer backend.Close()
 
@@ -557,13 +557,13 @@ func TestInformationDisclosure(t *testing.T) {
 		switch r.URL.Path {
 		case "/error":
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Internal server error with sensitive info: database connection failed"))
+			_, _ = w.Write([]byte("Internal server error with sensitive info: database connection failed"))
 		case "/debug":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("Debug: server version 1.2.3, built on 2024-01-01"))
+			_, _ = w.Write([]byte("Debug: server version 1.2.3, built on 2024-01-01"))
 		default:
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("OK"))
+			_, _ = w.Write([]byte("OK"))
 		}
 	}))
 	defer backend.Close()

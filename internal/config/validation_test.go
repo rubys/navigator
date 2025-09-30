@@ -567,7 +567,7 @@ applications:
 	}
 
 	// Restore permissions for cleanup
-	os.Chmod(unreadableFile, 0644)
+	_ = os.Chmod(unreadableFile, 0644)
 }
 
 // TestVariableSubstitutionEdgeCases tests edge cases in variable substitution

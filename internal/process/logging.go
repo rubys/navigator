@@ -33,9 +33,9 @@ func (w *LogWriter) Write(p []byte) (n int, err error) {
 		}
 		// Write prefixed line
 		prefix := fmt.Sprintf("[%s.%s] ", w.source, w.stream)
-		w.output.Write([]byte(prefix))
-		w.output.Write(line)
-		w.output.Write([]byte("\n"))
+		_, _ = w.output.Write([]byte(prefix))
+		_, _ = w.output.Write(line)
+		_, _ = w.output.Write([]byte("\n"))
 	}
 	return len(p), nil
 }
@@ -70,8 +70,8 @@ func (w *JSONLogWriter) Write(p []byte) (n int, err error) {
 			// Check if it contains Rails JSON log markers
 			if bytes.Contains(line, []byte(`"@timestamp"`)) && bytes.Contains(line, []byte(`"severity"`)) {
 				// This looks like Rails JSON output - pass it through directly
-				w.output.Write(line)
-				w.output.Write([]byte("\n"))
+				_, _ = w.output.Write(line)
+				_, _ = w.output.Write([]byte("\n"))
 				continue
 			}
 		}
@@ -85,8 +85,8 @@ func (w *JSONLogWriter) Write(p []byte) (n int, err error) {
 			Tenant:    w.tenant,
 		}
 		data, _ := json.Marshal(entry)
-		w.output.Write(data)
-		w.output.Write([]byte("\n"))
+		_, _ = w.output.Write(data)
+		_, _ = w.output.Write([]byte("\n"))
 	}
 	return len(p), nil
 }
@@ -99,7 +99,7 @@ type MultiLogWriter struct {
 // Write implements io.Writer interface, writing to all configured outputs
 func (m *MultiLogWriter) Write(p []byte) (n int, err error) {
 	for _, output := range m.outputs {
-		output.Write(p)
+		_, _ = output.Write(p)
 	}
 	return len(p), nil
 }

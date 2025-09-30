@@ -359,7 +359,7 @@ func (w *RetryResponseWriter) Commit() {
 
 	// Write body
 	if w.body.Len() > 0 {
-		w.ResponseWriter.Write(w.body.Bytes())
+		_, _ = w.ResponseWriter.Write(w.body.Bytes())
 	}
 }
 

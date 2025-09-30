@@ -39,7 +39,7 @@ func TestRetryLogicFast(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Success"))
+		_, _ = w.Write([]byte("Success"))
 	}))
 	defer testServer.Close()
 
@@ -161,7 +161,7 @@ func TestBasicProxyFunctionality(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Backend", "test")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Backend response"))
+		_, _ = w.Write([]byte("Backend response"))
 	}))
 	defer backend.Close()
 
@@ -261,7 +261,7 @@ func TestRetryBufferLimits(t *testing.T) {
 
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(largeResponse))
+		_, _ = w.Write([]byte(largeResponse))
 	}))
 	defer backend.Close()
 

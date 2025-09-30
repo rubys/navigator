@@ -43,6 +43,11 @@ jobs:
           exit 1
         fi
 
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: latest
+
   # Fast tests for quick feedback
   fast-tests:
     runs-on: ubuntu-latest

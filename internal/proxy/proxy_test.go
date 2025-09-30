@@ -127,7 +127,7 @@ func TestRetryResponseWriterReset(t *testing.T) {
 	// Write some data
 	retryWriter.Header().Set("Content-Type", "text/plain")
 	retryWriter.WriteHeader(http.StatusBadRequest)
-	retryWriter.Write([]byte("first attempt"))
+	_, _ = retryWriter.Write([]byte("first attempt"))
 
 	// Reset for retry
 	retryWriter.Reset()
@@ -135,7 +135,7 @@ func TestRetryResponseWriterReset(t *testing.T) {
 	// Write different data
 	retryWriter.Header().Set("Content-Type", "application/json")
 	retryWriter.WriteHeader(http.StatusOK)
-	retryWriter.Write([]byte(`{"status": "success"}`))
+	_, _ = retryWriter.Write([]byte(`{"status": "success"}`))
 
 	// Commit
 	retryWriter.Commit()
@@ -301,7 +301,7 @@ func BenchmarkRetryResponseWriter(b *testing.B) {
 
 		retryWriter.Header().Set("Content-Type", "text/plain")
 		retryWriter.WriteHeader(http.StatusOK)
-		retryWriter.Write(testBody)
+		_, _ = retryWriter.Write(testBody)
 		retryWriter.Commit()
 	}
 }
@@ -321,7 +321,7 @@ func TestHandleProxy(t *testing.T) {
 
 		response := fmt.Sprintf(`{"path":"%s","method":"%s","forwarded_for":"%s","forwarded_host":"%s","forwarded_proto":"%s"}`,
 			r.URL.Path, r.Method, forwardedFor, forwardedHost, forwardedProto)
-		w.Write([]byte(response))
+		_, _ = w.Write([]byte(response))
 	}))
 	defer backend.Close()
 
@@ -408,7 +408,7 @@ func TestHandleProxyWithRetry(t *testing.T) {
 	// Test 1: Successful backend
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	}))
 	defer backend.Close()
 
@@ -473,7 +473,7 @@ func TestProxyWithWebSocketSupport(t *testing.T) {
 			w.WriteHeader(http.StatusSwitchingProtocols)
 		} else {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("HTTP response"))
+			_, _ = w.Write([]byte("HTTP response"))
 		}
 	}))
 	defer wsBackend.Close()
@@ -567,7 +567,7 @@ func TestProxyWithWebSocketSupport(t *testing.T) {
 func BenchmarkHandleProxy(b *testing.B) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 	defer backend.Close()
 
@@ -583,7 +583,7 @@ func BenchmarkHandleProxy(b *testing.B) {
 func BenchmarkProxyWithWebSocketSupport(b *testing.B) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 	defer backend.Close()
 

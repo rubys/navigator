@@ -19,7 +19,7 @@ func TestHTTPProxy_Success(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Backend", "test")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("backend response"))
+		_, _ = w.Write([]byte("backend response"))
 	}))
 	defer backend.Close()
 
@@ -282,7 +282,7 @@ func TestWebSocketProxy_SuccessfulUpgrade(t *testing.T) {
 			if err != nil {
 				break
 			}
-			conn.WriteMessage(messageType, message)
+			_ = conn.WriteMessage(messageType, message)
 		}
 	}))
 	defer backend.Close()
@@ -584,7 +584,7 @@ func TestGetScheme(t *testing.T) {
 func BenchmarkHTTPProxy(b *testing.B) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 	defer backend.Close()
 

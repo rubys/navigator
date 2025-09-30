@@ -35,7 +35,7 @@ func TestProxyRetryIntegration(t *testing.T) {
 
 		// Succeed on 3rd attempt
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Success after retries"))
+		_, _ = w.Write([]byte("Success after retries"))
 	}))
 	defer backend.Close()
 

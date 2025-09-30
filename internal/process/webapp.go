@@ -175,7 +175,7 @@ func (m *AppManager) monitorAppIdleTimeout(tenantName string) {
 
 			// Execute tenant stop hooks
 			if app.Tenant != nil {
-				ExecuteTenantHooks(m.config.Applications.Hooks.Stop, app.Tenant.Hooks.Stop,
+				_ = ExecuteTenantHooks(m.config.Applications.Hooks.Stop, app.Tenant.Hooks.Stop,
 					app.Tenant.Env, tenantName, "stop")
 			}
 
@@ -258,7 +258,7 @@ func (m *AppManager) CleanupWithContext(ctx context.Context) {
 
 			// Execute tenant stop hooks
 			if app.Tenant != nil {
-				ExecuteTenantHooks(m.config.Applications.Hooks.Stop, app.Tenant.Hooks.Stop,
+				_ = ExecuteTenantHooks(m.config.Applications.Hooks.Stop, app.Tenant.Hooks.Stop,
 					app.Tenant.Env, tenantName, "stop")
 			}
 

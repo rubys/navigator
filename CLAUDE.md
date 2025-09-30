@@ -361,20 +361,6 @@ Navigator includes robust proxy error handling:
 
 **CRITICAL IMPORTANCE**: Comprehensive test coverage is essential for maintaining Navigator's reliability in production.
 
-### Test-Driven Development Principles
-
-**Every bug is a missing test.** When fixing bugs:
-1. **Reproduce the bug** - Write a test that fails due to the bug
-2. **Fix the bug** - Implement the minimal fix to make the test pass
-3. **Verify coverage** - Ensure the test covers edge cases and variations
-4. **Document the test** - Explain what scenario the test prevents
-
-**Every feature requires tests.** When adding features:
-1. **Plan tests first** - Identify what needs testing before implementation
-2. **Write comprehensive tests** - Cover success cases, failure cases, and edge cases
-3. **Test integration** - Verify the feature works with existing components
-4. **Maintain coverage** - Run `go test -cover ./...` to ensure high coverage
-
 ### Test Organization
 
 Navigator's test suite is organized by package:
@@ -464,39 +450,24 @@ The workflow creates binaries for:
 
 All binaries include version information and build metadata.
 
-## Code Quality and Pre-Commit Checks
+## Code Quality and CI Requirements
 
-**CRITICAL**: All code must pass quality checks before committing and pushing.
+**CRITICAL**: All code must pass CI checks. GitHub Actions will reject pushes that fail.
 
-### Required Checks Before Every Commit
+### CI Checks (Required)
 
-```bash
-# 1. Format code
-go fmt ./...
-
-# 2. Vet code for issues
-go vet ./...
-
-# 3. Run all tests
-go test ./... -short
-```
-
-### Pre-Push Checklist (CI Requirements)
-
-Before pushing to the repository, ensure these checks pass (CI will verify):
-
-1. ✓ **Code is formatted** - `gofmt -s -l .` returns no files
-2. ✓ **No vet warnings** - `go vet ./...` passes
-3. ✓ **All tests pass** - `go test -race -cover ./...` passes
-4. ✓ **Build succeeds** - Both legacy and refactored navigators build
-
-**GitHub Actions will reject pushes that fail these checks.** Running them locally saves time and prevents CI failures.
+1. ✓ **Formatting** - `gofmt -s -l .` returns no files
+2. ✓ **Linting** - `golangci-lint run` passes (0 errors)
+3. ✓ **Vet** - `go vet ./...` passes
+4. ✓ **Tests** - `go test -race -cover ./...` passes
+5. ✓ **Build** - Both navigators build successfully
 
 ### Quick Pre-Push Validation
 
 ```bash
-# Run all CI checks locally
+# Run all checks locally before pushing
 gofmt -s -l . && \
+golangci-lint run && \
 go vet ./... && \
 go test -race -cover -timeout=3m ./... && \
 go build ./cmd/navigator-legacy && \
@@ -504,19 +475,17 @@ go build ./cmd/navigator-refactored && \
 echo "✓ All CI checks passed!"
 ```
 
-### Optional: golangci-lint (Not Required for CI)
+### Test-Driven Development
 
-While not enforced by CI, golangci-lint provides additional code quality checks:
+**Every bug is a missing test.**
+1. Write a failing test that reproduces the bug
+2. Fix the bug with minimal changes
+3. Verify the test passes and covers edge cases
 
-```bash
-# Install
-brew install golangci-lint  # macOS
-# or
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-# Run
-golangci-lint run
-```
+**Every feature requires tests.**
+1. Write tests before implementing the feature
+2. Cover success, failure, and edge cases
+3. Verify integration with existing components
 
 ## Dependencies
 

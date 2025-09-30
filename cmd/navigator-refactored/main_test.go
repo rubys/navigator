@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"io/ioutil"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -231,7 +230,7 @@ func TestPrintHelp(t *testing.T) {
 
 	// Read captured output
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	// Verify help text contains expected content
@@ -303,7 +302,7 @@ logging:
   format: "text"
 `
 
-	err := ioutil.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
@@ -368,7 +367,7 @@ logging:
   format: "text"
 `
 
-	err := ioutil.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
@@ -483,7 +482,7 @@ logging:
   format: "text"
 `
 
-	err := ioutil.WriteFile(configFile, []byte(configContent), 0644)
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test config file: %v", err)
 	}

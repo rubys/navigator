@@ -134,7 +134,7 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 			return true
 		}
 		slog.Debug("Fly replay response body", "body", string(responseBodyBytes))
-		w.Write(responseBodyBytes)
+		_, _ = w.Write(responseBodyBytes)
 
 		// Set metadata for fly-replay response
 		if recorder, ok := w.(*ResponseRecorder); ok {
@@ -291,6 +291,6 @@ func ServeMaintenancePage(w http.ResponseWriter, r *http.Request, config *config
 </body>
 </html>`
 
-	w.Write([]byte(fallbackHTML))
+	_, _ = w.Write([]byte(fallbackHTML))
 	slog.Debug("Served fallback maintenance page")
 }

@@ -15,7 +15,10 @@ import (
 // GenerateRequestID generates a random request ID similar to nginx $request_id
 func GenerateRequestID() string {
 	bytes := make([]byte, 16)
-	rand.Read(bytes)
+	if _, err := rand.Read(bytes); err != nil {
+		// rand.Read from crypto/rand should never fail, but handle it defensively
+		panic("failed to generate random bytes: " + err.Error())
+	}
 	return hex.EncodeToString(bytes)
 }
 

@@ -290,7 +290,7 @@ func BenchmarkExecuteHooks(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ExecuteHooks(hooks, env, "benchmark")
+		_ = ExecuteHooks(hooks, env, "benchmark")
 	}
 }
 
@@ -474,7 +474,7 @@ func TestUpdateManagedProcessesIntegration(t *testing.T) {
 	}
 
 	manager := NewManager(cfg)
-	manager.StartManagedProcesses()
+	_ = manager.StartManagedProcesses()
 	time.Sleep(100 * time.Millisecond)
 
 	if len(manager.processes) != 1 {
@@ -529,7 +529,7 @@ func TestProcessManagerConcurrency(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			manager.StartManagedProcesses()
+			_ = manager.StartManagedProcesses()
 		}()
 	}
 
@@ -822,7 +822,7 @@ func TestCleanupPidFile(t *testing.T) {
 	}
 
 	// Test cleanup
-	cleanupPidFile(pidFile)
+	_ = cleanupPidFile(pidFile)
 
 	// Verify file was removed
 	if _, err := os.Stat(pidFile); !os.IsNotExist(err) {
@@ -832,7 +832,7 @@ func TestCleanupPidFile(t *testing.T) {
 	}
 
 	// Test cleanup of non-existent file (should not error)
-	cleanupPidFile("/tmp/non-existent-pid.pid")
+	_ = cleanupPidFile("/tmp/non-existent-pid.pid")
 }
 
 func TestStartWebAppDefaultValues(t *testing.T) {

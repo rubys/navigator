@@ -31,7 +31,7 @@ func NewProcessStarter(cfg *config.Config) *ProcessStarter {
 func (ps *ProcessStarter) StartWebApp(app *WebApp, tenant *config.Tenant) error {
 	// Clean up any existing PID file first
 	if pidfile, ok := tenant.Env["PIDFILE"]; ok {
-		cleanupPidFile(pidfile)
+		_ = cleanupPidFile(pidfile)
 	}
 
 	// Determine runtime, server, and args

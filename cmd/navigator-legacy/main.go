@@ -391,9 +391,9 @@ func (w *LogWriter) Write(p []byte) (n int, err error) {
 		}
 		// Write prefixed line
 		prefix := fmt.Sprintf("[%s.%s] ", w.source, w.stream)
-		w.output.Write([]byte(prefix))
-		w.output.Write(line)
-		w.output.Write([]byte("\n"))
+		_, _ = w.output.Write([]byte(prefix))
+		_, _ = w.output.Write(line)
+		_, _ = w.output.Write([]byte("\n"))
 	}
 	return len(p), nil
 }
@@ -430,8 +430,8 @@ func (w *JSONLogWriter) Write(p []byte) (n int, err error) {
 			// Check if it contains Rails JSON log markers
 			if bytes.Contains(line, []byte(`"@timestamp"`)) && bytes.Contains(line, []byte(`"severity"`)) {
 				// This looks like Rails JSON output - pass it through directly
-				w.output.Write(line)
-				w.output.Write([]byte("\n"))
+				_, _ = w.output.Write(line)
+				_, _ = w.output.Write([]byte("\n"))
 				continue
 			}
 		}
@@ -445,8 +445,8 @@ func (w *JSONLogWriter) Write(p []byte) (n int, err error) {
 			Tenant:    w.tenant,
 		}
 		data, _ := json.Marshal(entry)
-		w.output.Write(data)
-		w.output.Write([]byte("\n"))
+		_, _ = w.output.Write(data)
+		_, _ = w.output.Write([]byte("\n"))
 	}
 	return len(p), nil
 }
@@ -459,7 +459,7 @@ type MultiLogWriter struct {
 // Write implements io.Writer interface, writing to all configured outputs
 func (m *MultiLogWriter) Write(p []byte) (n int, err error) {
 	for _, output := range m.outputs {
-		output.Write(p)
+		_, _ = output.Write(p)
 	}
 	return len(p), nil
 }
@@ -695,7 +695,10 @@ func extractTenantName(path string) string {
 // generateRequestID generates a random request ID similar to nginx $request_id
 func generateRequestID() string {
 	bytes := make([]byte, 16)
-	rand.Read(bytes)
+	if _, err := rand.Read(bytes); err != nil {
+		// rand.Read from crypto/rand should never fail, but handle it defensively
+		panic("failed to generate random bytes: " + err.Error())
+	}
 	return hex.EncodeToString(bytes)
 }
 
@@ -1050,7 +1053,7 @@ func (pm *ProcessManager) StopAll() {
 		slog.Warn("Timeout waiting for processes to stop, forcing shutdown")
 		for _, mp := range pm.processes {
 			if mp.Process != nil && mp.Process.Process != nil {
-				mp.Process.Process.Kill()
+				_ = mp.Process.Process.Kill()
 			}
 		}
 	}
@@ -2319,7 +2322,7 @@ func (m *AppManager) startApp(app *WebApp) {
 
 	// Wait for process to exit in background
 	go func() {
-		cmd.Wait()
+		_ = cmd.Wait()
 		slog.Info("Web app exited", "path", app.Location.Path, "port", app.Port)
 
 		// Clean up PID file when app exits
@@ -2475,7 +2478,7 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	// Main handler
@@ -2841,7 +2844,7 @@ func handleRewrites(w http.ResponseWriter, r *http.Request, config *Config) bool
 								return true
 							}
 							slog.Debug("Fly replay response body", "body", string(responseBodyBytes))
-							w.Write(responseBodyBytes)
+							_, _ = w.Write(responseBodyBytes)
 
 							// Set metadata for fly-replay response
 							if recorder, ok := w.(*responseRecorder); ok {
@@ -2971,7 +2974,7 @@ func handleStickySession(w http.ResponseWriter, r *http.Request, config *Config)
 			}
 
 			responseBytes, _ := json.Marshal(response)
-			w.Write(responseBytes)
+			_, _ = w.Write(responseBytes)
 
 			// Set metadata for sticky session fly-replay
 			if recorder, ok := w.(*responseRecorder); ok {
@@ -3071,7 +3074,7 @@ func serveMaintenancePage(w http.ResponseWriter, r *http.Request, config *Config
 			w.Header().Set("Pragma", "no-cache")
 			w.Header().Set("Expires", "0")
 
-			w.Write(content)
+			_, _ = w.Write(content)
 			slog.Debug("Served maintenance page from file", "path", fullPath)
 			return
 		} else {
@@ -3107,7 +3110,7 @@ func serveMaintenancePage(w http.ResponseWriter, r *http.Request, config *Config
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Expires", "0")
 
-	w.Write([]byte(fallbackHTML))
+	_, _ = w.Write([]byte(fallbackHTML))
 	slog.Debug("Served fallback maintenance page")
 }
 
@@ -3497,7 +3500,7 @@ func (w *retryResponseWriter) WriteResponse() {
 		}
 		// Write buffered body
 		if w.buffer.Len() > 0 {
-			w.ResponseWriter.Write(w.buffer.Bytes())
+			_, _ = w.ResponseWriter.Write(w.buffer.Bytes())
 		}
 	}
 }
