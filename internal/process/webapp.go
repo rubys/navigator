@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -30,6 +31,18 @@ type WebApp struct {
 	cancel           context.CancelFunc
 	wsConnections    map[string]interface{}
 	wsConnectionsMux sync.RWMutex
+	activeWebSockets int32 // Atomic counter for active WebSocket connections
+}
+
+// GetActiveWebSocketsPtr returns a pointer to the atomic WebSocket counter
+// This allows external packages to track WebSocket connections using atomic operations
+func (w *WebApp) GetActiveWebSocketsPtr() *int32 {
+	return &w.activeWebSockets
+}
+
+// GetActiveWebSocketCount returns the current number of active WebSocket connections
+func (w *WebApp) GetActiveWebSocketCount() int32 {
+	return atomic.LoadInt32(&w.activeWebSockets)
 }
 
 // AppManager manages web application processes
@@ -141,11 +154,15 @@ func (m *AppManager) monitorAppIdleTimeout(tenantName string) {
 
 		app.mutex.Lock()
 		idleTime := time.Since(app.LastActivity)
-		hasConnections := len(app.wsConnections) > 0
 		app.mutex.Unlock()
 
 		// Don't stop if there are active WebSocket connections
-		if hasConnections {
+		activeWS := app.GetActiveWebSocketCount()
+		if activeWS > 0 {
+			slog.Debug("App has active WebSocket connections, skipping idle check",
+				"tenant", tenantName,
+				"activeWebSockets", activeWS,
+				"idleTime", idleTime)
 			continue
 		}
 

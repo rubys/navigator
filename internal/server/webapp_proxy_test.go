@@ -67,8 +67,8 @@ func TestProxyRetryIntegration(t *testing.T) {
 // TestProxyNoRetryForUnsafeMethods tests that unsafe methods (POST/PUT/DELETE) are not retried
 func TestProxyNoRetryForUnsafeMethods(t *testing.T) {
 	tests := []struct {
-		method        string
-		expectRetry   bool
+		method      string
+		expectRetry bool
 	}{
 		{"GET", true},
 		{"HEAD", true},

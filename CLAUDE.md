@@ -464,6 +464,60 @@ The workflow creates binaries for:
 
 All binaries include version information and build metadata.
 
+## Code Quality and Pre-Commit Checks
+
+**CRITICAL**: All code must pass quality checks before committing and pushing.
+
+### Required Checks Before Every Commit
+
+```bash
+# 1. Format code
+go fmt ./...
+
+# 2. Vet code for issues
+go vet ./...
+
+# 3. Run all tests
+go test ./... -short
+```
+
+### Pre-Push Checklist (CI Requirements)
+
+Before pushing to the repository, ensure these checks pass (CI will verify):
+
+1. ✓ **Code is formatted** - `gofmt -s -l .` returns no files
+2. ✓ **No vet warnings** - `go vet ./...` passes
+3. ✓ **All tests pass** - `go test -race -cover ./...` passes
+4. ✓ **Build succeeds** - Both legacy and refactored navigators build
+
+**GitHub Actions will reject pushes that fail these checks.** Running them locally saves time and prevents CI failures.
+
+### Quick Pre-Push Validation
+
+```bash
+# Run all CI checks locally
+gofmt -s -l . && \
+go vet ./... && \
+go test -race -cover -timeout=3m ./... && \
+go build ./cmd/navigator-legacy && \
+go build ./cmd/navigator-refactored && \
+echo "✓ All CI checks passed!"
+```
+
+### Optional: golangci-lint (Not Required for CI)
+
+While not enforced by CI, golangci-lint provides additional code quality checks:
+
+```bash
+# Install
+brew install golangci-lint  # macOS
+# or
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+# Run
+golangci-lint run
+```
+
 ## Dependencies
 
 Navigator uses minimal, focused dependencies:
