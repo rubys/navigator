@@ -1,10 +1,10 @@
 # Process Management
 
-Navigator provides intelligent process management for Rails applications, handling everything from startup to graceful shutdown with automatic resource management.
+Navigator provides intelligent process management for web applications, handling everything from startup to graceful shutdown with automatic resource management.
 
 ## How It Works
 
-Navigator manages Rails applications as separate processes, providing:
+Navigator manages web applications as separate processes, providing:
 
 1. **On-demand startup** - Applications start when first requested
 2. **Dynamic port allocation** - Automatically finds available ports
@@ -30,14 +30,14 @@ graph TD
 
 **Steps:**
 
-1. **Request arrives** for a Rails application
+1. **Request arrives** for a web application
 2. **Check if process exists** in the pool
-3. **If no process**: Start new Rails process
+3. **If no process**: Start new process
 4. **Port allocation**: Find available port (4000-4099 range)
 5. **PID file cleanup**: Remove stale PID files
-6. **Process startup**: Start Rails with proper environment
+6. **Process startup**: Start application with proper environment
 7. **Health check**: Wait for process to be ready
-8. **Request proxy**: Forward request to Rails process
+8. **Request proxy**: Forward request to application
 
 ### Process States
 

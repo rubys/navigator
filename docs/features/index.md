@@ -1,6 +1,6 @@
 # Features
 
-Navigator provides a comprehensive set of features designed specifically for Rails applications, from basic process management to advanced regional routing.
+Navigator provides a comprehensive set of features for multi-tenant web applications, from basic process management to advanced regional routing.
 
 !!! tip "What's New in v0.11.0"
     - **Modular Architecture**: Refactored from single-file to clean package structure
@@ -11,7 +11,7 @@ Navigator provides a comprehensive set of features designed specifically for Rai
 ## Core Features
 
 ### :zap: Process Management
-- **On-demand startup** - Rails apps start when first requested
+- **On-demand startup** - Web applications start when first requested
 - **Dynamic port allocation** - Automatically finds available ports
 - **Graceful shutdown** - Clean termination with proper cleanup
 - **Auto-restart** - Crashed processes automatically restart
@@ -20,11 +20,11 @@ Navigator provides a comprehensive set of features designed specifically for Rai
 [Learn more about Process Management](process-management.md)
 
 ### :file_folder: Static File Serving
-- **Direct filesystem serving** - Bypass Rails for static content
+- **Direct filesystem serving** - Bypass application for static content
 - **Configurable caching** - Set cache headers for different content types
 - **Try files behavior** - Flexible file resolution with fallbacks
 - **MIME type detection** - Automatic content type headers
-- **Performance optimization** - 10-40x faster than Rails serving
+- **Performance optimization** - 10-40x faster than application serving
 
 [Learn more about Static Files](../configuration/static-files.md)
 
@@ -74,7 +74,7 @@ Navigator provides a comprehensive set of features designed specifically for Rai
 - **Flexible resolution** - Try multiple file paths and extensions
 - **Multiple suffixes** - Try different file extensions
 - **Index file support** - Automatic index.html resolution
-- **Rails fallback** - Proxy to Rails when no file found
+- **Application fallback** - Proxy to application when no file found
 
 [Learn more about Try Files](try-files.md)
 
