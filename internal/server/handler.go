@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -46,39 +45,34 @@ type AccessLogEntry struct {
 // CreateHandler creates the main HTTP handler for Navigator
 func CreateHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager) http.Handler {
 	return &Handler{
-		config:      cfg,
-		appManager:  appManager,
-		auth:        basicAuth,
-		idleManager: idleManager,
+		config:       cfg,
+		appManager:   appManager,
+		auth:         basicAuth,
+		idleManager:  idleManager,
+		staticHandler: NewStaticFileHandler(cfg),
 	}
 }
 
 // CreateTestHandler creates a handler with logging disabled for tests
 func CreateTestHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager) http.Handler {
 	return &Handler{
-		config:      cfg,
-		appManager:  appManager,
-		auth:        basicAuth,
-		idleManager: idleManager,
-		disableLog:  true,
+		config:       cfg,
+		appManager:   appManager,
+		auth:         basicAuth,
+		idleManager:  idleManager,
+		staticHandler: NewStaticFileHandler(cfg),
+		disableLog:   true,
 	}
 }
 
 // Handler is the main HTTP handler for Navigator
 type Handler struct {
-	config      *config.Config
-	appManager  *process.AppManager
-	auth        *auth.BasicAuth
-	idleManager *idle.Manager
-	disableLog  bool // When true, suppresses access log output (for tests)
-}
-
-// getPublicDir returns the configured public directory or the default
-func (h *Handler) getPublicDir() string {
-	if h.config.Server.PublicDir != "" {
-		return h.config.Server.PublicDir
-	}
-	return config.DefaultPublicDir
+	config        *config.Config
+	appManager    *process.AppManager
+	auth          *auth.BasicAuth
+	idleManager   *idle.Manager
+	staticHandler *StaticFileHandler
+	disableLog    bool // When true, suppresses access log output (for tests)
 }
 
 // ServeHTTP handles all incoming HTTP requests
@@ -136,12 +130,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Try to serve static files
-	if h.serveStaticFile(recorder, r) {
+	if h.staticHandler.ServeStatic(recorder, r) {
 		return
 	}
 
 	// Try files for public paths
-	if isPublic && h.tryFiles(recorder, r) {
+	if isPublic && h.staticHandler.TryFiles(recorder, r) {
 		return
 	}
 
@@ -150,7 +144,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleWebAppProxy(recorder, r)
 	} else {
 		// No tenants configured - check for static fallback (maintenance mode)
-		h.handleStaticFallback(recorder, r)
+		h.staticHandler.ServeFallback(recorder, r)
 	}
 }
 
@@ -237,203 +231,27 @@ func (h *Handler) handleRewrites(w http.ResponseWriter, r *http.Request) bool {
 }
 
 // findBestLocation removed - use Routes.ReverseProxies instead
-
-// serveStaticFile attempts to serve a static file
-func (h *Handler) serveStaticFile(w http.ResponseWriter, r *http.Request) bool {
-	// Check if this is a request for static assets
-	path := r.URL.Path
-
-	slog.Debug("Checking static file",
-		"path", path,
-		"publicDir", h.config.Server.PublicDir,
-		"rootPath", h.config.Server.RootPath)
-
-	// Strip the root path if configured (e.g., "/showcase" prefix)
-	rootPath := h.config.Server.RootPath
-
-	if rootPath != "" && strings.HasPrefix(path, rootPath) {
-		slog.Debug("Stripping root path", "originalPath", path, "rootPath", rootPath, "configured", h.config.Server.RootPath != "")
-		path = strings.TrimPrefix(path, rootPath)
-		if path == "" {
-			path = "/"
-		}
-		slog.Debug("Path after stripping", "newPath", path)
-	}
-
-	// Check if file has a static extension (common static extensions)
-	isStatic := false
-	ext := strings.TrimPrefix(filepath.Ext(path), ".")
-	if ext != "" {
-		// Common static file extensions
-		staticExts := []string{"js", "css", "png", "jpg", "jpeg", "gif", "svg", "ico", "pdf", "txt", "xml", "json", "woff", "woff2", "ttf", "eot"}
-		for _, staticExt := range staticExts {
-			if ext == staticExt {
-				isStatic = true
-				break
-			}
-		}
-	}
-
-	if !isStatic {
-		return false
-	}
-
-	// Use server-level public directory (location-based serving removed)
-	fsPath := filepath.Join(h.getPublicDir(), path)
-
-	// Check if file exists
-	slog.Debug("Checking file existence", "fsPath", fsPath, "originalPath", path)
-	if info, err := os.Stat(fsPath); os.IsNotExist(err) || info.IsDir() {
-		slog.Debug("File not found or is directory", "fsPath", fsPath, "err", err)
-		return false
-	}
-
-	// Set response metadata for logging
-	if recorder, ok := w.(*ResponseRecorder); ok {
-		recorder.SetMetadata("response_type", "static")
-		recorder.SetMetadata("file_path", fsPath)
-	}
-
-	// Set content type and serve the file
-	setContentType(w, fsPath)
-	http.ServeFile(w, r, fsPath)
-	slog.Debug("Serving static file", "path", path, "fsPath", fsPath)
-	return true
-}
-
-// tryFiles attempts to find and serve files with different extensions
-func (h *Handler) tryFiles(w http.ResponseWriter, r *http.Request) bool {
-	path := r.URL.Path
-
-	slog.Debug("tryFiles checking", "path", path)
-
-	// Only try files for paths that don't already have an extension
-	if filepath.Ext(path) != "" {
-		slog.Debug("tryFiles skipping - path has extension")
-		return false
-	}
-
-	// Get try_files suffixes from config (location-based removed)
-	var extensions []string
-	if len(h.config.Server.TryFiles) > 0 {
-		extensions = h.config.Server.TryFiles
-	} else if h.config.Static.TryFiles.Enabled && len(h.config.Static.TryFiles.Suffixes) > 0 {
-		// Use static try_files configuration (like the original navigator)
-		extensions = h.config.Static.TryFiles.Suffixes
-	} else {
-		// Default extensions if not configured
-		extensions = []string{".html", ".htm", ".txt", ".xml", ".json"}
-	}
-
-	// Skip if no extensions configured
-	if len(extensions) == 0 {
-		slog.Debug("tryFiles disabled - no suffixes configured")
-		return false
-	}
-
-	// First, check static directories from config (like the original navigator)
-	var bestStaticDir *config.StaticDir
-	bestStaticDirLen := 0
-	slog.Debug("Static directory matching", "path", path, "numDirectories", len(h.config.Static.Directories))
-	for i, staticDir := range h.config.Static.Directories {
-		hasPrefix := strings.HasPrefix(path, staticDir.Path)
-		isLonger := len(staticDir.Path) > bestStaticDirLen
-		slog.Debug("Checking static directory",
-			"index", i,
-			"staticPath", staticDir.Path,
-			"dir", staticDir.Dir,
-			"hasPrefix", hasPrefix,
-			"pathLen", len(staticDir.Path),
-			"bestLen", bestStaticDirLen,
-			"isLonger", isLonger)
-		if hasPrefix && isLonger {
-			slog.Debug("New best match found", "staticPath", staticDir.Path, "dir", staticDir.Dir)
-			bestStaticDir = &staticDir
-			bestStaticDirLen = len(staticDir.Path)
-		}
-	}
-
-	// If we found a matching static directory, try to serve from there
-	if bestStaticDir != nil {
-		slog.Debug("Found matching static directory", "path", path, "staticPath", bestStaticDir.Path, "dir", bestStaticDir.Dir)
-
-		// Remove the URL prefix to get the relative path
-		relativePath := strings.TrimPrefix(path, bestStaticDir.Path)
-		if relativePath == "" {
-			relativePath = "/"
-		}
-		if relativePath[0] != '/' {
-			relativePath = "/" + relativePath
-		}
-
-		// Use server public directory as base
-		publicDir := h.getPublicDir()
-
-		// Try each extension
-		for _, ext := range extensions {
-			// Build the full filesystem path using static directory dir
-			fsPath := filepath.Join(publicDir, bestStaticDir.Dir, relativePath+ext)
-			slog.Debug("tryFiles checking static", "fsPath", fsPath)
-			if info, err := os.Stat(fsPath); err == nil && !info.IsDir() {
-				return h.serveFile(w, r, fsPath, path+ext)
-			}
-		}
-		return false
-	}
-
-	slog.Debug("No static directory match found, using fallback", "path", path)
-	// Fallback: check location-based public directory
-	var publicDir string
-	// Location-based public directory removed
-	if h.config.Server.PublicDir != "" {
-		publicDir = h.config.Server.PublicDir
-		// Strip the root path if configured (e.g., "/showcase" prefix)
-		if h.config.Server.RootPath != "" && strings.HasPrefix(path, h.config.Server.RootPath) {
-			path = strings.TrimPrefix(path, h.config.Server.RootPath)
-			if path == "" {
-				path = "/"
-			}
-		}
-	} else {
-		// Default to public directory in current working directory
-		publicDir = h.getPublicDir()
-		// Strip the root path if configured (e.g., "/showcase" prefix)
-		if h.config.Server.RootPath != "" && strings.HasPrefix(path, h.config.Server.RootPath) {
-			path = strings.TrimPrefix(path, h.config.Server.RootPath)
-			if path == "" {
-				path = "/"
-			}
-		}
-	}
-
-	// Try each extension
-	for _, ext := range extensions {
-		// Build the full filesystem path
-		fsPath := filepath.Join(publicDir, path+ext)
-		slog.Debug("tryFiles checking", "fsPath", fsPath)
-		if info, err := os.Stat(fsPath); err == nil && !info.IsDir() {
-			return h.serveFile(w, r, fsPath, path+ext)
-		}
-	}
-
-	return false
-}
-
+// serveStaticFile removed - use staticHandler.ServeStatic instead
+// tryFiles removed - use staticHandler.TryFiles instead
 // handleStandaloneProxy removed - use Routes.ReverseProxies instead
+
+// extractTenantFromPath extracts the tenant name from the URL path
+func (h *Handler) extractTenantFromPath(path string) string {
+	for _, tenant := range h.config.Applications.Tenants {
+		lookingFor := "/showcase/" + tenant.Name + "/"
+		if strings.HasPrefix(path, lookingFor) {
+			return tenant.Name
+		}
+	}
+	return ""
+}
 
 // handleWebAppProxy proxies requests to web applications
 func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request) {
 	recorder := w.(*ResponseRecorder)
 
 	// Extract tenant name from path
-	tenantName := ""
-	for _, tenant := range h.config.Applications.Tenants {
-		lookingFor := "/showcase/" + tenant.Name + "/"
-		if strings.HasPrefix(r.URL.Path, lookingFor) {
-			tenantName = tenant.Name
-			break
-		}
-	}
+	tenantName := h.extractTenantFromPath(r.URL.Path)
 
 	slog.Debug("Tenant extraction result", "tenantName", tenantName, "path", r.URL.Path)
 
@@ -633,90 +451,4 @@ func (r *ResponseRecorder) logNavigatorRequest(req *http.Request) {
 	// Output JSON log entry (matching nginx/rails format)
 	data, _ := json.Marshal(entry)
 	fmt.Fprintln(os.Stdout, string(data))
-}
-
-// serveFile serves a specific file with appropriate headers
-func (h *Handler) serveFile(w http.ResponseWriter, r *http.Request, fsPath, requestPath string) bool {
-	// Set metadata for static file response
-	if recorder, ok := w.(*ResponseRecorder); ok {
-		recorder.SetMetadata("response_type", "static")
-		recorder.SetMetadata("file_path", fsPath)
-	}
-
-	// Set appropriate content type
-	setContentType(w, fsPath)
-
-	// Serve the file
-	http.ServeFile(w, r, fsPath)
-	slog.Info("Serving file via tryFiles", "requestPath", requestPath, "fsPath", fsPath)
-	return true
-}
-
-// handleStaticFallback handles requests when no tenants are configured (maintenance mode)
-func (h *Handler) handleStaticFallback(w http.ResponseWriter, r *http.Request) {
-	// Check if static fallback is configured
-	if h.config.Static.TryFiles.Fallback != "" {
-		fallbackPath := h.config.Static.TryFiles.Fallback
-
-		// Build the filesystem path
-		publicDir := h.getPublicDir()
-		fsPath := filepath.Join(publicDir, fallbackPath)
-
-		// Check if the fallback file exists
-		if info, err := os.Stat(fsPath); err == nil && !info.IsDir() {
-			if recorder, ok := w.(*ResponseRecorder); ok {
-				recorder.SetMetadata("response_type", "static-fallback")
-				recorder.SetMetadata("file_path", fsPath)
-			}
-
-			setContentType(w, fsPath)
-			http.ServeFile(w, r, fsPath)
-			slog.Info("Serving static fallback", "path", r.URL.Path, "fallback", fallbackPath, "fsPath", fsPath)
-			return
-		}
-	}
-
-	// No fallback configured or file not found
-	http.NotFound(w, r)
-}
-
-// setContentType sets the appropriate Content-Type header based on file extension
-func setContentType(w http.ResponseWriter, fsPath string) {
-	ext := filepath.Ext(fsPath)
-	switch ext {
-	case ".js":
-		w.Header().Set("Content-Type", "application/javascript")
-	case ".css":
-		w.Header().Set("Content-Type", "text/css")
-	case ".html", ".htm":
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	case ".txt":
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	case ".xml":
-		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-	case ".json":
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	case ".png":
-		w.Header().Set("Content-Type", "image/png")
-	case ".jpg", ".jpeg":
-		w.Header().Set("Content-Type", "image/jpeg")
-	case ".gif":
-		w.Header().Set("Content-Type", "image/gif")
-	case ".svg":
-		w.Header().Set("Content-Type", "image/svg+xml")
-	case ".ico":
-		w.Header().Set("Content-Type", "image/x-icon")
-	case ".pdf":
-		w.Header().Set("Content-Type", "application/pdf")
-	case ".xlsx":
-		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	case ".woff":
-		w.Header().Set("Content-Type", "font/woff")
-	case ".woff2":
-		w.Header().Set("Content-Type", "font/woff2")
-	case ".ttf":
-		w.Header().Set("Content-Type", "font/ttf")
-	case ".eot":
-		w.Header().Set("Content-Type", "application/vnd.ms-fontobject")
-	}
 }

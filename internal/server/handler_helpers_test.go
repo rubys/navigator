@@ -34,11 +34,9 @@ func TestHandler_getPublicDir(t *testing.T) {
 			cfg := &config.Config{}
 			cfg.Server.PublicDir = tt.publicDir
 
-			h := &Handler{
-				config: cfg,
-			}
+			staticHandler := NewStaticFileHandler(cfg)
 
-			result := h.getPublicDir()
+			result := staticHandler.getPublicDir()
 			if result != tt.expected {
 				t.Errorf("getPublicDir() = %v, want %v", result, tt.expected)
 			}

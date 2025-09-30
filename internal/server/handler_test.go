@@ -62,7 +62,7 @@ func TestResponseRecorder(t *testing.T) {
 
 func TestHealthCheckHandler(t *testing.T) {
 	cfg := &config.Config{}
-	handler := &Handler{config: cfg}
+	handler := &Handler{config: cfg, staticHandler: NewStaticFileHandler(cfg)}
 
 	req := httptest.NewRequest("GET", "/up", nil)
 	recorder := httptest.NewRecorder()
@@ -90,9 +90,9 @@ func TestSetContentType(t *testing.T) {
 		expected string
 	}{
 		{"test.html", "text/html; charset=utf-8"},
-		{"test.css", "text/css"},
-		{"test.js", "application/javascript"},
-		{"test.json", "application/json; charset=utf-8"},
+		{"test.css", "text/css; charset=utf-8"},                // stdlib adds charset
+		{"test.js", "text/javascript; charset=utf-8"},          // stdlib uses text/javascript
+		{"test.json", "application/json"},                      // stdlib omits charset for json
 		{"test.png", "image/png"},
 		{"test.jpg", "image/jpeg"},
 		{"test.gif", "image/gif"},
@@ -105,7 +105,7 @@ func TestSetContentType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
-			setContentType(recorder, tt.filename)
+			SetContentType(recorder, tt.filename)
 
 			contentType := recorder.Header().Get("Content-Type")
 			if contentType != tt.expected {
@@ -164,6 +164,7 @@ func TestTryFilesWithStaticDirectories(t *testing.T) {
 	handler := &Handler{
 		config: cfg,
 		auth:   &auth.BasicAuth{},
+		staticHandler: NewStaticFileHandler(cfg),
 	}
 
 	tests := []struct {
@@ -203,7 +204,7 @@ func TestTryFilesWithStaticDirectories(t *testing.T) {
 			respRecorder := NewResponseRecorder(recorder, nil)
 
 			// Test tryFiles directly
-			found := handler.tryFiles(respRecorder, req)
+			found := handler.staticHandler.TryFiles(respRecorder, req)
 
 			if found != tt.expectedFound {
 				t.Errorf("Expected tryFiles to return %v for %s, got %v", tt.expectedFound, tt.path, found)
@@ -468,7 +469,7 @@ func TestServeStaticFileWithRootPath(t *testing.T) {
 			cfg.Server.PublicDir = tt.publicDir
 
 			// Create handler
-			handler := &Handler{config: cfg}
+			handler := &Handler{config: cfg, staticHandler: NewStaticFileHandler(cfg)}
 
 			// Create request and response recorder
 			req := httptest.NewRequest(http.MethodGet, tt.requestPath, nil)
@@ -476,7 +477,7 @@ func TestServeStaticFileWithRootPath(t *testing.T) {
 			respRecorder := NewResponseRecorder(recorder, nil)
 
 			// Test serveStaticFile
-			handled := handler.serveStaticFile(respRecorder, req)
+			handled := handler.staticHandler.ServeStatic(respRecorder, req)
 
 			if tt.expectedStatus == 0 {
 				// Should not be handled
@@ -717,7 +718,7 @@ func TestHandler_ServeHTTP_Routing(t *testing.T) {
 
 func TestHandler_handleHealthCheck(t *testing.T) {
 	cfg := &config.Config{}
-	handler := &Handler{config: cfg}
+	handler := &Handler{config: cfg, staticHandler: NewStaticFileHandler(cfg)}
 
 	req := httptest.NewRequest("GET", "/up", nil)
 	recorder := httptest.NewRecorder()
@@ -758,7 +759,7 @@ func TestHandler_handleStickySession(t *testing.T) {
 			cfg.Server.StickySession.Enabled = tt.stickyEnabled
 			cfg.Server.StickySession.Paths = tt.paths
 
-			handler := &Handler{config: cfg}
+			handler := &Handler{config: cfg, staticHandler: NewStaticFileHandler(cfg)}
 
 			req := httptest.NewRequest("GET", tt.requestPath, nil)
 			recorder := httptest.NewRecorder()
@@ -881,6 +882,7 @@ func TestRewriteRulesWithMaintenanceConfig(t *testing.T) {
 	// Create handler
 	handler := &Handler{
 		config: cfg,
+		staticHandler: NewStaticFileHandler(cfg),
 	}
 
 	// Test rewrite handling
@@ -932,13 +934,14 @@ func TestStaticFallbackWithNoTenants(t *testing.T) {
 	// Create handler
 	handler := &Handler{
 		config: cfg,
+		staticHandler: NewStaticFileHandler(cfg),
 	}
 
 	// Test fallback handling
 	req := httptest.NewRequest("GET", "/any/path", nil)
 	rr := httptest.NewRecorder()
 
-	handler.handleStaticFallback(rr, req)
+	handler.staticHandler.ServeFallback(rr, req)
 
 	// Check status code
 	if rr.Code != http.StatusOK {
@@ -1017,8 +1020,9 @@ func TestAssetServingIntegration(t *testing.T) {
 				auth:        &auth.BasicAuth{},
 				idleManager: idle.NewManager(cfg),
 				appManager:  &process.AppManager{},
-			}
+				staticHandler: NewStaticFileHandler(cfg),
 
+			}
 			// Test cases for asset requests that should succeed
 			assetTests := []struct {
 				path        string
@@ -1108,6 +1112,7 @@ func TestAssetServingIntegrationErrorCases(t *testing.T) {
 		auth:        &auth.BasicAuth{},
 		idleManager: idle.NewManager(cfg),
 		appManager:  &process.AppManager{},
+		staticHandler: NewStaticFileHandler(cfg),
 	}
 
 	// Test 404 for non-existent asset
@@ -1190,10 +1195,11 @@ func TestAssetServingRootPathVariations(t *testing.T) {
 			cfg.Server.RewriteRules = []config.RewriteRule{}
 
 			handler := &Handler{
-				config:      cfg,
-				auth:        &auth.BasicAuth{},
-				idleManager: idle.NewManager(cfg),
-				appManager:  &process.AppManager{},
+				config:        cfg,
+				auth:          &auth.BasicAuth{},
+				idleManager:   idle.NewManager(cfg),
+				appManager:    &process.AppManager{},
+				staticHandler: NewStaticFileHandler(cfg),
 			}
 
 			req := httptest.NewRequest("GET", tc.requestPath, nil)
@@ -1438,6 +1444,7 @@ func TestHandler_HandleRewritesFlyReplayWithMethods(t *testing.T) {
 
 	handler := &Handler{
 		config: cfg,
+		staticHandler: NewStaticFileHandler(cfg),
 	}
 
 	tests := []struct {
@@ -1482,6 +1489,7 @@ func TestHandler_HandleRewritesFlyReplayLargeRequest(t *testing.T) {
 
 	handler := &Handler{
 		config: cfg,
+		staticHandler: NewStaticFileHandler(cfg),
 	}
 
 	// Create a POST request with large content that should trigger fallback
@@ -1515,6 +1523,7 @@ func TestHandler_HandleRewritesBasicRedirect(t *testing.T) {
 
 	handler := &Handler{
 		config: cfg,
+		staticHandler: NewStaticFileHandler(cfg),
 	}
 
 	tests := []struct {
@@ -1576,6 +1585,7 @@ func TestHandler_HandleRewritesInternalRewrite(t *testing.T) {
 
 	handler := &Handler{
 		config: cfg,
+		staticHandler: NewStaticFileHandler(cfg),
 	}
 
 	tests := []struct {
@@ -1636,6 +1646,7 @@ func TestHandler_HandleRewritesRegexReplacement(t *testing.T) {
 
 	handler := &Handler{
 		config: cfg,
+		staticHandler: NewStaticFileHandler(cfg),
 	}
 
 	tests := []struct {
@@ -1720,6 +1731,7 @@ func TestHandler_HandleRewritesMultipleRules(t *testing.T) {
 
 	handler := &Handler{
 		config: cfg,
+		staticHandler: NewStaticFileHandler(cfg),
 	}
 
 	tests := []struct {

@@ -44,8 +44,10 @@ func TestHandler_ProxyIntegration(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		// Basic handler without proxy integration yet
+		cfg := &config.Config{}
 		handler := &Handler{
-			config: &config.Config{},
+			config:        cfg,
+			staticHandler: NewStaticFileHandler(cfg),
 		}
 
 		handler.ServeHTTP(w, req)
