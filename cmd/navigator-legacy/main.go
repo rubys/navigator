@@ -784,8 +784,8 @@ func cleanupPidFile(pidfilePath string) error {
 		}
 		// Try SIGKILL if needed
 		if err := process.Signal(syscall.SIGKILL); err != nil {
-		slog.Debug("Failed to send SIGKILL to stale process", "pid", pid, "error", err)
-	}
+			slog.Debug("Failed to send SIGKILL to stale process", "pid", pid, "error", err)
+		}
 	}
 
 	// Remove PID file
