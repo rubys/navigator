@@ -317,9 +317,15 @@ type YAMLConfig struct {
 	ManagedProcesses []ManagedProcessConfig `yaml:"managed_processes"`
 	Logging          LogConfig              `yaml:"logging"`
 	Hooks            struct {
-		Start  []HookConfig `yaml:"start"`
-		Ready  []HookConfig `yaml:"ready"`
-		Resume []HookConfig `yaml:"resume"`
-		Idle   []HookConfig `yaml:"idle"`
+		Server struct {
+			Start  []HookConfig `yaml:"start"`
+			Ready  []HookConfig `yaml:"ready"`
+			Resume []HookConfig `yaml:"resume"`
+			Idle   []HookConfig `yaml:"idle"`
+		} `yaml:"server"`
+		Tenant struct {
+			Start []HookConfig `yaml:"start"`
+			Stop  []HookConfig `yaml:"stop"`
+		} `yaml:"tenant"`
 	} `yaml:"hooks"`
 }

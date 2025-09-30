@@ -195,7 +195,15 @@ func (p *ConfigParser) parseLoggingConfig() {
 
 // parseHooksConfig parses lifecycle hooks
 func (p *ConfigParser) parseHooksConfig() {
-	p.config.Hooks = p.yamlConfig.Hooks
+	// Map server hooks from hooks.server to Config.Hooks
+	p.config.Hooks.Start = p.yamlConfig.Hooks.Server.Start
+	p.config.Hooks.Ready = p.yamlConfig.Hooks.Server.Ready
+	p.config.Hooks.Resume = p.yamlConfig.Hooks.Server.Resume
+	p.config.Hooks.Idle = p.yamlConfig.Hooks.Server.Idle
+
+	// Map tenant default hooks from hooks.tenant to Config.Applications.Hooks
+	p.config.Applications.Hooks.Start = p.yamlConfig.Hooks.Tenant.Start
+	p.config.Applications.Hooks.Stop = p.yamlConfig.Hooks.Tenant.Stop
 }
 
 // parseRoutesConfig parses routes configuration

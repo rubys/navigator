@@ -11,30 +11,63 @@ server:
   listen: 3000                    # Port to listen on (required)
   hostname: "localhost"           # Hostname for requests (optional)
   public_dir: "./public"          # Default public directory (optional)
+  root_path: "/showcase"          # Root URL path prefix (optional)
+  authentication: "./htpasswd"    # Path to htpasswd file (optional)
+  auth_exclude:                   # Paths excluded from auth (optional)
+    - "/assets/"
+    - "*.css"
+    - "*.js"
+
+  # Machine idle configuration (Fly.io)
+  idle:
+    action: suspend               # "suspend" or "stop"
+    timeout: 20m                  # Duration: "30s", "5m", "1h30m"
+
+  # Sticky sessions configuration
+  sticky_sessions:
+    enabled: true
+    cookie_name: "_navigator_machine"
+    cookie_max_age: "2h"
+    cookie_secure: true
+    cookie_httponly: true
+    cookie_samesite: "Lax"
+    cookie_path: "/"
+    paths:                        # Optional: specific paths for sticky sessions
+      - "/app/*"
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `listen` | integer | `3000` | Port to bind HTTP server |
+| `listen` | integer/string | `3000` | Port to bind HTTP server |
 | `hostname` | string | `""` | Hostname for Host header matching |
 | `public_dir` | string | `"./public"` | Default directory for static files |
+| `root_path` | string | `""` | Root URL path prefix (e.g., "/showcase") |
+| `authentication` | string | `""` | Path to htpasswd file for authentication |
+| `auth_exclude` | array | `[]` | Glob patterns for paths excluded from auth |
 
-## pools
+### server.idle
 
-Process pool management settings.
-
-```yaml
-pools:
-  max_size: 10                    # Maximum Rails processes
-  idle_timeout: 300               # Seconds before stopping idle process
-  start_port: 4000                # Starting port for Rails processes
-```
+Machine auto-suspend/stop configuration (Fly.io only).
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `max_size` | integer | `10` | Maximum number of Rails processes |
-| `idle_timeout` | integer | `300` | Idle timeout in seconds |
-| `start_port` | integer | `4000` | Starting port for Rails process allocation |
+| `action` | string | `""` | Action to take: "suspend" or "stop" |
+| `timeout` | string | `""` | Idle duration before action (e.g., "20m", "1h") |
+
+### server.sticky_sessions
+
+Cookie-based session affinity for routing requests to the same machine.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable sticky sessions |
+| `cookie_name` | string | `"_navigator"` | Name of the session cookie |
+| `cookie_max_age` | string | `"24h"` | Cookie lifetime (duration format) |
+| `cookie_secure` | boolean | `true` | Set Secure flag (HTTPS only) |
+| `cookie_httponly` | boolean | `true` | Set HttpOnly flag |
+| `cookie_samesite` | string | `"Lax"` | SameSite attribute: "Strict", "Lax", "None" |
+| `cookie_path` | string | `"/"` | Cookie path |
+| `paths` | array | `[]` | Specific URL patterns for sticky sessions |
 
 ## auth
 
@@ -106,51 +139,99 @@ List of file extensions to serve directly from filesystem.
 
 ## applications
 
-Rails application configuration.
+Application configuration for multi-tenant deployments.
 
 ```yaml
 applications:
-  global_env:                     # Environment variables for all apps
+  # Process pool configuration
+  pools:
+    max_size: 10                  # Maximum app processes
+    timeout: 5m                   # Idle timeout (duration format)
+    start_port: 4000              # Starting port for allocation
+
+  # Framework configuration (optional, can be per-tenant)
+  framework:
+    command: bin/rails
+    args: ["server", "-p", "${port}"]
+    app_directory: "/rails"
+    port_env_var: PORT
+    start_delay: 2s
+
+  # Environment variable templates
+  env:
+    DATABASE_URL: "sqlite3://db/${database}.sqlite3"
     RAILS_ENV: production
-    
-  env:                           # Template environment variables
-    DATABASE_URL: "postgres://localhost/${database}"
-    
-  tenants:                       # Individual applications
-    - name: myapp                # Unique identifier
-      path: "/"                  # URL path prefix
-      working_dir: "/var/www/app" # Rails application directory
-      env:                       # App-specific environment
-        DATABASE_NAME: myapp
-      var:                       # Template variables
-        database: myapp_db
-      min_instances: 0           # Minimum running processes
-      max_processes: 5           # Maximum processes for this app
-      idle_timeout: 300          # Custom idle timeout
-      standalone_server: "localhost:8080"  # Proxy to external server
-      match_pattern: "*/api"     # Pattern matching for requests
-      force_max_concurrent_requests: 1     # Limit concurrent requests
-      auth_realm: "Admin"        # Custom auth realm
-      exclude_methods: [DELETE]  # HTTP methods to exclude from proxy
+
+  # Individual tenant applications
+  tenants:
+    - path: "/tenant1/"           # URL path prefix (required)
+      var:                        # Template variables
+        database: tenant1
+      env:                        # Tenant-specific environment
+        TENANT_NAME: "Tenant 1"
+
+      # Optional tenant-specific overrides
+      root: "/app"                # Application directory
+      public_dir: "public"        # Public files directory
+      framework: rails            # Framework type
+      runtime: bundle             # Runtime command
+      server: exec                # Server command
+      args: ["puma", "-p", "${port}"]  # Server arguments
+
+      # Tenant-specific lifecycle hooks
+      hooks:
+        start:
+          - command: /app/bin/tenant-init.sh
+            timeout: 30s
+        stop:
+          - command: /app/bin/tenant-cleanup.sh
+            timeout: 30s
 ```
 
-### tenants
+### applications.pools
+
+Process pool management for tenant applications.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max_size` | integer | `10` | Maximum number of app processes |
+| `timeout` | string | `"5m"` | Idle timeout (duration: "5m", "10m") |
+| `start_port` | integer | `4000` | Starting port for dynamic allocation |
+
+### applications.framework
+
+Default framework configuration (can be overridden per-tenant).
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `command` | string | `""` | Framework command (e.g., "bin/rails") |
+| `args` | array | `[]` | Command arguments with ${port} substitution |
+| `app_directory` | string | `""` | Application root directory |
+| `port_env_var` | string | `"PORT"` | Environment variable for port number |
+| `start_delay` | string | `"0s"` | Delay before starting (duration format) |
+
+### applications.env
+
+Environment variable templates with `${variable}` substitution from tenant `var` values.
+
+### applications.tenants
+
+List of tenant applications.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | string | ✓ | Unique identifier for the application |
 | `path` | string | ✓ | URL path prefix (must start/end with /) |
-| `working_dir` | string | | Rails application directory |
-| `env` | object | | Application-specific environment variables |
-| `var` | object | | Template variables for substitution |
-| `min_instances` | integer | | Minimum running processes |
-| `max_processes` | integer | | Maximum processes for this app |
-| `idle_timeout` | integer | | Custom idle timeout in seconds |
-| `standalone_server` | string | | Proxy to external server (host:port) |
-| `match_pattern` | string | | Glob pattern for URL matching |
-| `force_max_concurrent_requests` | integer | | Limit concurrent requests (0=unlimited) |
-| `auth_realm` | string | | Custom authentication realm |
-| `exclude_methods` | array | | HTTP methods to exclude from proxy |
+| `var` | object | | Template variables for env substitution |
+| `env` | object | | Tenant-specific environment variables |
+| `root` | string | | Application root directory |
+| `public_dir` | string | | Public files directory |
+| `framework` | string | | Framework type override |
+| `runtime` | string | | Runtime command override |
+| `server` | string | | Server command override |
+| `args` | array | | Server arguments override |
+| `hooks` | object | | Tenant-specific lifecycle hooks |
+
+**Note**: The `name` field is automatically derived from the `path` (e.g., `/showcase/2025/boston/` → `2025/boston`).
 
 ## managed_processes
 
@@ -219,20 +300,114 @@ routes:
 | `status` | integer | | HTTP status code |
 | `methods` | array | | HTTP methods to match |
 
-## suspend
+## hooks
 
-Machine suspension configuration (Fly.io only).
+Lifecycle hooks for server and tenant events.
 
 ```yaml
-suspend:
-  enabled: false                 # Enable auto-suspend
-  idle_timeout: 600             # Idle time before suspend (seconds)
+hooks:
+  # Server lifecycle hooks
+  server:
+    start:                        # Execute when Navigator starts
+      - command: /usr/local/bin/init.sh
+        args: ["--setup"]
+        timeout: 30s
+    ready:                        # Execute when Navigator is ready
+      - command: curl
+        args: ["-X", "POST", "http://monitoring.example.com/ready"]
+        timeout: 5s
+    idle:                         # Execute before machine suspend/stop
+      - command: /usr/local/bin/backup-to-s3.sh
+        timeout: 5m
+    resume:                       # Execute after machine resume
+      - command: /usr/local/bin/restore-from-s3.sh
+        timeout: 2m
+
+  # Default tenant lifecycle hooks (executed for all tenants)
+  tenant:
+    start:                        # Execute after tenant app starts
+      - command: /usr/local/bin/tenant-init.sh
+        args: ["${database}"]
+        timeout: 30s
+    stop:                         # Execute before tenant app stops
+      - command: /usr/local/bin/tenant-backup.sh
+        args: ["${database}"]
+        timeout: 2m
+```
+
+### hooks.server
+
+Server-level lifecycle hooks execute at key Navigator events.
+
+| Event | When Executed | Use Cases |
+|-------|---------------|-----------|
+| `start` | Before Navigator accepts requests | Initialize services, run migrations |
+| `ready` | After Navigator starts listening | Notify monitoring, warm caches |
+| `idle` | Before machine suspend/stop (Fly.io) | Upload data to S3, checkpoint state |
+| `resume` | After machine resume (Fly.io) | Download data from S3, reconnect services |
+
+### hooks.tenant
+
+Default tenant hooks execute for all tenant applications. Can be overridden per-tenant under `applications.tenants[].hooks`.
+
+| Event | When Executed | Use Cases |
+|-------|---------------|-----------|
+| `start` | After tenant app starts | Initialize tenant data, warm caches |
+| `stop` | Before tenant app stops | Backup database, sync to storage |
+
+### Hook Configuration
+
+Each hook entry supports:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `command` | string | ✓ | Command to execute |
+| `args` | array | | Command arguments (supports ${var} substitution) |
+| `timeout` | string | | Max execution time (duration: "30s", "5m") |
+
+**Environment**:
+- Server hooks receive Navigator's environment
+- Tenant hooks receive tenant's full environment (including `env` and `var` values)
+
+**Execution Order**:
+- Multiple hooks execute sequentially in order
+- Failed hooks log errors but don't stop Navigator
+- Tenant stop: default hooks → tenant-specific hooks
+
+## logging
+
+Logging configuration for Navigator and managed processes.
+
+```yaml
+logging:
+  format: json                    # "text" or "json"
+  file: "/var/log/navigator.log" # Optional file output
+
+  # Vector integration (optional)
+  vector:
+    enabled: true
+    socket: "/tmp/vector.sock"
+    config: "/etc/vector/vector.toml"
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Enable auto-suspend feature |
-| `idle_timeout` | integer | `600` | Idle timeout in seconds |
+| `format` | string | `"text"` | Log format: "text" or "json" |
+| `file` | string | `""` | Optional file path for log output (supports {{app}} template) |
+
+### logging.vector
+
+Professional log aggregation with automatic Vector process management.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable Vector integration |
+| `socket` | string | `""` | Unix socket path for Vector communication |
+| `config` | string | `""` | Path to vector.toml configuration file |
+
+**Log Format**: All process output (Navigator, web apps, managed processes) includes:
+- **Text mode**: `[source.stream]` prefix (e.g., `[2025/boston.stdout]`)
+- **JSON mode**: Structured with `timestamp`, `source`, `stream`, `message`, `tenant` fields
 
 ## Environment Variable Substitution
 
@@ -272,12 +447,14 @@ applications:
 
 Navigator validates configuration on startup:
 
-1. **Required fields**: `server.listen`, `applications.tenants[].name`, `applications.tenants[].path`
+1. **Required fields**: `server.listen`, `applications.tenants[].path`
 2. **Port ranges**: Listen port must be 1-65535
-3. **Path format**: Paths must start and end with `/`
-4. **File paths**: Must be accessible by Navigator process
-5. **Regex patterns**: Must compile successfully
+3. **Path format**: Tenant paths must start and end with `/`
+4. **File paths**: Must be accessible by Navigator process (htpasswd, config files)
+5. **Regex patterns**: Must compile successfully (routes, fly_replay)
 6. **Process names**: Must be unique within managed_processes
+7. **Duration format**: Must be valid Go duration (e.g., "30s", "5m", "1h30m")
+8. **Hook timeouts**: Should be reasonable (<10m for most operations)
 
 ## Examples
 
@@ -299,58 +476,82 @@ applications:
 ```yaml
 server:
   listen: 3000
-
-auth:
-  enabled: true
-  htpasswd: /etc/navigator/htpasswd
-  public_paths: ["/assets/", "*.css", "*.js"]
+  authentication: /etc/navigator/htpasswd
+  auth_exclude: ["/assets/", "*.css", "*.js"]
 
 static:
   directories:
     - path: /assets/
-      root: public/assets/
-      cache: 86400
+      dir: assets/
+      cache: 24h
 
 applications:
+  pools:
+    max_size: 10
+    timeout: 5m
+    start_port: 4000
+
   env:
-    DATABASE_URL: "postgres://localhost/${database}"
-    
+    DATABASE_URL: "sqlite3://db/${database}.sqlite3"
+
   tenants:
-    - name: tenant1
-      path: /tenant1/
+    - path: /tenant1/
       var:
-        database: app_tenant1
-    - name: tenant2
-      path: /tenant2/
+        database: tenant1
+    - path: /tenant2/
       var:
-        database: app_tenant2
+        database: tenant2
 ```
 
-### With Background Jobs
+### With Background Jobs and Hooks
 
 ```yaml
+server:
+  listen: 3000
+  idle:
+    action: suspend
+    timeout: 20m
+
+hooks:
+  server:
+    idle:
+      - command: /usr/local/bin/backup-all.sh
+        timeout: 5m
+  tenant:
+    stop:
+      - command: /usr/local/bin/backup-tenant.sh
+        args: ["${database}"]
+        timeout: 2m
+
 managed_processes:
   - name: redis
     command: redis-server
+    args: ["/etc/redis/redis.conf"]
     auto_restart: true
-    
+
   - name: sidekiq
     command: bundle
     args: [exec, sidekiq]
-    working_dir: /var/www/app
+    working_dir: /app
     env:
       REDIS_URL: redis://localhost:6379
     auto_restart: true
-    start_delay: 2
+    start_delay: 2s
 
 applications:
-  global_env:
+  pools:
+    max_size: 5
+    timeout: 10m
+    start_port: 4000
+
+  env:
     REDIS_URL: redis://localhost:6379
-    
+    DATABASE_URL: "sqlite3://db/${database}.sqlite3"
+
   tenants:
-    - name: app
-      path: /
-      working_dir: /var/www/app
+    - path: /
+      var:
+        database: production
 ```
 
 ## See Also
@@ -359,4 +560,8 @@ applications:
 - [Server Settings](server.md)
 - [Applications](applications.md)
 - [Authentication](authentication.md)
+- [Lifecycle Hooks](../features/lifecycle-hooks.md)
+- [Machine Suspend](../features/machine-suspend.md)
+- [Sticky Sessions](../features/sticky-sessions.md)
+- [Logging](../features/logging.md)
 - [Examples](../examples/index.md)
