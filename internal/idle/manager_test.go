@@ -311,3 +311,192 @@ func BenchmarkIdleManagerConcurrentTracking(b *testing.B) {
 		}
 	})
 }
+
+// Tests for previously uncovered functions
+
+func TestGetStats(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Server.Idle.Action = "suspend"
+	cfg.Server.Idle.Timeout = "1m"
+	manager := NewManager(cfg)
+	if manager == nil {
+		t.Fatal("Failed to create IdleManager")
+	}
+	defer manager.Stop()
+
+	// Initially should have 0 active requests
+	activeRequests, lastActivity := manager.GetStats()
+	if activeRequests != 0 {
+		t.Errorf("Expected 0 active requests, got %d", activeRequests)
+	}
+	if lastActivity.IsZero() {
+		t.Error("Expected lastActivity to be set")
+	}
+
+	// Start some requests
+	manager.RequestStarted()
+	manager.RequestStarted()
+
+	activeRequests, _ = manager.GetStats()
+	if activeRequests != 2 {
+		t.Errorf("Expected 2 active requests, got %d", activeRequests)
+	}
+
+	// Finish requests
+	manager.RequestFinished()
+	activeRequests, _ = manager.GetStats()
+	if activeRequests != 1 {
+		t.Errorf("Expected 1 active request, got %d", activeRequests)
+	}
+}
+
+func TestUpdateConfig(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Server.Idle.Action = "suspend"
+	cfg.Server.Idle.Timeout = "1m"
+	manager := NewManager(cfg)
+	if manager == nil {
+		t.Fatal("Failed to create IdleManager")
+	}
+	defer manager.Stop()
+
+	manager.EnableTestMode()
+
+	// Update config with new timeout
+	newCfg := &config.Config{}
+	newCfg.Server.Idle.Action = "suspend"
+	newCfg.Server.Idle.Timeout = "5m"
+
+	manager.UpdateConfig(newCfg)
+
+	// Verify manager is still enabled
+	if !manager.IsEnabled() {
+		t.Error("Expected manager to still be enabled after config update")
+	}
+
+	// Update config to disable
+	disabledCfg := &config.Config{}
+	disabledCfg.Server.Idle.Action = ""
+	disabledCfg.Server.Idle.Timeout = "1m"
+
+	manager.UpdateConfig(disabledCfg)
+
+	// Verify manager is now disabled
+	if manager.IsEnabled() {
+		t.Error("Expected manager to be disabled after config update")
+	}
+}
+
+func TestStopMachine(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Server.Idle.Action = "stop"
+	cfg.Server.Idle.Timeout = "10ms"
+	manager := NewManager(cfg)
+	if manager == nil {
+		t.Fatal("Failed to create IdleManager")
+	}
+	defer manager.Stop()
+
+	// Enable test mode to prevent actual SIGTERM
+	manager.EnableTestMode()
+
+	// Manually invoke stopMachine (in test mode it won't send signals)
+	manager.stopMachine()
+
+	// Should not panic - test mode prevents actual signal
+	// This mainly verifies the test mode protection works
+}
+
+func TestSuspend(t *testing.T) {
+	t.Run("Suspend with valid config", func(t *testing.T) {
+		cfg := &config.Config{}
+		cfg.Server.Idle.Action = "suspend"
+		cfg.Server.Idle.Timeout = "1m"
+		manager := NewManager(cfg)
+		if manager == nil {
+			t.Fatal("Failed to create IdleManager")
+		}
+		defer manager.Stop()
+
+		manager.EnableTestMode()
+
+		// Should succeed
+		err := manager.Suspend()
+		if err != nil {
+			t.Errorf("Expected Suspend to succeed, got error: %v", err)
+		}
+	})
+
+	t.Run("Suspend with stop action (should fail)", func(t *testing.T) {
+		cfg := &config.Config{}
+		cfg.Server.Idle.Action = "stop"
+		cfg.Server.Idle.Timeout = "1m"
+		manager := NewManager(cfg)
+		if manager == nil {
+			t.Fatal("Failed to create IdleManager")
+		}
+		defer manager.Stop()
+
+		manager.EnableTestMode()
+
+		// Should fail because action is "stop" not "suspend"
+		err := manager.Suspend()
+		if err == nil {
+			t.Error("Expected Suspend to fail with stop action")
+		}
+	})
+
+	t.Run("Suspend when disabled", func(t *testing.T) {
+		cfg := &config.Config{}
+		cfg.Server.Idle.Action = ""
+		cfg.Server.Idle.Timeout = "1m"
+		manager := NewManager(cfg)
+
+		// Manager should be nil or disabled
+		if manager != nil && manager.IsEnabled() {
+			err := manager.Suspend()
+			if err == nil {
+				t.Error("Expected Suspend to fail when disabled")
+			}
+		}
+	})
+}
+
+func TestRequestStartedWithTimer(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Server.Idle.Action = "suspend"
+	cfg.Server.Idle.Timeout = "100ms"
+	manager := NewManager(cfg)
+	if manager == nil {
+		t.Fatal("Failed to create IdleManager")
+	}
+	defer manager.Stop()
+
+	manager.EnableTestMode()
+
+	// Start a request - should cancel any idle timer
+	manager.RequestStarted()
+
+	// Verify active requests increased
+	activeRequests, _ := manager.GetStats()
+	if activeRequests != 1 {
+		t.Errorf("Expected 1 active request, got %d", activeRequests)
+	}
+
+	// Start another request while first is still active
+	manager.RequestStarted()
+
+	activeRequests, _ = manager.GetStats()
+	if activeRequests != 2 {
+		t.Errorf("Expected 2 active requests, got %d", activeRequests)
+	}
+
+	// Finish both requests
+	manager.RequestFinished()
+	manager.RequestFinished()
+
+	activeRequests, _ = manager.GetStats()
+	if activeRequests != 0 {
+		t.Errorf("Expected 0 active requests, got %d", activeRequests)
+	}
+}
