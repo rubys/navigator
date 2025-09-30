@@ -68,14 +68,18 @@ go version  # Should be 1.21 or higher
 git clone https://github.com/rubys/navigator.git
 cd navigator
 
-# Build
+# Build (creates both legacy and refactored versions)
 make build
 
-# Or build directly
-go build -mod=readonly -o bin/navigator cmd/navigator/main.go
+# Or build the refactored version directly (recommended)
+go build -mod=readonly -o bin/navigator cmd/navigator-refactored/main.go
 
 # Install globally (optional)
-sudo cp bin/navigator /usr/local/bin/
+# Use the refactored version (v0.11.0+)
+sudo cp bin/navigator-refactored /usr/local/bin/navigator
+
+# Or if you built with the direct command:
+# sudo cp bin/navigator /usr/local/bin/
 ```
 
 ### Docker

@@ -2,6 +2,11 @@
 
 A lightweight, fast Go-based web server for multi-tenant web applications with on-demand process management. Framework-independent with built-in support for Rails, Django, Node.js, and other frameworks.
 
+!!! success "Latest Release: v0.11.0"
+    **Major refactoring release** with modular architecture, enhanced test coverage (81.2%), and full cross-platform support (Linux, macOS, Windows).
+
+    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v0.11.0)
+
 ## What is Navigator?
 
 Navigator is a modern alternative to nginx + Passenger, designed for multi-tenant web applications across different frameworks. It provides intelligent request routing, dynamic process management, and built-in support for modern deployment patterns like Fly.io, Azure Deployment Stamps, and container orchestration.
@@ -127,6 +132,29 @@ applications:
 - **Regional deployments** - Deploy closer to users with Fly.io
 - **Development environments** - Replace complex nginx setups
 - **Resource-constrained servers** - Lower memory footprint
+
+## Architecture
+
+Navigator v0.11.0+ uses a **modular package structure** for improved maintainability and testing:
+
+- **internal/server/** - HTTP handling, routing, static files, proxying
+- **internal/process/** - Web app and managed process lifecycle
+- **internal/config/** - Configuration loading and validation
+- **internal/auth/** - Authentication (htpasswd)
+- **internal/proxy/** - Reverse proxy and Fly-Replay logic
+- **internal/idle/** - Fly.io machine idle management
+- **internal/errors/** - Domain-specific error constructors
+- **internal/logging/** - Structured logging helpers
+- **internal/utils/** - Common utilities (duration parsing, environment)
+
+**Benefits of the refactored architecture**:
+
+- ✅ **81.2% test coverage** - Comprehensive testing of all components
+- ✅ **Cross-platform** - Native support for Linux, macOS, and Windows
+- ✅ **Maintainable** - Clear separation of concerns, focused modules
+- ✅ **Single binary** - Still deploys as one self-contained executable
+
+See [REFACTORING.md](https://github.com/rubys/navigator/blob/main/REFACTORING.md) for technical details.
 
 ## Real-World Use Cases
 

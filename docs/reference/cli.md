@@ -91,8 +91,8 @@ navigator --version
 
 Output:
 ```
-Navigator v0.7.1
-Built with Go 1.21.0
+Navigator v0.11.0
+Built with Go 1.24.0
 ```
 
 ### Control Options
