@@ -29,7 +29,7 @@ Navigator supports multiple deployment strategies:
 make build
 
 # Run with configuration
-./bin/navigator config/navigator.yml
+./bin/navigator-refactored config/navigator.yml
 ```
 
 ### Production Deployment

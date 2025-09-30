@@ -50,10 +50,10 @@ applications:
 
 ```bash
 # With config file
-./navigator config/navigator.yml
+./bin/navigator-refactored config/navigator.yml
 
 # Reload configuration (no restart)
-./navigator -s reload
+./bin/navigator-refactored -s reload
 ```
 
 ## What Can Navigator Do?

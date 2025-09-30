@@ -37,7 +37,7 @@ Trusted in production serving 75+ customers across 8 countries.
     make build
     
     # Run Navigator
-    ./bin/navigator config/navigator.yml
+    ./bin/navigator-refactored config/navigator.yml
     ```
 
 === "Docker"
