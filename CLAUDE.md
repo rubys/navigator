@@ -359,6 +359,54 @@ Navigator includes robust proxy error handling:
 
 ## Testing
 
+**CRITICAL IMPORTANCE**: Comprehensive test coverage is essential for maintaining Navigator's reliability in production.
+
+### Test-Driven Development Principles
+
+**Every bug is a missing test.** When fixing bugs:
+1. **Reproduce the bug** - Write a test that fails due to the bug
+2. **Fix the bug** - Implement the minimal fix to make the test pass
+3. **Verify coverage** - Ensure the test covers edge cases and variations
+4. **Document the test** - Explain what scenario the test prevents
+
+**Every feature requires tests.** When adding features:
+1. **Plan tests first** - Identify what needs testing before implementation
+2. **Write comprehensive tests** - Cover success cases, failure cases, and edge cases
+3. **Test integration** - Verify the feature works with existing components
+4. **Maintain coverage** - Run `go test -cover ./...` to ensure high coverage
+
+### Test Organization
+
+Navigator's test suite is organized by package:
+- **internal/proxy/** - Proxy retry logic, WebSocket handling, response buffering
+- **internal/server/** - Request routing, authentication, static files, fly-replay
+- **internal/process/** - Web app lifecycle, managed processes, graceful shutdown
+- **internal/config/** - Configuration parsing, validation, variable substitution
+- **internal/auth/** - htpasswd authentication with multiple hash formats
+- **internal/idle/** - Fly.io machine idle management and auto-suspend
+- **internal/logging/** - Structured logging helpers
+- **internal/utils/** - Duration parsing and utility functions
+
+### Running Tests
+
+```bash
+# Run all tests with coverage
+go test -cover ./...
+
+# Run tests for specific package
+go test -v ./internal/proxy/...
+
+# Run tests with race detection
+go test -race ./...
+
+# Run short tests only (skip slow integration tests)
+go test -short ./...
+
+# Generate coverage report
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
 ### Manual Testing
 
 ```bash

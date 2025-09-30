@@ -249,9 +249,9 @@ func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request) {
 	recorder.SetMetadata("response_type", "proxy")
 	recorder.SetMetadata("proxy_backend", fmt.Sprintf("tenant:%s", tenantName))
 
-	// Proxy to the web app
+	// Proxy to the web app with retry support
 	targetURL := fmt.Sprintf("http://localhost:%d", app.Port)
-	proxy.HandleProxy(w, r, targetURL)
+	proxy.ProxyWithWebSocketSupport(w, r, targetURL, nil)
 }
 
 // ResponseRecorder wraps http.ResponseWriter to capture response details
