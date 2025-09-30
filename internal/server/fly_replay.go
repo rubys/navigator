@@ -165,10 +165,7 @@ func HandleFlyReplayFallback(w http.ResponseWriter, r *http.Request, target stri
 	listenPort := 3000 // Default port
 	if config.Server.Listen != "" {
 		// Parse port from config.Server.Listen (could be ":3000" or "3000")
-		portStr := config.Server.Listen
-		if strings.HasPrefix(portStr, ":") {
-			portStr = portStr[1:]
-		}
+		portStr := strings.TrimPrefix(config.Server.Listen, ":")
 		if port, err := strconv.Atoi(portStr); err == nil {
 			listenPort = port
 		}

@@ -3,7 +3,6 @@ package utils
 import (
 	"os/exec"
 	"reflect"
-	"sort"
 	"testing"
 )
 
@@ -274,9 +273,4 @@ func splitEnvVar(env string) []string {
 		}
 	}
 	return []string{env}
-}
-
-// Helper function to sort environment variables for comparison
-func sortEnv(env []string) {
-	sort.Strings(env)
 }

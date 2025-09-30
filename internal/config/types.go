@@ -197,15 +197,12 @@ type ProxyRoute struct {
 
 // WebApp represents a web application
 type WebApp struct {
-	URL              string
-	Process          interface{}
-	Tenant           *Tenant
-	Port             int
-	StartTime        time.Time
-	LastActivity     time.Time
-	mutex            sync.Mutex
-	wsConnections    map[string]interface{}
-	wsConnectionsMux sync.RWMutex
+	URL          string
+	Process      interface{}
+	Tenant       *Tenant
+	Port         int
+	StartTime    time.Time
+	LastActivity time.Time
 }
 
 // FrameworkConfig represents framework-specific configuration

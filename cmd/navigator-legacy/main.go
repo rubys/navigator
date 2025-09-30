@@ -3741,11 +3741,6 @@ func proxyWithRetryForApp(w http.ResponseWriter, r *http.Request, target *url.UR
 	}
 }
 
-// proxyRequest proxies a request to another server with retry logic
-func proxyRequest(w http.ResponseWriter, r *http.Request, route *ProxyRoute) {
-	proxyRequestWithTarget(w, r, route, route.ProxyPass)
-}
-
 // proxyRequestWithTarget proxies a request to a specific target URL with retry logic
 func proxyRequestWithTarget(w http.ResponseWriter, r *http.Request, route *ProxyRoute, targetURL string) {
 	target, err := url.Parse(targetURL)

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -18,26 +17,6 @@ func LoadConfig(filename string) (*Config, error) {
 
 	slog.Debug("Loading YAML configuration")
 	return ParseYAML(content)
-}
-
-// substituteVars replaces template variables with tenant values
-func substituteVars(template string, tenant *Tenant) string {
-	result := template
-	// Replace ${var} with values from the Var map
-	if tenant.Var != nil {
-		for key, value := range tenant.Var {
-			// Convert interface{} to string
-			strValue := ""
-			switch v := value.(type) {
-			case string:
-				strValue = v
-			default:
-				strValue = fmt.Sprintf("%v", v)
-			}
-			result = strings.ReplaceAll(result, "${"+key+"}", strValue)
-		}
-	}
-	return result
 }
 
 // ParseYAML parses the new YAML configuration format

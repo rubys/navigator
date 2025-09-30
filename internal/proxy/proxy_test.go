@@ -274,7 +274,7 @@ func TestRetryResponseWriterSizeLimit(t *testing.T) {
 	}
 
 	// Second write should hit the limit and switch to direct writing
-	n, err = retryWriter.Write(largeData[500000:]) // Rest of the data
+	_, err = retryWriter.Write(largeData[500000:]) // Rest of the data
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}

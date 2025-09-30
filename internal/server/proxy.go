@@ -142,7 +142,7 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 	}
 
 	// Build target WebSocket URL
-	targetPath := targetURL.Path
+	var targetPath string
 	if route.StripPath && route.Prefix != "" {
 		targetPath = strings.TrimPrefix(r.URL.Path, route.Prefix)
 	} else {
