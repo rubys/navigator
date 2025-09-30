@@ -3,9 +3,7 @@ package idle
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/rubys/navigator/internal/config"
@@ -168,41 +166,9 @@ func (m *Manager) handleIdle() {
 	}
 }
 
-// suspendMachine sends SIGTSTP to suspend the machine (Fly.io specific)
-func (m *Manager) suspendMachine() {
-	slog.Info("Suspending machine due to inactivity",
-		"timeout", m.idleTimeout,
-		"lastActivity", m.lastActivity)
-
-	// Skip signal sending in test mode
-	if m.testMode {
-		slog.Info("Test mode: skipping SIGTSTP signal")
-		return
-	}
-
-	// Send SIGTSTP to self to trigger machine suspension
-	if err := syscall.Kill(os.Getpid(), syscall.SIGTSTP); err != nil {
-		slog.Error("Failed to suspend machine", "error", err)
-	}
-}
-
-// stopMachine sends SIGTERM to stop the machine gracefully
-func (m *Manager) stopMachine() {
-	slog.Info("Stopping machine due to inactivity",
-		"timeout", m.idleTimeout,
-		"lastActivity", m.lastActivity)
-
-	// Skip signal sending in test mode
-	if m.testMode {
-		slog.Info("Test mode: skipping SIGTERM signal")
-		return
-	}
-
-	// Send SIGTERM to self to trigger graceful shutdown
-	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
-		slog.Error("Failed to stop machine", "error", err)
-	}
-}
+// suspendMachine and stopMachine are implemented in platform-specific files:
+// - signals_unix.go for Unix/Linux/macOS
+// - signals_windows.go for Windows
 
 // Stop cancels any pending idle timer
 func (m *Manager) Stop() {
