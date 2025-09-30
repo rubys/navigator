@@ -80,22 +80,32 @@ This document tracks the ongoing refactoring effort to improve code maintainabil
 
 ### Phase 1: Large File Analysis (In Progress)
 
-#### ⏭️ internal/process/webapp.go (651 LOC)
+#### ✅ internal/process/webapp.go (COMPLETED)
 
-**Status**: Pending review
-**Priority**: Medium
+**Original size**: 498 LOC (355 code lines)
+**Final size**: 351 LOC (252 code lines) - 30% total reduction, 29% code reduction
 
-**Potential refactoring opportunities**:
-- Extract process lifecycle management
-- Separate port allocation logic
-- Extract environment variable handling
-- Consider splitting into multiple focused files
+**Extractions performed**:
 
-**Next steps**:
-1. Review file for complexity and duplication
-2. Identify extraction opportunities
-3. Create refactoring plan
-4. Implement and test
+1. **Process Starter** → `internal/process/process_starter.go` (187 LOC, 133 code)
+   - Created `ProcessStarter` type
+   - Methods: `StartWebApp`, `getRuntime`, `getServer`, `getArgs`, `setupCommand`, `waitForReady`
+   - Handles framework detection, command building, environment setup, readiness checks
+   - Commit: TBD (Sep 30, 2025)
+
+2. **Port Allocator** → `internal/process/port_allocator.go` (34 LOC, 25 code)
+   - Created `PortAllocator` type
+   - Method: `FindAvailablePort`
+   - Finds available TCP ports in configured range
+   - Commit: TBD (Sep 30, 2025)
+
+**Benefits achieved**:
+- ✅ Better separation of concerns (process starting, port allocation isolated)
+- ✅ Improved testability (each module can be tested independently)
+- ✅ Cleaner AppManager focused on lifecycle management
+- ✅ Easier to maintain and extend framework support
+- ✅ All 100+ tests passing
+- ✅ No behavioral changes
 
 #### ⏸️ cmd/navigator-legacy/main.go (3842 LOC)
 
@@ -191,6 +201,7 @@ This document tracks the ongoing refactoring effort to improve code maintainabil
 | File | Original | Current | Reduction | Status |
 |------|----------|---------|-----------|--------|
 | internal/server/handler.go | 722 LOC | 343 LOC | 52% | ✅ Complete |
+| internal/process/webapp.go | 498 LOC | 351 LOC | 30% | ✅ Complete |
 | cmd/navigator-refactored/main.go | ~300 LOC | ~280 LOC | ~7% | ✅ Complete |
 
 ### New Modules Created
@@ -200,6 +211,8 @@ This document tracks the ongoing refactoring effort to improve code maintainabil
 | internal/server/static.go | 263 LOC | Static file serving | ✅ Complete |
 | internal/server/mime.go | 30 LOC | MIME type detection | ✅ Complete |
 | internal/server/access_log.go | 119 LOC | Access logging | ✅ Complete |
+| internal/process/process_starter.go | 187 LOC | Process lifecycle management | ✅ Complete |
+| internal/process/port_allocator.go | 34 LOC | Port allocation | ✅ Complete |
 
 ### Test Coverage
 
@@ -213,6 +226,13 @@ This document tracks the ongoing refactoring effort to improve code maintainabil
 ## Recent Activity
 
 ### September 30, 2025
+
+**Webapp.go Refactoring** (Commit: TBD)
+- Extracted process starting to `internal/process/process_starter.go`
+- Extracted port allocation to `internal/process/port_allocator.go`
+- Reduced webapp.go from 498 to 351 LOC (30% reduction)
+- Updated AppManager to use ProcessStarter and PortAllocator
+- All tests passing (100+ tests), CI pending
 
 **Access Logging Extraction** (Commit: `aacd4d0`)
 - Extracted access logging to `internal/server/access_log.go`
@@ -241,10 +261,11 @@ This document tracks the ongoing refactoring effort to improve code maintainabil
 
 ## Next Steps
 
-1. **Review internal/process/webapp.go** for refactoring opportunities
-2. **Begin Phase 2**: Identify and extract code duplication
-3. **Consider**: Extract reverse proxy handling from handler.go
-4. **Consider**: Simplify rewrite rules processing
+1. ✅ **Complete**: internal/process/webapp.go refactoring finished
+2. **Begin Phase 2**: Identify and extract code duplication across the codebase
+3. **Consider**: Extract reverse proxy handling from handler.go (if still beneficial)
+4. **Consider**: Extract WebSocket connection management from webapp.go
+5. **Consider**: Extract idle monitoring logic from webapp.go
 
 ---
 
@@ -270,4 +291,4 @@ If you have questions about this refactoring effort or want to contribute:
 ---
 
 **Last Updated**: September 30, 2025
-**Status**: Phase 1 - handler.go refactoring complete, webapp.go next
+**Status**: Phase 1 - handler.go and webapp.go refactoring complete

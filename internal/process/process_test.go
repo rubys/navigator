@@ -447,13 +447,13 @@ func TestWebAppManagerIntegration(t *testing.T) {
 	// Test basic app manager functionality without actually starting processes
 	// (since we don't have a real web app to start in tests)
 
-	// Test port allocation (use the module function)
-	port, err := findAvailablePort(appManager.minPort, appManager.maxPort)
+	// Test port allocation (use the port allocator)
+	port, err := appManager.portAllocator.FindAvailablePort()
 	if err != nil {
-		t.Fatalf("findAvailablePort failed: %v", err)
+		t.Fatalf("FindAvailablePort failed: %v", err)
 	}
-	if port < appManager.minPort || port > appManager.maxPort {
-		t.Errorf("Port %d is outside expected range [%d, %d]", port, appManager.minPort, appManager.maxPort)
+	if port < 4000 || port > 4099 {
+		t.Errorf("Port %d is outside expected range [%d, %d]", port, 4000, 4099)
 	}
 
 	// Test cleanup
@@ -544,14 +544,15 @@ func TestProcessManagerConcurrency(t *testing.T) {
 }
 
 func TestWebAppPortAllocation(t *testing.T) {
-	// Test port allocation (independent of config)
-	port1, err1 := findAvailablePort(4000, 4099)
+	// Test port allocation (using PortAllocator)
+	allocator := NewPortAllocator(4000, 4099)
+	port1, err1 := allocator.FindAvailablePort()
 	if err1 != nil {
-		t.Fatalf("findAvailablePort failed: %v", err1)
+		t.Fatalf("FindAvailablePort failed: %v", err1)
 	}
-	port2, err2 := findAvailablePort(4000, 4099)
+	port2, err2 := allocator.FindAvailablePort()
 	if err2 != nil {
-		t.Fatalf("findAvailablePort failed: %v", err2)
+		t.Fatalf("FindAvailablePort failed: %v", err2)
 	}
 
 	// Ports should be in valid range
@@ -684,9 +685,9 @@ func TestStartWebApp(t *testing.T) {
 	tenant := &cfg.Applications.Tenants[0]
 
 	// Test starting a web app
-	err := appManager.startWebApp(app, tenant)
+	err := appManager.processStarter.StartWebApp(app, tenant)
 	if err != nil {
-		t.Errorf("startWebApp should not error with echo command: %v", err)
+		t.Errorf("StartWebApp should not error with echo command: %v", err)
 	}
 
 	// Cleanup
@@ -868,9 +869,9 @@ func TestStartWebAppDefaultValues(t *testing.T) {
 	tenant.Server = "test"
 	tenant.Args = []string{"default", "test"}
 
-	err := appManager.startWebApp(app, tenant)
+	err := appManager.processStarter.StartWebApp(app, tenant)
 	if err != nil {
-		t.Errorf("startWebApp should not error with default values: %v", err)
+		t.Errorf("StartWebApp should not error with default values: %v", err)
 	}
 
 	// Cleanup
@@ -921,9 +922,9 @@ func TestStartWebAppWithFrameworkConfig(t *testing.T) {
 	tenant := &cfg.Applications.Tenants[0]
 
 	// Test with framework configuration
-	err := appManager.startWebApp(app, tenant)
+	err := appManager.processStarter.StartWebApp(app, tenant)
 	if err != nil {
-		t.Errorf("startWebApp should not error with framework config: %v", err)
+		t.Errorf("StartWebApp should not error with framework config: %v", err)
 	}
 
 	// Cleanup

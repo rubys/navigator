@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/url"
 	"os"
 	"os/exec"
@@ -33,12 +32,12 @@ type WebApp struct {
 
 // AppManager manages web application processes
 type AppManager struct {
-	apps        map[string]*WebApp
-	config      *config.Config
-	mutex       sync.RWMutex
-	idleTimeout time.Duration
-	minPort     int // Minimum port for web apps
-	maxPort     int // Maximum port for web apps
+	apps           map[string]*WebApp
+	config         *config.Config
+	processStarter *ProcessStarter
+	portAllocator  *PortAllocator
+	mutex          sync.RWMutex
+	idleTimeout    time.Duration
 }
 
 // NewAppManager creates a new application manager
@@ -58,11 +57,11 @@ func NewAppManager(cfg *config.Config) *AppManager {
 	}
 
 	return &AppManager{
-		apps:        make(map[string]*WebApp),
-		config:      cfg,
-		idleTimeout: idleTimeout,
-		minPort:     startPort,
-		maxPort:     startPort + config.MaxPortRange,
+		apps:           make(map[string]*WebApp),
+		config:         cfg,
+		processStarter: NewProcessStarter(cfg),
+		portAllocator:  NewPortAllocator(startPort, startPort+config.MaxPortRange),
+		idleTimeout:    idleTimeout,
 	}
 }
 
@@ -103,7 +102,7 @@ func (m *AppManager) GetOrStartApp(tenantName string) (*WebApp, error) {
 	}
 
 	// Find an available port
-	port, err := findAvailablePort(m.minPort, m.maxPort)
+	port, err := m.portAllocator.FindAvailablePort()
 	if err != nil {
 		return nil, fmt.Errorf("no available ports: %w", err)
 	}
@@ -117,8 +116,8 @@ func (m *AppManager) GetOrStartApp(tenantName string) (*WebApp, error) {
 		wsConnections: make(map[string]interface{}),
 	}
 
-	// Start the Rails application
-	if err := m.startWebApp(app, tenant); err != nil {
+	// Start the web application
+	if err := m.processStarter.StartWebApp(app, tenant); err != nil {
 		return nil, err
 	}
 
@@ -128,137 +127,6 @@ func (m *AppManager) GetOrStartApp(tenantName string) (*WebApp, error) {
 	go m.monitorAppIdleTimeout(tenantName)
 
 	return app, nil
-}
-
-// startWebApp starts a web application process
-func (m *AppManager) startWebApp(app *WebApp, tenant *config.Tenant) error {
-	// Clean up any existing PID file first
-	if pidfile, ok := tenant.Env["PIDFILE"]; ok {
-		cleanupPidFile(pidfile)
-	}
-
-	// Determine runtime command (e.g., "ruby", "python", "node")
-	runtime := tenant.Runtime
-	if runtime == "" {
-		// Check framework-specific runtime
-		if tenant.Framework != "" && m.config.Applications.Runtime != nil {
-			runtime = m.config.Applications.Runtime[tenant.Framework]
-		}
-	}
-	if runtime == "" {
-		runtime = "ruby" // Default to Ruby
-	}
-
-	// Determine server command (e.g., "bin/rails", "manage.py", "server.js")
-	server := tenant.Server
-	if server == "" {
-		// Check framework-specific server
-		if tenant.Framework != "" && m.config.Applications.Server != nil {
-			server = m.config.Applications.Server[tenant.Framework]
-		}
-	}
-	if server == "" {
-		server = "bin/rails" // Default to Rails
-	}
-
-	// Determine command arguments
-	args := tenant.Args
-	if len(args) == 0 {
-		// Check framework-specific args
-		if tenant.Framework != "" && m.config.Applications.Args != nil {
-			args = m.config.Applications.Args[tenant.Framework]
-		}
-	}
-	if len(args) == 0 {
-		// Default Rails server args
-		args = []string{"server", "-b", "0.0.0.0", "-p", strconv.Itoa(app.Port)}
-	} else {
-		// Replace {{port}} placeholder in args
-		for i, arg := range args {
-			args[i] = strings.ReplaceAll(arg, "{{port}}", strconv.Itoa(app.Port))
-		}
-	}
-
-	// Create command
-	ctx, cancel := context.WithCancel(context.Background())
-	app.cancel = cancel
-
-	cmd := exec.CommandContext(ctx, runtime, append([]string{server}, args...)...)
-
-	// Set working directory
-	if tenant.Root != "" {
-		cmd.Dir = tenant.Root
-	}
-
-	// Set environment
-	cmd.Env = os.Environ()
-
-	// Add PORT environment variable
-	cmd.Env = append(cmd.Env, fmt.Sprintf("PORT=%d", app.Port))
-
-	// Add tenant-specific environment variables
-	for key, value := range tenant.Env {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
-	}
-
-	// Create log writers for the app output
-	tenantName := tenant.Name
-	stdout := CreateLogWriter(tenantName, "stdout", m.config.Logging)
-	stderr := CreateLogWriter(tenantName, "stderr", m.config.Logging)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-
-	app.Process = cmd
-
-	slog.Info("Starting web app",
-		"tenant", tenantName,
-		"port", app.Port,
-		"runtime", runtime,
-		"server", server,
-		"args", args,
-		"dir", cmd.Dir)
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start web app: %w", err)
-	}
-
-	// Execute tenant start hooks
-	if err := ExecuteTenantHooks(m.config.Applications.Hooks.Start, tenant.Hooks.Start,
-		tenant.Env, tenantName, "start"); err != nil {
-		slog.Error("Failed to execute tenant start hooks", "tenant", tenantName, "error", err)
-	}
-
-	// Skip readiness check if in test mode with echo command
-	if os.Getenv("NAVIGATOR_TEST_SKIP_READINESS") == "true" || runtime == "echo" {
-		slog.Debug("Skipping readiness check for test", "tenant", tenantName)
-		return nil
-	}
-
-	// Wait for Rails to be ready
-	readyCtx, readyCancel := context.WithTimeout(context.Background(), config.RailsStartupTimeout)
-	defer readyCancel()
-
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-readyCtx.Done():
-			// Give Rails more time but don't fail
-			slog.Warn("Rails startup timeout reached, continuing anyway",
-				"tenant", tenantName,
-				"timeout", config.RailsStartupTimeout)
-			return nil
-		case <-ticker.C:
-			// Try to connect to the Rails app
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", app.Port), 100*time.Millisecond)
-			if err == nil {
-				conn.Close()
-				slog.Info("Web app is ready", "tenant", tenantName, "port", app.Port)
-				return nil
-			}
-		}
-	}
 }
 
 // monitorAppIdleTimeout monitors and stops idle apps
@@ -341,6 +209,7 @@ func (m *AppManager) UpdateConfig(newConfig *config.Config) {
 	defer m.mutex.Unlock()
 
 	m.config = newConfig
+	m.processStarter = NewProcessStarter(newConfig)
 
 	// Update idle timeout if changed
 	idleTimeout := config.DefaultIdleTimeout
@@ -356,13 +225,11 @@ func (m *AppManager) UpdateConfig(newConfig *config.Config) {
 	if startPort == 0 {
 		startPort = config.DefaultStartPort
 	}
-	m.minPort = startPort
-	m.maxPort = startPort + config.MaxPortRange
+	m.portAllocator = NewPortAllocator(startPort, startPort+config.MaxPortRange)
 
 	slog.Info("Updated AppManager configuration",
 		"idleTimeout", m.idleTimeout,
-		"minPort", m.minPort,
-		"maxPort", m.maxPort)
+		"portRange", fmt.Sprintf("%d-%d", startPort, startPort+config.MaxPortRange))
 }
 
 // Cleanup stops all running web applications
@@ -476,20 +343,6 @@ func cleanupPidFile(pidfilePath string) error {
 	}
 
 	return nil
-}
-
-// findAvailablePort finds an available port in the specified range
-func findAvailablePort(minPort, maxPort int) (int, error) {
-	for port := minPort; port <= maxPort; port++ {
-		// Try to listen on the port
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-		if err == nil {
-			// Port is available
-			listener.Close()
-			return port, nil
-		}
-	}
-	return 0, fmt.Errorf("no available ports in range %d-%d", minPort, maxPort)
 }
 
 // ParseURL safely parses a URL string
