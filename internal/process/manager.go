@@ -188,6 +188,11 @@ func (m *Manager) startProcess(proc *ManagedProcess) error {
 
 // StopManagedProcesses stops all managed processes
 func (m *Manager) StopManagedProcesses() {
+	m.StopManagedProcessesWithContext(context.Background())
+}
+
+// StopManagedProcessesWithContext stops all managed processes with context deadline
+func (m *Manager) StopManagedProcessesWithContext(ctx context.Context) {
 	m.mutex.RLock()
 	processesCopy := make([]*ManagedProcess, len(m.processes))
 	copy(processesCopy, m.processes)
@@ -207,17 +212,28 @@ func (m *Manager) StopManagedProcesses() {
 		proc.mutex.Unlock()
 	}
 
-	// Wait for all processes to finish
+	// Wait for all processes to finish with context awareness
 	done := make(chan struct{})
 	go func() {
 		m.wg.Wait()
 		close(done)
 	}()
 
+	// Use context timeout if available, otherwise fall back to default timeout
+	timeout := config.ProcessStopTimeout
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining < timeout {
+			timeout = remaining
+		}
+	}
+
 	select {
 	case <-done:
 		slog.Info("All managed processes stopped")
-	case <-time.After(config.ProcessStopTimeout):
+	case <-ctx.Done():
+		slog.Warn("Context deadline exceeded during managed process shutdown")
+	case <-time.After(timeout):
 		slog.Warn("Timeout waiting for managed processes to stop")
 	}
 }

@@ -261,27 +261,31 @@ func TestHandleConfigReload(t *testing.T) {
 	cfg.Server.Listen = "3000"
 	cfg.Server.Hostname = "localhost"
 
-	// Create managers (they can be nil for this test)
-	var appManager *process.AppManager
-	var processManager *process.Manager
-	var currentAuth *auth.BasicAuth
-	var idleManager *idle.Manager
+	// Create real managers to avoid nil pointer issues
+	appManager := process.NewAppManager(cfg)
+	processManager := process.NewManager(cfg)
+	idleManager := idle.NewManager(cfg)
+
+	// Create lifecycle with nonexistent config file
+	lifecycle := &ServerLifecycle{
+		configFile:     "nonexistent-config.yml",
+		cfg:            cfg,
+		appManager:     appManager,
+		processManager: processManager,
+		basicAuth:      nil,
+		idleManager:    idleManager,
+	}
 
 	// Test failed reload with nonexistent config file
-	newConfig, newAuth, success := handleConfigReload("nonexistent-config.yml", appManager, processManager, currentAuth, idleManager)
+	// This should log an error but not crash
+	lifecycle.handleReload()
 
-	// Should fail because the config file doesn't exist
-	if success {
-		t.Error("Expected handleConfigReload to fail with nonexistent config file")
-	}
-	if newConfig != nil {
-		t.Error("Expected nil config when reload fails")
-	}
-	if newAuth != nil {
-		t.Error("Expected nil auth when reload fails")
+	// Config should remain unchanged because reload failed
+	if lifecycle.cfg.Server.Listen != "3000" {
+		t.Error("Expected config to remain unchanged after failed reload")
 	}
 
-	t.Log("handleConfigReload correctly handles missing config files")
+	t.Log("handleReload correctly handles missing config files")
 }
 
 func TestHandleConfigReloadWithValidConfig(t *testing.T) {
@@ -313,30 +317,36 @@ logging:
 	appManager := process.NewAppManager(cfg)
 	processManager := process.NewManager(cfg)
 	idleManager := idle.NewManager(cfg)
-	var currentAuth *auth.BasicAuth
+
+	// Create lifecycle with valid config file
+	lifecycle := &ServerLifecycle{
+		configFile:     configFile,
+		cfg:            cfg,
+		appManager:     appManager,
+		processManager: processManager,
+		basicAuth:      nil,
+		idleManager:    idleManager,
+	}
 
 	// Test successful reload with valid config file
-	newConfig, newAuth, success := handleConfigReload(configFile, appManager, processManager, currentAuth, idleManager)
+	lifecycle.handleReload()
 
-	// Should succeed because the config file exists and is valid
-	if !success {
-		t.Error("Expected handleConfigReload to succeed with valid config file")
-	}
-	if newConfig == nil {
-		t.Error("Expected non-nil config when reload succeeds")
+	// Config should be updated
+	if lifecycle.cfg == nil {
+		t.Fatal("Expected non-nil config after reload")
 	}
 
-	// newAuth should be nil because no authentication is configured
-	if newAuth != nil {
+	// basicAuth should be nil because no authentication is configured
+	if lifecycle.basicAuth != nil {
 		t.Error("Expected nil auth when no authentication configured")
 	}
 
 	// Config should be updated
-	if newConfig.Server.Listen != "3001" {
-		t.Errorf("Expected config to be updated with listen port 3001, got %s", newConfig.Server.Listen)
+	if lifecycle.cfg.Server.Listen != "3001" {
+		t.Errorf("Expected config to be updated with listen port 3001, got %s", lifecycle.cfg.Server.Listen)
 	}
-	if newConfig.Server.Hostname != "test-host" {
-		t.Errorf("Expected config to be updated with hostname 'test-host', got %s", newConfig.Server.Hostname)
+	if lifecycle.cfg.Server.Hostname != "test-host" {
+		t.Errorf("Expected config to be updated with hostname 'test-host', got %s", lifecycle.cfg.Server.Hostname)
 	}
 }
 
@@ -498,22 +508,28 @@ logging:
 	appManager := process.NewAppManager(cfg)
 	processManager := process.NewManager(cfg)
 	idleManager := idle.NewManager(cfg)
-	var currentAuth *auth.BasicAuth
+
+	// Create lifecycle with valid config file
+	lifecycle := &ServerLifecycle{
+		configFile:     configFile,
+		cfg:            cfg,
+		appManager:     appManager,
+		processManager: processManager,
+		basicAuth:      nil,
+		idleManager:    idleManager,
+	}
 
 	// Test reload with config containing multiple static directories
-	newConfig, newAuth, success := handleConfigReload(configFile, appManager, processManager, currentAuth, idleManager)
+	lifecycle.handleReload()
 
-	// Should succeed
-	if !success {
-		t.Error("Expected handleConfigReload to succeed with valid config file")
-	}
-	if newConfig == nil {
-		t.Error("Expected non-nil config when reload succeeds")
+	// Verify config was updated
+	if lifecycle.cfg == nil {
+		t.Fatal("Expected non-nil config after reload")
 	}
 
 	// Verify static directories were updated (this was the bug)
-	if len(newConfig.Static.Directories) != 3 {
-		t.Errorf("Expected 3 static directories after reload, got %d", len(newConfig.Static.Directories))
+	if len(lifecycle.cfg.Static.Directories) != 3 {
+		t.Errorf("Expected 3 static directories after reload, got %d", len(lifecycle.cfg.Static.Directories))
 	}
 
 	// Verify specific directories are present
@@ -524,7 +540,7 @@ logging:
 	}
 
 	actualDirs := make(map[string]string)
-	for _, dir := range newConfig.Static.Directories {
+	for _, dir := range lifecycle.cfg.Static.Directories {
 		actualDirs[dir.Path] = dir.Dir
 	}
 
@@ -536,8 +552,8 @@ logging:
 		}
 	}
 
-	// newAuth should be nil because no authentication is configured
-	if newAuth != nil {
+	// basicAuth should be nil because no authentication is configured
+	if lifecycle.basicAuth != nil {
 		t.Error("Expected nil auth when no auth is configured")
 	}
 

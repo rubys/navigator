@@ -367,39 +367,57 @@ func (m *AppManager) UpdateConfig(newConfig *config.Config) {
 
 // Cleanup stops all running web applications
 func (m *AppManager) Cleanup() {
+	m.CleanupWithContext(context.Background())
+}
+
+// CleanupWithContext stops all running web applications with context deadline
+func (m *AppManager) CleanupWithContext(ctx context.Context) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	slog.Info("Cleaning up all web applications")
 
-	for tenantName, app := range m.apps {
-		slog.Info("Stopping web app", "tenant", tenantName)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
 
-		// Execute tenant stop hooks
-		if app.Tenant != nil {
-			ExecuteTenantHooks(m.config.Applications.Hooks.Stop, app.Tenant.Hooks.Stop,
-				app.Tenant.Env, tenantName, "stop")
-		}
+		for tenantName, app := range m.apps {
+			slog.Info("Stopping web app", "tenant", tenantName)
 
-		// Clean up PID file
-		if app.Tenant != nil {
-			if pidfile, ok := app.Tenant.Env["PIDFILE"]; ok {
-				if err := os.Remove(pidfile); err != nil && !os.IsNotExist(err) {
-					slog.Warn("Error removing PID file", "file", pidfile, "error", err)
+			// Execute tenant stop hooks
+			if app.Tenant != nil {
+				ExecuteTenantHooks(m.config.Applications.Hooks.Stop, app.Tenant.Hooks.Stop,
+					app.Tenant.Env, tenantName, "stop")
+			}
+
+			// Clean up PID file
+			if app.Tenant != nil {
+				if pidfile, ok := app.Tenant.Env["PIDFILE"]; ok {
+					if err := os.Remove(pidfile); err != nil && !os.IsNotExist(err) {
+						slog.Warn("Error removing PID file", "file", pidfile, "error", err)
+					}
 				}
+			}
+
+			if app.cancel != nil {
+				app.cancel()
 			}
 		}
 
-		if app.cancel != nil {
-			app.cancel()
-		}
+		// Clear the apps map
+		m.apps = make(map[string]*WebApp)
+
+		// Give processes a moment to exit cleanly
+		time.Sleep(500 * time.Millisecond)
+	}()
+
+	// Wait for cleanup or context timeout
+	select {
+	case <-done:
+		slog.Info("All web applications stopped")
+	case <-ctx.Done():
+		slog.Warn("Context deadline exceeded during web app cleanup")
 	}
-
-	// Clear the apps map
-	m.apps = make(map[string]*WebApp)
-
-	// Give processes a moment to exit cleanly
-	time.Sleep(500 * time.Millisecond)
 }
 
 // GetApp returns a web app by tenant name if it exists and is running

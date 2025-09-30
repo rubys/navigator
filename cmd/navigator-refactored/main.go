@@ -88,85 +88,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create HTTP handler with the new server package
-	handler := server.CreateHandler(cfg, appManager, basicAuth, idleManager)
-
-	// Create HTTP server
-	addr := fmt.Sprintf(":%s", cfg.Server.Listen)
-	srv := &http.Server{
-		Addr:    addr,
-		Handler: handler,
+	// Create and run server lifecycle
+	lifecycle := &ServerLifecycle{
+		configFile:     configFile,
+		cfg:            cfg,
+		appManager:     appManager,
+		processManager: processManager,
+		basicAuth:      basicAuth,
+		idleManager:    idleManager,
 	}
 
-	// Setup signal handling
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
-
-	// Start server in goroutine
-	serverErrors := make(chan error, 1)
-	go func() {
-		slog.Info("Navigator starting", "address", addr)
-
-		// Execute server ready hooks
-		process.ExecuteServerHooks(cfg.Hooks.Ready, "ready")
-
-		serverErrors <- srv.ListenAndServe()
-	}()
-
-	// Handle signals and server errors
-	for {
-		select {
-		case err := <-serverErrors:
-			if err != http.ErrServerClosed {
-				slog.Error("Server failed", "error", err)
-			}
-			return
-
-		case sig := <-sigChan:
-			switch sig {
-			case syscall.SIGHUP:
-				slog.Info("Received SIGHUP, reloading configuration")
-				newConfig, newBasicAuth, reloadSuccess := handleConfigReload(configFile, appManager, processManager, basicAuth, idleManager)
-				if reloadSuccess {
-					// Replace the old config with the new one
-					cfg = newConfig
-					basicAuth = newBasicAuth
-					// Create new handler with the new configuration
-					newHandler := server.CreateHandler(cfg, appManager, basicAuth, idleManager)
-					srv.Handler = newHandler
-				}
-				// Continue the loop to keep the server running
-
-			case syscall.SIGTERM, syscall.SIGINT:
-				slog.Info("Received shutdown signal", "signal", sig)
-
-				// Stop idle manager
-				idleManager.Stop()
-
-				// Graceful shutdown
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer cancel()
-
-				// Shutdown server
-				if err := srv.Shutdown(ctx); err != nil {
-					slog.Error("Server shutdown failed", "error", err)
-				}
-
-				// Stop all applications
-				appManager.Cleanup()
-
-				// Stop managed processes
-				processManager.StopManagedProcesses()
-
-				// Log shutdown completion and exit
-				slog.Info("Navigator shutdown complete")
-				return
-			}
-		}
+	if err := lifecycle.Run(); err != nil {
+		slog.Error("Server lifecycle failed", "error", err)
+		os.Exit(1)
 	}
 }
 
-func initLogger() {
+func getLogLevel() slog.Level {
 	logLevel := slog.LevelInfo
 	if lvl := os.Getenv("LOG_LEVEL"); lvl != "" {
 		switch strings.ToLower(lvl) {
@@ -180,9 +118,12 @@ func initLogger() {
 			logLevel = slog.LevelError
 		}
 	}
+	return logLevel
+}
 
+func initLogger() {
 	opts := &slog.HandlerOptions{
-		Level: logLevel,
+		Level: getLogLevel(),
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
 	slog.SetDefault(logger)
@@ -191,24 +132,9 @@ func initLogger() {
 func setupLogging(cfg *config.Config) {
 	// Check if JSON logging is configured
 	if cfg.Logging.Format == "json" {
-		// Get current log level from existing logger
-		logLevel := slog.LevelInfo
-		if lvl := os.Getenv("LOG_LEVEL"); lvl != "" {
-			switch strings.ToLower(lvl) {
-			case "debug":
-				logLevel = slog.LevelDebug
-			case "info":
-				logLevel = slog.LevelInfo
-			case "warn", "warning":
-				logLevel = slog.LevelWarn
-			case "error":
-				logLevel = slog.LevelError
-			}
-		}
-
 		// Switch to JSON handler
 		opts := &slog.HandlerOptions{
-			Level: logLevel,
+			Level: getLogLevel(),
 		}
 		jsonLogger := slog.New(slog.NewJSONHandler(os.Stdout, opts))
 		slog.SetDefault(jsonLogger)
@@ -255,42 +181,137 @@ func printHelp() {
 	fmt.Println("  SIGINT   Immediate shutdown")
 }
 
-func handleConfigReload(configFile string, appManager *process.AppManager, processManager *process.Manager, currentAuth *auth.BasicAuth, idleManager *idle.Manager) (*config.Config, *auth.BasicAuth, bool) {
-	// Load new configuration
-	newConfig, err := config.LoadConfig(configFile)
-	if err != nil {
-		slog.Error("Failed to reload configuration", "error", err)
-		return nil, nil, false
+// ServerLifecycle manages the HTTP server lifecycle and signal handling
+type ServerLifecycle struct {
+	configFile     string
+	cfg            *config.Config
+	appManager     *process.AppManager
+	processManager *process.Manager
+	basicAuth      *auth.BasicAuth
+	idleManager    *idle.Manager
+	srv            *http.Server
+}
+
+// Run starts the server and handles signals until shutdown
+func (l *ServerLifecycle) Run() error {
+	// Create HTTP handler
+	handler := server.CreateHandler(l.cfg, l.appManager, l.basicAuth, l.idleManager)
+
+	// Create HTTP server
+	addr := fmt.Sprintf(":%s", l.cfg.Server.Listen)
+	l.srv = &http.Server{
+		Addr:    addr,
+		Handler: handler,
 	}
 
-	// Update configuration in all managers with the new config
-	appManager.UpdateConfig(newConfig)
-	processManager.UpdateManagedProcesses(newConfig)
-	idleManager.UpdateConfig(newConfig)
+	// Setup signal handling
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
+
+	// Start server in goroutine
+	serverErrors := make(chan error, 1)
+	go func() {
+		slog.Info("Navigator starting", "address", addr)
+
+		// Execute server ready hooks
+		process.ExecuteServerHooks(l.cfg.Hooks.Ready, "ready")
+
+		serverErrors <- l.srv.ListenAndServe()
+	}()
+
+	// Handle signals and server errors
+	for {
+		select {
+		case err := <-serverErrors:
+			if err != http.ErrServerClosed {
+				slog.Error("Server failed", "error", err)
+				return err
+			}
+			return nil
+
+		case sig := <-sigChan:
+			switch sig {
+			case syscall.SIGHUP:
+				l.handleReload()
+
+			case syscall.SIGTERM, syscall.SIGINT:
+				return l.handleShutdown(sig)
+			}
+		}
+	}
+}
+
+// handleReload reloads configuration without restarting the server
+func (l *ServerLifecycle) handleReload() {
+	slog.Info("Received SIGHUP, reloading configuration")
+
+	// Load new configuration
+	newConfig, err := config.LoadConfig(l.configFile)
+	if err != nil {
+		slog.Error("Failed to reload configuration", "error", err)
+		return
+	}
+
+	// Update configuration in all managers
+	l.appManager.UpdateConfig(newConfig)
+	l.processManager.UpdateManagedProcesses(newConfig)
+	l.idleManager.UpdateConfig(newConfig)
 
 	// Reload auth if configured
-	var newAuth *auth.BasicAuth
 	if newConfig.Server.Authentication != "" {
-		newAuth, err = auth.LoadAuthFile(
+		newAuth, err := auth.LoadAuthFile(
 			newConfig.Server.Authentication,
-			"Restricted", // Default realm
+			"Restricted",
 			newConfig.Server.AuthExclude,
 		)
 		if err != nil {
 			slog.Warn("Failed to reload auth file", "file", newConfig.Server.Authentication, "error", err)
-			// Keep existing auth on error
-			newAuth = currentAuth
 		} else {
+			l.basicAuth = newAuth
 			slog.Info("Reloaded authentication", "file", newConfig.Server.Authentication)
 		}
 	} else {
-		// Auth disabled in new config
-		newAuth = nil
+		l.basicAuth = nil
 	}
 
 	// Update logging format if changed
 	setupLogging(newConfig)
 
+	// Replace config and recreate handler
+	l.cfg = newConfig
+
+	// Update server handler if server is running
+	if l.srv != nil {
+		newHandler := server.CreateHandler(l.cfg, l.appManager, l.basicAuth, l.idleManager)
+		l.srv.Handler = newHandler
+	}
+
 	slog.Info("Configuration reloaded successfully")
-	return newConfig, newAuth, true
 }
+
+// handleShutdown performs graceful shutdown with context propagation
+func (l *ServerLifecycle) handleShutdown(sig os.Signal) error {
+	slog.Info("Received shutdown signal", "signal", sig)
+
+	// Stop idle manager
+	l.idleManager.Stop()
+
+	// Create shutdown context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Shutdown server
+	if err := l.srv.Shutdown(ctx); err != nil {
+		slog.Error("Server shutdown failed", "error", err)
+	}
+
+	// Stop all applications with context
+	l.appManager.CleanupWithContext(ctx)
+
+	// Stop managed processes with context
+	l.processManager.StopManagedProcessesWithContext(ctx)
+
+	slog.Info("Navigator shutdown complete")
+	return nil
+}
+
