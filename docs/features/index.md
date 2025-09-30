@@ -44,6 +44,14 @@ Navigator provides a comprehensive set of features designed specifically for Rai
 
 [Learn more about Hot Reload](hot-reload.md)
 
+### :electric_plug: WebSocket Support
+- **Action Cable integration** - Built-in Rails Action Cable support
+- **Standalone servers** - Manage WebSocket servers as separate processes
+- **Connection upgrades** - Automatic WebSocket protocol upgrades
+- **Long-lived connections** - Efficient handling of persistent connections
+
+[Learn more about WebSocket Support](websocket-support.md)
+
 ## Advanced Features
 
 ### :globe_with_meridians: Fly-Replay Routing

@@ -2,6 +2,18 @@
 
 A lightweight web server for multi-tenant applications with on-demand process management. Deploy multiple customers or projects from a single configuration file.
 
+## What Can Navigator Do?
+
+- **Process management** - On-demand startup, auto-restart, graceful shutdown
+- **Multi-tenant hosting** - Isolated databases and processes per customer
+- **Static file serving** - High-performance direct filesystem access with try-files
+- **Authentication** - htpasswd support with flexible exclusions
+- **Hot reload** - Update configuration without restart
+- **WebSocket support** - Built-in Action Cable and WebSocket proxying
+- **Regional routing** - Smart routing with Fly-Replay
+- **Machine suspension** - Auto-suspend idle machines on Fly.io
+- **Structured logging** - Built-in Vector integration for log aggregation
+
 **[📚 Full Documentation](https://rubys.github.io/navigator/)**
 
 ## Quick Start
@@ -55,16 +67,6 @@ applications:
 # Reload configuration (no restart)
 ./bin/navigator-refactored -s reload
 ```
-
-## What Can Navigator Do?
-
-- **Multi-tenant hosting** - Isolated databases and processes per customer
-- **Cost optimization** - Auto-suspend idle machines on Fly.io
-- **WebSocket support** - Built-in Action Cable and WebSocket proxying
-- **Smart routing** - Regional routing with Fly-Replay
-- **Static file serving** - High-performance direct filesystem access
-- **Authentication** - htpasswd support with flexible exclusions
-- **Process management** - Automatic startup, shutdown, and recovery
 
 ## Documentation
 
