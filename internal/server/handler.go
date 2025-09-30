@@ -45,10 +45,10 @@ type AccessLogEntry struct {
 // CreateHandler creates the main HTTP handler for Navigator
 func CreateHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager) http.Handler {
 	return &Handler{
-		config:       cfg,
-		appManager:   appManager,
-		auth:         basicAuth,
-		idleManager:  idleManager,
+		config:        cfg,
+		appManager:    appManager,
+		auth:          basicAuth,
+		idleManager:   idleManager,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 }
@@ -56,12 +56,12 @@ func CreateHandler(cfg *config.Config, appManager *process.AppManager, basicAuth
 // CreateTestHandler creates a handler with logging disabled for tests
 func CreateTestHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager) http.Handler {
 	return &Handler{
-		config:       cfg,
-		appManager:   appManager,
-		auth:         basicAuth,
-		idleManager:  idleManager,
+		config:        cfg,
+		appManager:    appManager,
+		auth:          basicAuth,
+		idleManager:   idleManager,
 		staticHandler: NewStaticFileHandler(cfg),
-		disableLog:   true,
+		disableLog:    true,
 	}
 }
 

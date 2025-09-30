@@ -314,4 +314,3 @@ func (l *ServerLifecycle) handleShutdown(sig os.Signal) error {
 	slog.Info("Navigator shutdown complete")
 	return nil
 }
-

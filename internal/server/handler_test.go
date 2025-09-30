@@ -90,9 +90,9 @@ func TestSetContentType(t *testing.T) {
 		expected string
 	}{
 		{"test.html", "text/html; charset=utf-8"},
-		{"test.css", "text/css; charset=utf-8"},                // stdlib adds charset
-		{"test.js", "text/javascript; charset=utf-8"},          // stdlib uses text/javascript
-		{"test.json", "application/json"},                      // stdlib omits charset for json
+		{"test.css", "text/css; charset=utf-8"},       // stdlib adds charset
+		{"test.js", "text/javascript; charset=utf-8"}, // stdlib uses text/javascript
+		{"test.json", "application/json"},             // stdlib omits charset for json
 		{"test.png", "image/png"},
 		{"test.jpg", "image/jpeg"},
 		{"test.gif", "image/gif"},
@@ -162,8 +162,8 @@ func TestTryFilesWithStaticDirectories(t *testing.T) {
 	cfg.Static.TryFiles.Suffixes = []string{"index.html", ".html"}
 
 	handler := &Handler{
-		config: cfg,
-		auth:   &auth.BasicAuth{},
+		config:        cfg,
+		auth:          &auth.BasicAuth{},
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 
@@ -881,7 +881,7 @@ func TestRewriteRulesWithMaintenanceConfig(t *testing.T) {
 
 	// Create handler
 	handler := &Handler{
-		config: cfg,
+		config:        cfg,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 
@@ -933,7 +933,7 @@ func TestStaticFallbackWithNoTenants(t *testing.T) {
 
 	// Create handler
 	handler := &Handler{
-		config: cfg,
+		config:        cfg,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 
@@ -1016,12 +1016,11 @@ func TestAssetServingIntegration(t *testing.T) {
 
 			// Create handler with all required components
 			handler := &Handler{
-				config:      cfg,
-				auth:        &auth.BasicAuth{},
-				idleManager: idle.NewManager(cfg),
-				appManager:  &process.AppManager{},
+				config:        cfg,
+				auth:          &auth.BasicAuth{},
+				idleManager:   idle.NewManager(cfg),
+				appManager:    &process.AppManager{},
 				staticHandler: NewStaticFileHandler(cfg),
-
 			}
 			// Test cases for asset requests that should succeed
 			assetTests := []struct {
@@ -1108,10 +1107,10 @@ func TestAssetServingIntegrationErrorCases(t *testing.T) {
 	cfg.Server.RewriteRules = []config.RewriteRule{}
 
 	handler := &Handler{
-		config:      cfg,
-		auth:        &auth.BasicAuth{},
-		idleManager: idle.NewManager(cfg),
-		appManager:  &process.AppManager{},
+		config:        cfg,
+		auth:          &auth.BasicAuth{},
+		idleManager:   idle.NewManager(cfg),
+		appManager:    &process.AppManager{},
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 
@@ -1443,7 +1442,7 @@ func TestHandler_HandleRewritesFlyReplayWithMethods(t *testing.T) {
 	}
 
 	handler := &Handler{
-		config: cfg,
+		config:        cfg,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 
@@ -1488,7 +1487,7 @@ func TestHandler_HandleRewritesFlyReplayLargeRequest(t *testing.T) {
 	}
 
 	handler := &Handler{
-		config: cfg,
+		config:        cfg,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 
@@ -1522,7 +1521,7 @@ func TestHandler_HandleRewritesBasicRedirect(t *testing.T) {
 	}
 
 	handler := &Handler{
-		config: cfg,
+		config:        cfg,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 
@@ -1584,7 +1583,7 @@ func TestHandler_HandleRewritesInternalRewrite(t *testing.T) {
 	}
 
 	handler := &Handler{
-		config: cfg,
+		config:        cfg,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 
@@ -1645,7 +1644,7 @@ func TestHandler_HandleRewritesRegexReplacement(t *testing.T) {
 	}
 
 	handler := &Handler{
-		config: cfg,
+		config:        cfg,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 
@@ -1730,7 +1729,7 @@ func TestHandler_HandleRewritesMultipleRules(t *testing.T) {
 	}
 
 	handler := &Handler{
-		config: cfg,
+		config:        cfg,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 
