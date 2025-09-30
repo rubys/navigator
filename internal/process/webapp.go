@@ -339,7 +339,9 @@ func cleanupPidFile(pidfilePath string) error {
 			time.Sleep(100 * time.Millisecond)
 		}
 		// Try SIGKILL if needed
-		process.Signal(syscall.SIGKILL)
+		if err := process.Signal(syscall.SIGKILL); err != nil {
+			slog.Debug("Failed to send SIGKILL to stale process", "pid", pid, "error", err)
+		}
 	}
 
 	// Remove PID file

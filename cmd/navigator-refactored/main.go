@@ -214,7 +214,9 @@ func (l *ServerLifecycle) Run() error {
 		slog.Info("Navigator starting", "address", addr)
 
 		// Execute server ready hooks
-		process.ExecuteServerHooks(l.cfg.Hooks.Ready, "ready")
+		if err := process.ExecuteServerHooks(l.cfg.Hooks.Ready, "ready"); err != nil {
+			slog.Error("Failed to execute ready hooks", "error", err)
+		}
 
 		serverErrors <- l.srv.ListenAndServe()
 	}()

@@ -17,6 +17,7 @@ func TestNewManager(t *testing.T) {
 
 	if manager == nil {
 		t.Fatal("NewManager should return a non-nil manager")
+		return
 	}
 
 	if manager.config != cfg {

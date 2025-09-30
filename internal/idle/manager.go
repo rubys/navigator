@@ -192,7 +192,9 @@ func (m *Manager) Suspend() error {
 	m.mutex.Unlock()
 
 	// Execute idle hooks before suspension
-	process.ExecuteServerHooks(m.config.Hooks.Idle, "idle")
+	if err := process.ExecuteServerHooks(m.config.Hooks.Idle, "idle"); err != nil {
+		slog.Error("Failed to execute idle hooks", "error", err)
+	}
 
 	m.suspendMachine()
 	return nil

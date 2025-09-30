@@ -780,7 +780,9 @@ func cleanupPidFile(pidfilePath string) error {
 			time.Sleep(100 * time.Millisecond)
 		}
 		// Try SIGKILL if needed
-		process.Signal(syscall.SIGKILL)
+		if err := process.Signal(syscall.SIGKILL); err != nil {
+		slog.Debug("Failed to send SIGKILL to stale process", "pid", pid, "error", err)
+	}
 	}
 
 	// Remove PID file
@@ -2683,14 +2685,9 @@ func CreateHandler(config *Config, manager *AppManager, auth *BasicAuth, idleMan
 
 		// For web apps, preserve the full path - don't strip the location prefix
 		// App routing expects to see the full path like "/2025/adelaide/adelaide-combined/"
-		// Only strip if the location is "/" (root)
+		// The path is used as-is regardless of location. Framework-specific environment
+		// variables tell the app what prefix to expect.
 		originalPath := r.URL.Path
-		if bestMatch.Path != "/" {
-			// Don't modify the path - app needs to see the full path
-			// Framework-specific environment variables tell the app what prefix to expect
-		} else {
-			// Root location - path is already correct
-		}
 
 		// Add headers
 		// Preserve X-Forwarded-For if it exists (from upstream proxy), otherwise use RemoteAddr
