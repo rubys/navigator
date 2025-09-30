@@ -2,6 +2,9 @@
 
 Ready-to-use Navigator configurations for common scenarios. Each example is complete and tested.
 
+!!! info "Updated for v0.11.0"
+    All examples have been verified to work with Navigator v0.11.0's refactored architecture. The configuration format remains unchanged, ensuring backwards compatibility.
+
 ## Quick Reference
 
 | Example | Use Case | Key Features |

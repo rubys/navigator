@@ -2,6 +2,12 @@
 
 Navigator provides a comprehensive set of features designed specifically for Rails applications, from basic process management to advanced regional routing.
 
+!!! tip "What's New in v0.11.0"
+    - **Modular Architecture**: Refactored from single-file to clean package structure
+    - **Enhanced Testing**: 81.2% test coverage across all packages
+    - **Cross-Platform**: Native Windows support alongside Linux and macOS
+    - **Improved Reliability**: Better error handling and logging utilities
+
 ## Core Features
 
 ### :zap: Process Management
@@ -158,6 +164,14 @@ Navigator provides a comprehensive set of features designed specifically for Rai
 - **Metrics export** - Structured data for monitoring systems
 
 ## Platform-Specific Features
+
+### Cross-Platform Support (v0.11.0+)
+- **Linux**: AMD64, ARM64 - Full feature support with SIGTSTP/SIGTERM
+- **macOS**: Intel (AMD64), Apple Silicon (ARM64) - Native macOS signal handling
+- **Windows**: AMD64, ARM64 - Graceful shutdown with os.Exit
+- **Platform-specific optimizations** - Uses native OS primitives where appropriate
+
+[Learn more about Architecture](../architecture.md)
 
 ### Fly.io Integration
 - **Machine suspension** - Auto-suspend idle machines

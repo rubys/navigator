@@ -4,10 +4,19 @@ Navigator can be installed in several ways depending on your needs and environme
 
 ## System Requirements
 
-- **Operating System**: Linux, macOS, or Windows (with WSL)
+- **Operating System**: Linux, macOS, or Windows
 - **Architecture**: AMD64 or ARM64
 - **Memory**: Minimum 128MB (plus Rails app requirements)
 - **Go**: Version 1.21+ (only if building from source)
+
+!!! success "Cross-Platform Support (v0.11.0+)"
+    Navigator now offers **native support** for all major platforms:
+
+    - **Linux**: AMD64, ARM64
+    - **macOS**: Intel (AMD64), Apple Silicon (ARM64)
+    - **Windows**: AMD64, ARM64 (**NEW** - native Windows support!)
+
+    Platform-specific signal handling ensures proper behavior on all operating systems.
 
 ## Installation Methods
 
