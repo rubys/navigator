@@ -229,11 +229,7 @@ func (m *AppManager) monitorAppIdleTimeout(tenantName string) {
 		if idleTime > m.idleTimeout {
 			logging.LogWebAppIdle(tenantName, idleTime.Round(time.Second).String())
 
-			m.mutex.Lock()
-			delete(m.apps, tenantName)
-			m.mutex.Unlock()
-
-			// Execute tenant stop hooks
+			// Execute tenant stop hooks before removing from registry
 			if app.Tenant != nil {
 				_ = ExecuteTenantHooks(m.config.Applications.Hooks.Stop, app.Tenant.Hooks.Stop,
 					app.Tenant.Env, tenantName, "stop")
@@ -243,6 +239,11 @@ func (m *AppManager) monitorAppIdleTimeout(tenantName string) {
 			if app.cancel != nil {
 				app.cancel()
 			}
+
+			// Remove from registry only after fully stopped
+			m.mutex.Lock()
+			delete(m.apps, tenantName)
+			m.mutex.Unlock()
 
 			// Clean up PID file
 			if app.Tenant != nil {
