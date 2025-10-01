@@ -181,12 +181,25 @@ type proxyRecorder struct {
 }
 
 // WriteHeader captures the status code and marks 502 as failure
+// Note: Only propagates non-502 status codes to underlying writer
 func (pr *proxyRecorder) WriteHeader(statusCode int) {
 	pr.statusCode = statusCode
 	if statusCode == http.StatusBadGateway {
 		pr.success = false
+		// Don't propagate 502 to underlying writer - we may retry
+		return
 	}
+	// Propagate non-502 status codes (success or non-retryable errors)
 	pr.ResponseWriter.WriteHeader(statusCode)
+}
+
+// Write blocks writes when a 502 error was detected
+func (pr *proxyRecorder) Write(b []byte) (int, error) {
+	if !pr.success {
+		// Don't propagate response body for failed requests that may be retried
+		return len(b), nil
+	}
+	return pr.ResponseWriter.Write(b)
 }
 
 // IsWebSocketRequest checks if request is a WebSocket upgrade
