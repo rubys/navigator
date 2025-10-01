@@ -249,12 +249,20 @@ func (m *AppManager) monitorAppIdleTimeout(tenantName string) {
 			// Check if a request came in during hooks and cancelled the shutdown
 			app.mutex.Lock()
 			shutdownCancelled := !app.Stopping
+			app.mutex.Unlock()
+
 			if shutdownCancelled {
-				app.mutex.Unlock()
 				slog.Info("App shutdown cancelled due to new request", "tenant", tenantName)
+				// Run start hooks to restore app to normal state
+				if app.Tenant != nil {
+					if err := ExecuteTenantHooks(m.config.Applications.Hooks.Start, app.Tenant.Hooks.Start,
+						app.Tenant.Env, tenantName, "start"); err != nil {
+						slog.Error("Failed to execute tenant start hooks after shutdown cancellation",
+							"tenant", tenantName, "error", err)
+					}
+				}
 				continue // Skip stopping, go back to monitoring
 			}
-			app.mutex.Unlock()
 
 			// Stop the process
 			if app.cancel != nil {
