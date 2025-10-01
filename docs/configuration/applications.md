@@ -118,6 +118,7 @@ applications:
 | `app_directory` | No | Working directory | `/rails`, `/app` (defaults to `/app`) |
 | `port_env_var` | No | Port environment variable | `PORT` (default) |
 | `startup_delay` | No | Startup delay in seconds | `5` (default) |
+| `health_check` | No | Health check endpoint | `/up`, `/health` (defaults to `/`) |
 
 ### Template Variables
 
@@ -169,6 +170,124 @@ applications:
 ```
 
 Each tenant can define `var` values that get substituted into the template.
+
+## Health Check Configuration
+
+Navigator verifies that web applications are ready to handle requests by making HTTP requests to a configurable health check endpoint. This prevents 502 errors during application startup.
+
+### Global Health Check
+
+Set a default health check endpoint for all applications:
+
+```yaml
+applications:
+  health_check: /up  # Default health check endpoint
+
+  tenants:
+    - name: myapp
+      path: /
+      working_dir: /var/www/app
+```
+
+### Per-Tenant Health Check
+
+Override the health check endpoint for specific tenants:
+
+```yaml
+applications:
+  health_check: /up  # Global default
+
+  tenants:
+    - name: rails-app
+      path: /
+      working_dir: /var/www/rails
+      health_check: /up  # Rails 7.1+ health check
+
+    - name: django-app
+      path: /django/
+      working_dir: /var/www/django
+      health_check: /health/  # Custom Django endpoint
+
+    - name: legacy-app
+      path: /legacy/
+      working_dir: /var/www/legacy
+      # Uses global /up endpoint
+```
+
+### How Health Checks Work
+
+1. **Application Startup**: Navigator starts the web application process
+2. **Health Check Polling**: Navigator makes HTTP GET requests to the health check endpoint every 500ms
+3. **Ready Detection**: Any HTTP response (even 404/500) indicates the app is serving requests
+4. **Timeout**: If no response after 30 seconds, Navigator continues anyway with a warning
+
+### Health Check Endpoints
+
+Common health check endpoints by framework:
+
+| Framework | Endpoint | Configuration |
+|-----------|----------|---------------|
+| Rails 7.1+ | `/up` | Built-in health check route |
+| Rails (custom) | `/health` | Add custom route |
+| Django | `/health/` | Add custom view |
+| Node.js/Express | `/health` | Add custom route |
+| Default | `/` | Root path works but may be slower |
+
+### Rails Health Check Setup
+
+Rails 7.1+ includes a built-in health check route at `/up`:
+
+```ruby
+# config/routes.rb
+Rails.application.routes.draw do
+  # Built-in health check (Rails 7.1+)
+  get "up" => "rails/health#show", as: :rails_health_check
+
+  # Or custom health check
+  get "health" => "health#index"
+end
+```
+
+For older Rails versions, create a custom health check:
+
+```ruby
+# app/controllers/health_controller.rb
+class HealthController < ApplicationController
+  def index
+    render plain: "OK", status: :ok
+  end
+end
+
+# config/routes.rb
+get "health" => "health#index"
+```
+
+### Best Practices
+
+1. **Use lightweight endpoints**: Health checks should be fast and not query databases
+2. **Return quickly**: Respond as soon as the app can handle requests
+3. **Accept any status**: Navigator considers any HTTP response as "ready"
+4. **Rails 7.1+**: Use the built-in `/up` endpoint
+5. **Older apps**: Create a simple health check route
+
+### Example Configuration
+
+```yaml
+applications:
+  health_check: /up  # Rails 7.1+ default
+
+  pools:
+    max_size: 10
+    timeout: 5m
+    start_port: 4000
+
+  tenants:
+    - name: 2025-boston
+      root: /var/www/app
+      var:
+        database: "2025-boston"
+        owner: "Boston Dance Studio"
+```
 
 ## Tenant Configuration
 

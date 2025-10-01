@@ -198,6 +198,14 @@ Process pool management for tenant applications.
 | `timeout` | string | `"5m"` | Idle timeout (duration: "5m", "10m") |
 | `start_port` | integer | `4000` | Starting port for dynamic allocation |
 
+### applications.health_check
+
+Global default health check endpoint for application readiness detection. Can be overridden per-tenant.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `health_check` | string | `"/"` | HTTP endpoint for health checks (e.g., "/up", "/health") |
+
 ### applications.framework
 
 Default framework configuration (can be overridden per-tenant).
@@ -229,6 +237,7 @@ List of tenant applications.
 | `runtime` | string | | Runtime command override |
 | `server` | string | | Server command override |
 | `args` | array | | Server arguments override |
+| `health_check` | string | | Health check endpoint override (e.g., "/up") |
 | `hooks` | object | | Tenant-specific lifecycle hooks |
 
 **Note**: The `name` field is automatically derived from the `path` (e.g., `/showcase/2025/boston/` → `2025/boston`).

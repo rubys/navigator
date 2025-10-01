@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -177,13 +177,38 @@ func (ps *ProcessStarter) waitForReady(app *WebApp, tenantName, runtime string) 
 				"timeout", config.RailsStartupTimeout)
 			return nil
 		case <-ticker.C:
-			// Try to connect to the app
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", app.Port), 100*time.Millisecond)
+			// Determine health check endpoint
+			healthCheck := ps.getHealthCheckEndpoint(app.Tenant)
+
+			// Try to make an HTTP request to verify app is ready
+			client := &http.Client{
+				Timeout: 500 * time.Millisecond,
+			}
+			resp, err := client.Get(fmt.Sprintf("http://localhost:%d%s", app.Port, healthCheck))
 			if err == nil {
-				conn.Close()
+				resp.Body.Close()
+				// Any HTTP response (even 404/500) means the app is serving requests
+				slog.Debug("Health check succeeded",
+					"tenant", tenantName,
+					"endpoint", healthCheck,
+					"status", resp.StatusCode)
 				logging.LogWebAppReady(tenantName, app.Port)
 				return nil
 			}
 		}
 	}
+}
+
+// getHealthCheckEndpoint determines the health check endpoint for a tenant
+func (ps *ProcessStarter) getHealthCheckEndpoint(tenant *config.Tenant) string {
+	// 1. Check tenant-specific health check
+	if tenant != nil && tenant.HealthCheck != "" {
+		return tenant.HealthCheck
+	}
+	// 2. Check global applications health check
+	if ps.config.Applications.HealthCheck != "" {
+		return ps.config.Applications.HealthCheck
+	}
+	// 3. Default to root path
+	return "/"
 }

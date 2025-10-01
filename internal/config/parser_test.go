@@ -139,25 +139,27 @@ func TestConfigParser_ParseApplicationConfig(t *testing.T) {
 				StartPort int    `yaml:"start_port"`
 			} `yaml:"pools"`
 			Tenants []struct {
-				Path      string                 `yaml:"path"`
-				Root      string                 `yaml:"root"`
-				PublicDir string                 `yaml:"public_dir"`
-				Env       map[string]string      `yaml:"env"`
-				Framework string                 `yaml:"framework"`
-				Runtime   string                 `yaml:"runtime"`
-				Server    string                 `yaml:"server"`
-				Args      []string               `yaml:"args"`
-				Var       map[string]interface{} `yaml:"var"`
-				Hooks     struct {
+				Path        string                 `yaml:"path"`
+				Root        string                 `yaml:"root"`
+				PublicDir   string                 `yaml:"public_dir"`
+				Env         map[string]string      `yaml:"env"`
+				Framework   string                 `yaml:"framework"`
+				Runtime     string                 `yaml:"runtime"`
+				Server      string                 `yaml:"server"`
+				Args        []string               `yaml:"args"`
+				Var         map[string]interface{} `yaml:"var"`
+				HealthCheck string                 `yaml:"health_check"`
+				Hooks       struct {
 					Start []HookConfig `yaml:"start"`
 					Stop  []HookConfig `yaml:"stop"`
 				} `yaml:"hooks"`
 			} `yaml:"tenants"`
-			Env     map[string]string   `yaml:"env"`
-			Runtime map[string]string   `yaml:"runtime"`
-			Server  map[string]string   `yaml:"server"`
-			Args    map[string][]string `yaml:"args"`
-			Hooks   struct {
+			Env         map[string]string   `yaml:"env"`
+			Runtime     map[string]string   `yaml:"runtime"`
+			Server      map[string]string   `yaml:"server"`
+			Args        map[string][]string `yaml:"args"`
+			HealthCheck string              `yaml:"health_check"`
+			Hooks       struct {
 				Start []HookConfig `yaml:"start"`
 				Stop  []HookConfig `yaml:"stop"`
 			} `yaml:"hooks"`
@@ -176,16 +178,17 @@ func TestConfigParser_ParseApplicationConfig(t *testing.T) {
 				"DB_HOST": "localhost",
 			},
 			Tenants: []struct {
-				Path      string                 `yaml:"path"`
-				Root      string                 `yaml:"root"`
-				PublicDir string                 `yaml:"public_dir"`
-				Env       map[string]string      `yaml:"env"`
-				Framework string                 `yaml:"framework"`
-				Runtime   string                 `yaml:"runtime"`
-				Server    string                 `yaml:"server"`
-				Args      []string               `yaml:"args"`
-				Var       map[string]interface{} `yaml:"var"`
-				Hooks     struct {
+				Path        string                 `yaml:"path"`
+				Root        string                 `yaml:"root"`
+				PublicDir   string                 `yaml:"public_dir"`
+				Env         map[string]string      `yaml:"env"`
+				Framework   string                 `yaml:"framework"`
+				Runtime     string                 `yaml:"runtime"`
+				Server      string                 `yaml:"server"`
+				Args        []string               `yaml:"args"`
+				Var         map[string]interface{} `yaml:"var"`
+				HealthCheck string                 `yaml:"health_check"`
+				Hooks       struct {
 					Start []HookConfig `yaml:"start"`
 					Stop  []HookConfig `yaml:"stop"`
 				} `yaml:"hooks"`
