@@ -28,6 +28,7 @@ type WebApp struct {
 	StartTime        time.Time
 	LastActivity     time.Time
 	Starting         bool // True while app is starting up
+	Stopping         bool // True while app is shutting down
 	mutex            sync.Mutex
 	cancel           context.CancelFunc
 	wsConnections    map[string]interface{}
@@ -83,8 +84,13 @@ func (m *AppManager) GetOrStartApp(tenantName string) (*WebApp, error) {
 
 	if exists {
 		app.mutex.Lock()
-		app.LastActivity = time.Now()
+		isStopping := app.Stopping
 		isStarting := app.Starting
+		app.LastActivity = time.Now()
+		// If app is stopping, cancel the shutdown by clearing the flag
+		if isStopping {
+			app.Stopping = false
+		}
 		app.mutex.Unlock()
 
 		if !isStarting {
@@ -229,11 +235,26 @@ func (m *AppManager) monitorAppIdleTimeout(tenantName string) {
 		if idleTime > m.idleTimeout {
 			logging.LogWebAppIdle(tenantName, idleTime.Round(time.Second).String())
 
+			// Mark as stopping so requests can cancel the shutdown
+			app.mutex.Lock()
+			app.Stopping = true
+			app.mutex.Unlock()
+
 			// Execute tenant stop hooks before removing from registry
 			if app.Tenant != nil {
 				_ = ExecuteTenantHooks(m.config.Applications.Hooks.Stop, app.Tenant.Hooks.Stop,
 					app.Tenant.Env, tenantName, "stop")
 			}
+
+			// Check if a request came in during hooks and cancelled the shutdown
+			app.mutex.Lock()
+			shutdownCancelled := !app.Stopping
+			if shutdownCancelled {
+				app.mutex.Unlock()
+				slog.Info("App shutdown cancelled due to new request", "tenant", tenantName)
+				continue // Skip stopping, go back to monitoring
+			}
+			app.mutex.Unlock()
 
 			// Stop the process
 			if app.cancel != nil {
