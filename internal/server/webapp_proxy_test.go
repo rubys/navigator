@@ -5,7 +5,6 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/rubys/navigator/internal/proxy"
 )
@@ -64,105 +63,8 @@ func TestProxyRetryIntegration(t *testing.T) {
 	t.Logf("Proxy retry test passed: %d attempts made", finalAttempts)
 }
 
-// TestProxyNoRetryForUnsafeMethods tests that unsafe methods (POST/PUT/DELETE) are not retried
-func TestProxyNoRetryForUnsafeMethods(t *testing.T) {
-	tests := []struct {
-		method      string
-		expectRetry bool
-	}{
-		{"GET", true},
-		{"HEAD", true},
-		{"POST", false},
-		{"PUT", false},
-		{"DELETE", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.method, func(t *testing.T) {
-			var attempts int32
-
-			// Create backend that always fails
-			backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				atomic.AddInt32(&attempts, 1)
-				// Always fail with connection error
-				hj, ok := w.(http.Hijacker)
-				if ok {
-					conn, _, _ := hj.Hijack()
-					if conn != nil {
-						conn.Close()
-					}
-				}
-			}))
-			defer backend.Close()
-
-			// Make request
-			req := httptest.NewRequest(tt.method, "/test", nil)
-			recorder := httptest.NewRecorder()
-
-			proxy.ProxyWithWebSocketSupport(recorder, req, backend.URL, nil)
-
-			// Check attempt count
-			finalAttempts := atomic.LoadInt32(&attempts)
-
-			if tt.expectRetry {
-				if finalAttempts < 2 {
-					t.Errorf("Method %s should retry, but only got %d attempts", tt.method, finalAttempts)
-				}
-			} else {
-				if finalAttempts > 1 {
-					t.Errorf("Method %s should NOT retry, but got %d attempts", tt.method, finalAttempts)
-				}
-			}
-
-			t.Logf("Method %s: %d attempts (retry=%v)", tt.method, finalAttempts, tt.expectRetry)
-		})
-	}
-}
-
-// TestProxyRetryTimeout tests that retry logic respects timeout duration
-func TestProxyRetryTimeout(t *testing.T) {
-	var attempts int32
-	startTime := time.Now()
-
-	// Create backend that always fails quickly
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&attempts, 1)
-		hj, ok := w.(http.Hijacker)
-		if ok {
-			conn, _, _ := hj.Hijack()
-			if conn != nil {
-				conn.Close()
-			}
-		}
-	}))
-	defer backend.Close()
-
-	// Make request
-	req := httptest.NewRequest("GET", "/test", nil)
-	recorder := httptest.NewRecorder()
-
-	proxy.ProxyWithWebSocketSupport(recorder, req, backend.URL, nil)
-
-	elapsed := time.Since(startTime)
-	finalAttempts := atomic.LoadInt32(&attempts)
-
-	// Should have multiple attempts
-	if finalAttempts < 2 {
-		t.Errorf("Expected multiple retry attempts, got %d", finalAttempts)
-	}
-
-	// Should respect timeout (default is 10 seconds for proxy retry)
-	if elapsed > 12*time.Second {
-		t.Errorf("Retry took too long: %v (expected < 12s)", elapsed)
-	}
-
-	// Should eventually give up with 502
-	if recorder.Code != http.StatusBadGateway {
-		t.Errorf("Expected 502 after retry timeout, got %d", recorder.Code)
-	}
-
-	t.Logf("Retry timeout test: %d attempts in %v", finalAttempts, elapsed)
-}
+// Note: TestProxyNoRetryForUnsafeMethods and TestProxyRetryTimeout moved to
+// webapp_proxy_integration_test.go because they take 20s+ to run
 
 // TestHandleProxyNoRetry tests that HandleProxy (without retry) fails immediately
 // This documents the difference between HandleProxy and ProxyWithWebSocketSupport

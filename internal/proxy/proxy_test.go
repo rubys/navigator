@@ -516,13 +516,8 @@ func TestProxyWithWebSocketSupport(t *testing.T) {
 			expectStatus:    http.StatusBadGateway, // Will retry and fail
 			trackWebSockets: true,
 		},
-		{
-			name:            "HTTP with retry fallback",
-			headers:         map[string]string{},
-			targetURL:       "http://localhost:99999",
-			expectWebSocket: false,
-			expectStatus:    http.StatusBadGateway,
-		},
+		// Note: "HTTP with retry fallback" test case moved to proxy_integration_test.go
+		// because it takes 10s+ waiting for retry timeout
 	}
 
 	for _, tt := range tests {

@@ -373,3 +373,20 @@ func TestRetryWithGETRequests(t *testing.T) {
 		t.Errorf("Expected success message, got %q", recorder.Body.String())
 	}
 }
+
+// TestProxyWithWebSocketSupportSlowRetry tests retry behavior with invalid target
+// This is an integration test because it waits for the full 10s retry timeout
+func TestProxyWithWebSocketSupportSlowRetry(t *testing.T) {
+	req := httptest.NewRequest("GET", "/cable", nil)
+	recorder := httptest.NewRecorder()
+
+	// Invalid target will cause retry timeout (10+ seconds)
+	ProxyWithWebSocketSupport(recorder, req, "http://localhost:99999", nil)
+
+	// Should fail with Bad Gateway after retry timeout
+	if recorder.Code != http.StatusBadGateway {
+		t.Errorf("Expected 502 Bad Gateway, got %d", recorder.Code)
+	}
+
+	t.Logf("Retry timeout test completed with status %d", recorder.Code)
+}

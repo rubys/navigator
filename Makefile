@@ -47,9 +47,9 @@ lint:
 test: test-fast
 
 # Run fast tests only (excludes integration and stress tests)
-test-fast: build
+test-fast:
 	@echo "Running fast tests..."
-	go test ./... -v
+	go test ./...
 	@echo "Fast tests passed!"
 
 # Run full comprehensive test suite (includes integration and stress tests)
@@ -86,9 +86,9 @@ help:
 	@echo "  clean             Remove build artifacts"
 	@echo "  lint              Run all linting checks (matches CI)"
 	@echo "  test              Run fast tests (default - excludes integration/stress tests)"
-	@echo "  test-fast         Run fast tests only (~5 seconds)"
-	@echo "  test-full         Run comprehensive test suite with integration and stress tests (~15+ seconds)"
-	@echo "  test-integration  Run integration tests only (~11 seconds)"
+	@echo "  test-fast         Run fast tests only (~6 seconds, or 0.3s with cache)"
+	@echo "  test-full         Run comprehensive test suite with integration and stress tests (~86 seconds)"
+	@echo "  test-integration  Run integration tests only (~50 seconds)"
 	@echo "  test-stress       Run stress tests only"
 	@echo "  deps              Download Go dependencies"
 	@echo "  help              Show this help message"
