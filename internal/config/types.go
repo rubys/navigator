@@ -11,7 +11,7 @@ const (
 	// Timeout constants
 	DefaultIdleTimeout  = 10 * time.Minute
 	RailsStartupTimeout = 30 * time.Second
-	ProxyRetryTimeout   = 10 * time.Second // Allow time for Rails app startup
+	ProxyRetryTimeout   = 3 * time.Second // Match legacy navigator timeout
 	ProcessStopTimeout  = 10 * time.Second
 	RailsStartupDelay   = 5 * time.Second
 

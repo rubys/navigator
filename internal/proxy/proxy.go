@@ -3,7 +3,6 @@ package proxy
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"fmt"
 	"log/slog"
 	"net"
@@ -76,22 +75,9 @@ func HandleProxyWithRetry(w http.ResponseWriter, r *http.Request, targetURL stri
 		responseWriter = w
 	}
 
-	// Create custom transport with shorter timeout for connection attempts
-	transport := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			dialer := &net.Dialer{
-				Timeout: config.ProxyRetryMaxDelay,
-			}
-			return dialer.DialContext(ctx, network, addr)
-		},
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
+	// Use default transport - no custom connection timeout needed
+	// The 500ms ProxyRetryMaxDelay is for retry backoff, not connection timeout
 	proxy := httputil.NewSingleHostReverseProxy(target)
-	proxy.Transport = transport
 
 	// Implement retry logic
 	startTime := time.Now()
