@@ -1,6 +1,6 @@
 # Makefile for Navigator - Go web server replacement for nginx + Passenger
 
-.PHONY: all build build-legacy build-refactored clean test test-fast test-full test-integration test-stress help
+.PHONY: all build build-legacy build-refactored clean lint test test-fast test-full test-integration test-stress help
 
 # Default target
 all: build
@@ -27,24 +27,36 @@ clean:
 	rm -f bin/navigator-legacy bin/navigator-refactored
 	@echo "Clean complete"
 
+# Run all linting checks (matches CI lint job)
+lint:
+	@echo "Running go mod verify..."
+	go mod verify
+	@echo "Running go vet..."
+	go vet ./...
+	@echo "Running gofmt check..."
+	@if [ "$$(gofmt -s -l . | wc -l)" -gt 0 ]; then \
+		echo "The following files are not properly formatted:"; \
+		gofmt -s -l .; \
+		exit 1; \
+	fi
+	@echo "Running golangci-lint..."
+	golangci-lint run
+	@echo "All lint checks passed!"
+
 # Run fast tests (default for development)
 test: test-fast
 
 # Run fast tests only (excludes integration and stress tests)
 test-fast: build
-	@echo "Running go vet on entire codebase..."
-	go vet ./...
 	@echo "Running fast tests..."
 	go test ./... -v
-	@echo "Fast tests and linting passed!"
+	@echo "Fast tests passed!"
 
 # Run full comprehensive test suite (includes integration and stress tests)
 test-full: build
-	@echo "Running go vet on entire codebase..."
-	go vet ./...
 	@echo "Running comprehensive test suite (integration + stress tests)..."
 	go test -tags="integration" ./... -v
-	@echo "Full test suite and linting passed!"
+	@echo "Full test suite passed!"
 
 # Run integration tests only
 test-integration: build
@@ -72,6 +84,7 @@ help:
 	@echo "  build-legacy      Build the navigator-legacy executable"
 	@echo "  build-refactored  Build the navigator-refactored executable"
 	@echo "  clean             Remove build artifacts"
+	@echo "  lint              Run all linting checks (matches CI)"
 	@echo "  test              Run fast tests (default - excludes integration/stress tests)"
 	@echo "  test-fast         Run fast tests only (~5 seconds)"
 	@echo "  test-full         Run comprehensive test suite with integration and stress tests (~15+ seconds)"
@@ -82,6 +95,7 @@ help:
 	@echo ""
 	@echo "Usage:"
 	@echo "  make                    # Build the navigator"
+	@echo "  make lint               # Run all linting checks"
 	@echo "  make test               # Run fast tests (development)"
 	@echo "  make test-full          # Run comprehensive tests (before release)"
 	@echo "  make test-integration   # Run integration tests only"
