@@ -32,7 +32,7 @@ const (
 
 	// Buffer sizes
 	DefaultBufferSize    = 4096
-	MaxRetryBufferSize   = 1024 * 1024 // 1MB
+	MaxRetryBufferSize   = 64 * 1024 // 64KB - most responses are smaller
 	DefaultLogBufferSize = 8192
 )
 

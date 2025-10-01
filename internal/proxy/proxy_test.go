@@ -256,25 +256,26 @@ func TestRetryResponseWriterSizeLimit(t *testing.T) {
 	retryWriter := NewRetryResponseWriter(recorder)
 
 	// Write data that exceeds the buffer limit
-	largeData := make([]byte, MaxRetryBufferSize+1000)
+	largeData := make([]byte, MaxRetryBufferSize+10000)
 	for i := range largeData {
 		largeData[i] = byte('A' + (i % 26))
 	}
 
-	// First write should start buffering
-	n, err := retryWriter.Write(largeData[:500000]) // 500KB
+	// First write should start buffering (write half the buffer size)
+	firstChunk := MaxRetryBufferSize / 2
+	n, err := retryWriter.Write(largeData[:firstChunk])
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
-	if n != 500000 {
-		t.Errorf("Write returned %d, expected %d", n, 500000)
+	if n != firstChunk {
+		t.Errorf("Write returned %d, expected %d", n, firstChunk)
 	}
 	if retryWriter.bufferLimitHit {
 		t.Error("Buffer limit should not be hit yet")
 	}
 
 	// Second write should hit the limit and switch to direct writing
-	_, err = retryWriter.Write(largeData[500000:]) // Rest of the data
+	_, err = retryWriter.Write(largeData[firstChunk:])
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
@@ -581,11 +582,11 @@ func BenchmarkHandleProxy(b *testing.B) {
 }
 
 // TestRetryResponseWriterLargeResponse verifies that responses larger than
-// MaxRetryBufferSize (1MB) are correctly streamed without truncation.
+// MaxRetryBufferSize (64KB) are correctly streamed without truncation.
 // This is a regression test for a bug where setting w.written=true before
 // calling Commit() caused the buffer to never be flushed.
 func TestRetryResponseWriterLargeResponse(t *testing.T) {
-	// Create a 2.5MB response (larger than 1MB buffer)
+	// Create a 2.5MB response (larger than 64KB buffer)
 	responseSize := 2*1024*1024 + 512*1024 // 2.5MB
 	largeData := bytes.Repeat([]byte("A"), responseSize)
 
@@ -622,8 +623,8 @@ func TestRetryResponseWriterLargeResponse(t *testing.T) {
 // TestRetryResponseWriterBufferOverflow specifically tests the buffer overflow
 // handling to ensure the buffer is committed before switching to streaming mode
 func TestRetryResponseWriterBufferOverflow(t *testing.T) {
-	// Create a response just over 1MB to trigger buffer overflow
-	responseSize := MaxRetryBufferSize + 100*1024 // 1MB + 100KB
+	// Create a response just over 64KB to trigger buffer overflow
+	responseSize := MaxRetryBufferSize + 100*1024 // 64KB + 100KB
 	testData := bytes.Repeat([]byte("B"), responseSize)
 
 	underlying := httptest.NewRecorder()

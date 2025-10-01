@@ -295,7 +295,8 @@ func ProxyWithWebSocketSupport(w http.ResponseWriter, r *http.Request, targetURL
 }
 
 // RetryResponseWriter buffers responses to enable retry on failure
-// Note: Only buffers responses up to MaxRetryBufferSize to prevent memory issues
+// Note: Only buffers responses up to MaxRetryBufferSize (64KB) to prevent memory issues
+// Large responses automatically switch to streaming mode
 type RetryResponseWriter struct {
 	http.ResponseWriter
 	statusCode     int
@@ -306,7 +307,8 @@ type RetryResponseWriter struct {
 }
 
 // MaxRetryBufferSize limits how much response data we buffer for retries
-const MaxRetryBufferSize = 1024 * 1024 // 1MB
+// Set to 64KB as most responses are smaller, and larger responses should stream immediately
+const MaxRetryBufferSize = 64 * 1024 // 64KB
 
 // NewRetryResponseWriter creates a new retry response writer
 func NewRetryResponseWriter(w http.ResponseWriter) *RetryResponseWriter {
