@@ -337,16 +337,29 @@ func (w *RetryResponseWriter) Write(b []byte) (int, error) {
 	if !w.written {
 		// Check if adding this data would exceed buffer limit
 		if w.body.Len()+len(b) > MaxRetryBufferSize {
-			// If we haven't hit the limit yet, buffer what we can
+			// Calculate how much we can still buffer
+			buffered := 0
 			if !w.bufferLimitHit && w.body.Len() < MaxRetryBufferSize {
 				remaining := MaxRetryBufferSize - w.body.Len()
 				w.body.Write(b[:remaining])
+				buffered = remaining
 			}
 			w.bufferLimitHit = true
-			// Switch to direct writing for large responses
-			w.written = true
+			// Commit the buffer before switching to streaming mode
 			w.Commit()
-			return w.ResponseWriter.Write(b)
+			// Now switch to direct writing for large responses
+			w.written = true
+			// Only write the portion that wasn't buffered
+			if buffered < len(b) {
+				n, err := w.ResponseWriter.Write(b[buffered:])
+				if err != nil {
+					return buffered + n, err
+				}
+				// All bytes processed successfully
+				return len(b), nil
+			}
+			// All bytes were buffered
+			return buffered, nil
 		}
 		return w.body.Write(b)
 	}

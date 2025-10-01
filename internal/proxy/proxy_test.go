@@ -580,6 +580,87 @@ func BenchmarkHandleProxy(b *testing.B) {
 	}
 }
 
+// TestRetryResponseWriterLargeResponse verifies that responses larger than
+// MaxRetryBufferSize (1MB) are correctly streamed without truncation.
+// This is a regression test for a bug where setting w.written=true before
+// calling Commit() caused the buffer to never be flushed.
+func TestRetryResponseWriterLargeResponse(t *testing.T) {
+	// Create a 2.5MB response (larger than 1MB buffer)
+	responseSize := 2*1024*1024 + 512*1024 // 2.5MB
+	largeData := bytes.Repeat([]byte("A"), responseSize)
+
+	// Create a test backend that returns the large response
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(largeData)
+	}))
+	defer backend.Close()
+
+	// Make a GET request through the retry proxy
+	req := httptest.NewRequest("GET", "/test", nil)
+	recorder := httptest.NewRecorder()
+
+	HandleProxyWithRetry(recorder, req, backend.URL, 3*time.Second)
+
+	// Verify the complete response was received
+	if recorder.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", recorder.Code)
+	}
+
+	receivedSize := recorder.Body.Len()
+	if receivedSize != responseSize {
+		t.Errorf("Response truncated: expected %d bytes, got %d bytes",
+			responseSize, receivedSize)
+	}
+
+	// Verify the content matches
+	if !bytes.Equal(recorder.Body.Bytes(), largeData) {
+		t.Error("Response content does not match original data")
+	}
+}
+
+// TestRetryResponseWriterBufferOverflow specifically tests the buffer overflow
+// handling to ensure the buffer is committed before switching to streaming mode
+func TestRetryResponseWriterBufferOverflow(t *testing.T) {
+	// Create a response just over 1MB to trigger buffer overflow
+	responseSize := MaxRetryBufferSize + 100*1024 // 1MB + 100KB
+	testData := bytes.Repeat([]byte("B"), responseSize)
+
+	underlying := httptest.NewRecorder()
+	retryWriter := NewRetryResponseWriter(underlying)
+
+	// Write the data in chunks (simulating http.ReverseProxy behavior)
+	chunkSize := 32768 // 32KB chunks
+	for offset := 0; offset < responseSize; offset += chunkSize {
+		end := offset + chunkSize
+		if end > responseSize {
+			end = responseSize
+		}
+		n, err := retryWriter.Write(testData[offset:end])
+		if err != nil {
+			t.Fatalf("Write failed at offset %d: %v", offset, err)
+		}
+		expectedN := end - offset
+		if n != expectedN {
+			t.Fatalf("Short write at offset %d: expected %d, got %d", offset, expectedN, n)
+		}
+	}
+
+	// Commit any remaining buffered data
+	retryWriter.Commit()
+
+	// Verify complete response was written
+	if underlying.Body.Len() != responseSize {
+		t.Errorf("Response size mismatch: expected %d, got %d",
+			responseSize, underlying.Body.Len())
+	}
+
+	// Verify content integrity
+	if !bytes.Equal(underlying.Body.Bytes(), testData) {
+		t.Error("Response data corrupted during buffer overflow")
+	}
+}
+
 func BenchmarkProxyWithWebSocketSupport(b *testing.B) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
