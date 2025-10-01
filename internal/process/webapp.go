@@ -27,6 +27,7 @@ type WebApp struct {
 	Port             int
 	StartTime        time.Time
 	LastActivity     time.Time
+	Starting         bool // True while app is starting up
 	mutex            sync.Mutex
 	cancel           context.CancelFunc
 	wsConnections    map[string]interface{}
@@ -83,8 +84,33 @@ func (m *AppManager) GetOrStartApp(tenantName string) (*WebApp, error) {
 	if exists {
 		app.mutex.Lock()
 		app.LastActivity = time.Now()
+		isStarting := app.Starting
 		app.mutex.Unlock()
-		return app, nil
+
+		if !isStarting {
+			return app, nil
+		}
+
+		// Wait if app is still starting (with timeout)
+		timeout := time.NewTimer(config.RailsStartupTimeout)
+		defer timeout.Stop()
+
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-timeout.C:
+				return nil, fmt.Errorf("timeout waiting for app %s to start", tenantName)
+			case <-ticker.C:
+				app.mutex.Lock()
+				isStarting := app.Starting
+				app.mutex.Unlock()
+				if !isStarting {
+					return app, nil
+				}
+			}
+		}
 	}
 
 	// Start new app
@@ -93,8 +119,38 @@ func (m *AppManager) GetOrStartApp(tenantName string) (*WebApp, error) {
 
 	// Double-check after acquiring write lock
 	if app, exists := m.apps[tenantName]; exists {
+		app.mutex.Lock()
 		app.LastActivity = time.Now()
-		return app, nil
+		isStarting := app.Starting
+		app.mutex.Unlock()
+
+		if !isStarting {
+			return app, nil
+		}
+
+		// Another goroutine is starting the app, wait for it
+		m.mutex.Unlock()
+		timeout := time.NewTimer(config.RailsStartupTimeout)
+		defer timeout.Stop()
+
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-timeout.C:
+				m.mutex.Lock() // Re-acquire lock before returning
+				return nil, fmt.Errorf("timeout waiting for app %s to start", tenantName)
+			case <-ticker.C:
+				app.mutex.Lock()
+				isStarting := app.Starting
+				app.mutex.Unlock()
+				if !isStarting {
+					m.mutex.Lock() // Re-acquire lock before returning
+					return app, nil
+				}
+			}
+		}
 	}
 
 	// Find tenant configuration
@@ -122,15 +178,19 @@ func (m *AppManager) GetOrStartApp(tenantName string) (*WebApp, error) {
 		Port:          port,
 		StartTime:     time.Now(),
 		LastActivity:  time.Now(),
+		Starting:      true, // Mark as starting
 		wsConnections: make(map[string]interface{}),
 	}
 
-	// Start the web application
+	// Register app immediately so other requests can see it's starting
+	m.apps[tenantName] = app
+
+	// Start the web application (this will clear Starting flag when ready)
 	if err := m.processStarter.StartWebApp(app, tenant); err != nil {
+		// Clean up on error
+		delete(m.apps, tenantName)
 		return nil, err
 	}
-
-	m.apps[tenantName] = app
 
 	// Start idle cleanup goroutine for this app
 	go m.monitorAppIdleTimeout(tenantName)
