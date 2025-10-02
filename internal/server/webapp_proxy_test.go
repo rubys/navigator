@@ -9,58 +9,43 @@ import (
 	"github.com/rubys/navigator/internal/proxy"
 )
 
-// TestProxyRetryIntegration tests that proxy requests retry on gateway failures
-// This test prevents regression of the bug where tenant app proxy didn't use retry logic
-func TestProxyRetryIntegration(t *testing.T) {
+// TestProxyNoRetryIntegration tests that proxy requests don't retry on gateway failures
+// Health checks ensure apps are ready before proxying, eliminating need for retries
+func TestProxyNoRetryIntegration(t *testing.T) {
 	// Track number of attempts to backend
 	var attempts int32
 
-	// Create a backend that fails a few times then succeeds
+	// Create a backend that always succeeds
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		attemptNum := atomic.AddInt32(&attempts, 1)
-
-		// Fail first 2 attempts with connection-like errors
-		if attemptNum <= 2 {
-			// Simulate connection refused by immediately closing connection
-			hj, ok := w.(http.Hijacker)
-			if ok {
-				conn, _, _ := hj.Hijack()
-				if conn != nil {
-					conn.Close()
-				}
-			}
-			return
-		}
-
-		// Succeed on 3rd attempt
+		atomic.AddInt32(&attempts, 1)
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("Success after retries"))
+		_, _ = w.Write([]byte("Success"))
 	}))
 	defer backend.Close()
 
-	// Make request through ProxyWithWebSocketSupport (what tenant apps should use)
+	// Make request through ProxyWithWebSocketSupport (what tenant apps use)
 	req := httptest.NewRequest("GET", "/test", nil)
 	recorder := httptest.NewRecorder()
 
-	// This should retry and eventually succeed
+	// This should succeed immediately (no retries)
 	proxy.ProxyWithWebSocketSupport(recorder, req, backend.URL, nil)
 
-	// Verify retry happened
+	// Verify only one attempt was made (no retries)
 	finalAttempts := atomic.LoadInt32(&attempts)
-	if finalAttempts < 2 {
-		t.Errorf("Expected at least 2 retry attempts for ProxyWithWebSocketSupport, got %d", finalAttempts)
+	if finalAttempts != 1 {
+		t.Errorf("Expected exactly 1 attempt (no retries), got %d", finalAttempts)
 	}
 
-	// Verify request eventually succeeded after retries
+	// Verify request succeeded
 	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status 200 after retries, got %d", recorder.Code)
+		t.Errorf("Expected status 200, got %d", recorder.Code)
 	}
 
-	if recorder.Body.String() != "Success after retries" {
-		t.Errorf("Expected 'Success after retries' in response body, got %q", recorder.Body.String())
+	if recorder.Body.String() != "Success" {
+		t.Errorf("Expected 'Success' in response body, got %q", recorder.Body.String())
 	}
 
-	t.Logf("Proxy retry test passed: %d attempts made", finalAttempts)
+	t.Logf("Proxy no-retry test passed: %d attempts made", finalAttempts)
 }
 
 // Note: TestProxyNoRetryForUnsafeMethods and TestProxyRetryTimeout moved to

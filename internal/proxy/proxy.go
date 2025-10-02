@@ -246,6 +246,7 @@ func (c *webSocketConn) Close() error {
 }
 
 // ProxyWithWebSocketSupport handles both HTTP and WebSocket proxying
+// Note: Health checks ensure apps are ready before proxying, so no retry needed
 func ProxyWithWebSocketSupport(w http.ResponseWriter, r *http.Request, targetURL string, activeWebSockets *int32) {
 	target, err := url.Parse(targetURL)
 	if err != nil {
@@ -253,31 +254,46 @@ func ProxyWithWebSocketSupport(w http.ResponseWriter, r *http.Request, targetURL
 		return
 	}
 
-	// Check if this is a WebSocket request
-	if IsWebSocketRequest(r) {
-		// Track WebSocket connection
-		if activeWebSockets != nil {
-			atomic.AddInt32(activeWebSockets, 1)
-			slog.Debug("WebSocket connection started", "activeWebSockets", atomic.LoadInt32(activeWebSockets))
+	// Create reverse proxy
+	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	// Customize the director to preserve headers
+	originalDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+
+		// Preserve X-Forwarded headers
+		if req.Header.Get("X-Forwarded-For") == "" {
+			req.Header.Set("X-Forwarded-For", r.RemoteAddr)
 		}
-
-		proxy := httputil.NewSingleHostReverseProxy(target)
-
-		// Wrap the response writer to detect when WebSocket closes
-		if activeWebSockets != nil {
-			w = &WebSocketTracker{
-				ResponseWriter:   w,
-				ActiveWebSockets: activeWebSockets,
-				Cleaned:          false,
-			}
+		req.Header.Set("X-Forwarded-Host", req.Host)
+		if req.Header.Get("X-Forwarded-Proto") == "" {
+			req.Header.Set("X-Forwarded-Proto", "http")
 		}
-
-		proxy.ServeHTTP(w, r)
-		return
 	}
 
-	// Regular HTTP proxy with retry
-	HandleProxyWithRetry(w, r, targetURL, config.ProxyRetryTimeout)
+	// Set error handler
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		slog.Error("Proxy error", "target", targetURL, "error", err)
+		http.Error(w, "Bad Gateway", http.StatusBadGateway)
+	}
+
+	// Check if this is a WebSocket request and tracking is enabled
+	if IsWebSocketRequest(r) && activeWebSockets != nil {
+		// Track WebSocket connection
+		atomic.AddInt32(activeWebSockets, 1)
+		slog.Debug("WebSocket connection started", "activeWebSockets", atomic.LoadInt32(activeWebSockets))
+
+		// Wrap the response writer to detect when WebSocket closes
+		w = &WebSocketTracker{
+			ResponseWriter:   w,
+			ActiveWebSockets: activeWebSockets,
+			Cleaned:          false,
+		}
+	}
+
+	// Perform the proxy request (no retry needed - health checks ensure app is ready)
+	proxy.ServeHTTP(w, r)
 }
 
 // RetryResponseWriter buffers responses to enable retry on failure

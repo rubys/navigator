@@ -335,10 +335,10 @@ rate_limiting:
 
 Automatic health monitoring with resilience patterns:
 
-- Periodic health checks for backend services
+- Health checks for tenant apps before proxying (already implemented)
 - Circuit breaker patterns to prevent cascading failures
 - Graceful degradation when services are unavailable
-- Automatic retry with exponential backoff (already implemented for proxying)
+- Automatic retry with exponential backoff for Fly-Replay fallback (already implemented)
 
 **Potential Configuration**:
 ```yaml

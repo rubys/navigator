@@ -71,18 +71,17 @@ Navigator's architecture is built on these core principles:
 
 **Key Components**:
 
-- Proxy request forwarding with retry logic
+- Proxy request forwarding to tenant apps and reverse proxies
 - Fly-Replay header generation for regional routing
 - Sticky session support with cookies
-- Large request detection and fallback
-- Connection error handling with exponential backoff
+- Large request detection and fallback for Fly-Replay
+- WebSocket support with optional connection tracking
 
 **Responsibilities**:
 
-- Proxying requests to web apps
-- Smart region routing (Fly-Replay)
+- Proxying requests to web apps (no retry - health checks ensure readiness)
+- Smart region routing with retry fallback (Fly-Replay)
 - Session affinity (sticky sessions)
-- Automatic retry with backoff
 - Maintenance page serving
 
 **Test Coverage**: 88.1%

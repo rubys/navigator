@@ -236,8 +236,8 @@ journalctl -u navigator -n 50
 ### Performance Issues
 
 1. **High Memory Usage**: Adjust pool sizes and idle timeouts
-2. **Slow Response**: Check static file serving and try_files configuration  
-3. **Connection Errors**: Verify proxy retry and backoff settings
+2. **Slow Response**: Check static file serving and try_files configuration
+3. **Connection Errors**: Check health check configuration and app startup
 4. **Process Crashes**: Review managed process configuration and auto-restart
 
 ## Migration Guides
