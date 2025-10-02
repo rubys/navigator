@@ -609,13 +609,13 @@ logging:
 
 func TestConfigParser_ParseTrackWebSocketsConfig(t *testing.T) {
 	tests := []struct {
-		name                  string
-		yamlConfig            string
-		wantGlobal            bool
-		wantTenant1Override   *bool
-		wantTenant2Override   *bool
-		wantEffectiveTenant1  bool
-		wantEffectiveTenant2  bool
+		name                 string
+		yamlConfig           string
+		wantGlobal           bool
+		wantTenant1Override  *bool
+		wantTenant2Override  *bool
+		wantEffectiveTenant1 bool
+		wantEffectiveTenant2 bool
 	}{
 		{
 			name: "global enabled, no tenant overrides",
@@ -628,11 +628,11 @@ applications:
     - path: "/showcase/2025/boston/"
       root: "/app/boston"
 `,
-			wantGlobal:            true,
-			wantTenant1Override:   nil,
-			wantTenant2Override:   nil,
-			wantEffectiveTenant1:  true,
-			wantEffectiveTenant2:  true,
+			wantGlobal:           true,
+			wantTenant1Override:  nil,
+			wantTenant2Override:  nil,
+			wantEffectiveTenant1: true,
+			wantEffectiveTenant2: true,
 		},
 		{
 			name: "global enabled, one tenant disables",
@@ -646,11 +646,11 @@ applications:
     - path: "/showcase/2025/boston/"
       root: "/app/boston"
 `,
-			wantGlobal:            true,
-			wantTenant1Override:   boolPtr(false),
-			wantTenant2Override:   nil,
-			wantEffectiveTenant1:  false,
-			wantEffectiveTenant2:  true,
+			wantGlobal:           true,
+			wantTenant1Override:  boolPtr(false),
+			wantTenant2Override:  nil,
+			wantEffectiveTenant1: false,
+			wantEffectiveTenant2: true,
 		},
 		{
 			name: "global disabled (default), tenant enables",
@@ -663,11 +663,11 @@ applications:
     - path: "/showcase/2025/boston/"
       root: "/app/boston"
 `,
-			wantGlobal:            true, // defaults to true in parser
-			wantTenant1Override:   boolPtr(true),
-			wantTenant2Override:   nil,
-			wantEffectiveTenant1:  true,
-			wantEffectiveTenant2:  true,
+			wantGlobal:           true, // defaults to true in parser
+			wantTenant1Override:  boolPtr(true),
+			wantTenant2Override:  nil,
+			wantEffectiveTenant1: true,
+			wantEffectiveTenant2: true,
 		},
 	}
 
