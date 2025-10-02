@@ -29,11 +29,17 @@ type WebApp struct {
 	LastActivity     time.Time
 	Starting         bool // True while app is starting up
 	Stopping         bool // True while app is shutting down
+	readyChan        chan struct{} // Closed when app is ready to accept requests
 	mutex            sync.Mutex
 	cancel           context.CancelFunc
 	wsConnections    map[string]interface{}
 	wsConnectionsMux sync.RWMutex
 	activeWebSockets int32 // Atomic counter for active WebSocket connections
+}
+
+// ReadyChan returns the channel that's closed when the app is ready
+func (w *WebApp) ReadyChan() <-chan struct{} {
+	return w.readyChan
 }
 
 // GetActiveWebSocketsPtr returns a pointer to the atomic WebSocket counter
@@ -194,6 +200,7 @@ func (m *AppManager) GetOrStartApp(tenantName string) (*WebApp, error) {
 		StartTime:     time.Now(),
 		LastActivity:  time.Now(),
 		Starting:      true, // Mark as starting
+		readyChan:     make(chan struct{}),
 		wsConnections: make(map[string]interface{}),
 	}
 

@@ -148,10 +148,11 @@ func (ps *ProcessStarter) setupCommand(cmd *exec.Cmd, tenant *config.Tenant, por
 
 // waitForReady waits for the web app to be ready to accept connections
 func (ps *ProcessStarter) waitForReady(app *WebApp, tenantName, runtime string) error {
-	// Clear Starting flag when done
+	// Clear Starting flag and signal ready when done
 	defer func() {
 		app.mutex.Lock()
 		app.Starting = false
+		close(app.readyChan)
 		app.mutex.Unlock()
 	}()
 

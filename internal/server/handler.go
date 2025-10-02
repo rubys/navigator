@@ -251,6 +251,21 @@ func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Wait for app to be ready (with timeout)
+	select {
+	case <-app.ReadyChan():
+		// App is ready, continue with proxy
+	case <-time.After(5 * time.Second):
+		// Timeout waiting for app to be ready, serve maintenance page
+		slog.Info("App still starting after timeout, serving maintenance page",
+			"tenant", tenantName,
+			"timeout", "5s")
+		recorder.SetMetadata("tenant", tenantName)
+		recorder.SetMetadata("response_type", "maintenance")
+		ServeMaintenancePage(w, r, h.config)
+		return
+	}
+
 	// Set metadata for logging
 	recorder.SetMetadata("tenant", tenantName)
 	recorder.SetMetadata("response_type", "proxy")

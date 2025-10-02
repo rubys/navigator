@@ -10,7 +10,8 @@ import (
 // TestWebAppWebSocketTracking tests that WebSocket connections are properly tracked
 func TestWebAppWebSocketTracking(t *testing.T) {
 	app := &WebApp{
-		Tenant: &config.Tenant{Name: "test-tenant"},
+		Tenant:    &config.Tenant{Name: "test-tenant"},
+		readyChan: make(chan struct{}),
 	}
 
 	// Test initial count is zero
@@ -54,7 +55,8 @@ func TestWebAppWebSocketTracking(t *testing.T) {
 // TestWebAppWebSocketPointerConsistency tests that the pointer returned is stable
 func TestWebAppWebSocketPointerConsistency(t *testing.T) {
 	app := &WebApp{
-		Tenant: &config.Tenant{Name: "test-tenant"},
+		Tenant:    &config.Tenant{Name: "test-tenant"},
+		readyChan: make(chan struct{}),
 	}
 
 	ptr1 := app.GetActiveWebSocketsPtr()
@@ -76,7 +78,8 @@ func TestWebAppWebSocketPointerConsistency(t *testing.T) {
 // TestWebAppWebSocketConcurrency tests concurrent WebSocket tracking
 func TestWebAppWebSocketConcurrency(t *testing.T) {
 	app := &WebApp{
-		Tenant: &config.Tenant{Name: "test-tenant"},
+		Tenant:    &config.Tenant{Name: "test-tenant"},
+		readyChan: make(chan struct{}),
 	}
 
 	wsPtr := app.GetActiveWebSocketsPtr()
@@ -139,6 +142,7 @@ func TestWebAppWebSocketIntegration(t *testing.T) {
 		Tenant:        &cfg.Applications.Tenants[0],
 		Port:          4000,
 		wsConnections: make(map[string]interface{}),
+		readyChan:     make(chan struct{}),
 	}
 
 	manager.mutex.Lock()
@@ -228,6 +232,7 @@ func TestWebAppShouldTrackWebSockets(t *testing.T) {
 					Name:            "test-tenant",
 					TrackWebSockets: tt.tenantSetting,
 				},
+				readyChan: make(chan struct{}),
 			}
 
 			got := app.ShouldTrackWebSockets(tt.globalSetting)

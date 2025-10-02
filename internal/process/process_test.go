@@ -650,6 +650,7 @@ func TestStartWebApp(t *testing.T) {
 		StartTime:     time.Now(),
 		LastActivity:  time.Now(),
 		wsConnections: make(map[string]interface{}),
+		readyChan:     make(chan struct{}),
 	}
 
 	tenant := &cfg.Applications.Tenants[0]
@@ -689,6 +690,7 @@ func TestMonitorAppIdleTimeout(t *testing.T) {
 		StartTime:     time.Now(),
 		LastActivity:  time.Now().Add(-200 * time.Millisecond), // Make it look idle
 		wsConnections: make(map[string]interface{}),
+		readyChan:     make(chan struct{}),
 	}
 
 	// Add app to manager
@@ -740,6 +742,7 @@ func TestWebSocketConnectionManagement(t *testing.T) {
 		LastActivity:  time.Now(),
 		wsConnections: make(map[string]interface{}),
 		Tenant:        &cfg.Applications.Tenants[0],
+		readyChan:     make(chan struct{}),
 	}
 
 	appManager.mutex.Lock()
@@ -828,6 +831,7 @@ func TestStartWebAppDefaultValues(t *testing.T) {
 		StartTime:     time.Now(),
 		LastActivity:  time.Now(),
 		wsConnections: make(map[string]interface{}),
+		readyChan:     make(chan struct{}),
 	}
 
 	tenant := &cfg.Applications.Tenants[0]
@@ -887,6 +891,7 @@ func TestStartWebAppWithFrameworkConfig(t *testing.T) {
 		StartTime:     time.Now(),
 		LastActivity:  time.Now(),
 		wsConnections: make(map[string]interface{}),
+		readyChan:     make(chan struct{}),
 	}
 
 	tenant := &cfg.Applications.Tenants[0]

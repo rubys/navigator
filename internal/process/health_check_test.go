@@ -113,9 +113,10 @@ func TestWaitForReadyWithHealthCheck(t *testing.T) {
 	}
 
 	app := &WebApp{
-		Port:     port,
-		Tenant:   tenant,
-		Starting: true,
+		Port:      port,
+		Tenant:    tenant,
+		Starting:  true,
+		readyChan: make(chan struct{}),
 	}
 
 	// Set test mode to skip the check, we're testing the health check logic directly
@@ -163,9 +164,10 @@ func TestWaitForReadyAcceptsAnyStatusCode(t *testing.T) {
 			}
 
 			app := &WebApp{
-				Port:     port,
-				Tenant:   tenant,
-				Starting: true,
+				Port:      port,
+				Tenant:    tenant,
+				Starting:  true,
+				readyChan: make(chan struct{}),
 			}
 
 			err := ps.waitForReady(app, "test-tenant", "test")
