@@ -17,22 +17,13 @@ import (
 	"github.com/rubys/navigator/internal/proxy"
 )
 
-// TestProxyNoRetryForUnsafeMethods tests that unsafe methods (POST/PUT/DELETE) are not retried
-// This is an integration test because it waits for the full retry timeout (~10s per method)
-func TestProxyNoRetryForUnsafeMethods(t *testing.T) {
-	tests := []struct {
-		method      string
-		expectRetry bool
-	}{
-		{"GET", true},
-		{"HEAD", true},
-		{"POST", false},
-		{"PUT", false},
-		{"DELETE", false},
-	}
+// TestProxyNoRetryAnyMethod tests that NO methods are retried for tenant apps
+// Health checks ensure apps are ready before proxying, eliminating need for retries
+func TestProxyNoRetryAnyMethod(t *testing.T) {
+	methods := []string{"GET", "HEAD", "POST", "PUT", "DELETE"}
 
-	for _, tt := range tests {
-		t.Run(tt.method, func(t *testing.T) {
+	for _, method := range methods {
+		t.Run(method, func(t *testing.T) {
 			var attempts int32
 
 			// Create backend that always fails
@@ -50,32 +41,31 @@ func TestProxyNoRetryForUnsafeMethods(t *testing.T) {
 			defer backend.Close()
 
 			// Make request
-			req := httptest.NewRequest(tt.method, "/test", nil)
+			req := httptest.NewRequest(method, "/test", nil)
 			recorder := httptest.NewRecorder()
 
 			proxy.ProxyWithWebSocketSupport(recorder, req, backend.URL, nil)
 
-			// Check attempt count
+			// Check attempt count - should be exactly 1 (no retries)
 			finalAttempts := atomic.LoadInt32(&attempts)
 
-			if tt.expectRetry {
-				if finalAttempts < 2 {
-					t.Errorf("Method %s should retry, but only got %d attempts", tt.method, finalAttempts)
-				}
-			} else {
-				if finalAttempts > 1 {
-					t.Errorf("Method %s should NOT retry, but got %d attempts", tt.method, finalAttempts)
-				}
+			if finalAttempts != 1 {
+				t.Errorf("Method %s should NOT retry, but got %d attempts", method, finalAttempts)
 			}
 
-			t.Logf("Method %s: %d attempts (retry=%v)", tt.method, finalAttempts, tt.expectRetry)
+			// Should fail immediately with 502
+			if recorder.Code != http.StatusBadGateway {
+				t.Errorf("Expected 502, got %d", recorder.Code)
+			}
+
+			t.Logf("Method %s: %d attempt (no retry)", method, finalAttempts)
 		})
 	}
 }
 
-// TestProxyRetryTimeout tests that retry logic respects timeout duration
-// This is an integration test because it waits for the full 10s retry timeout
-func TestProxyRetryTimeout(t *testing.T) {
+// TestProxyFailsImmediately tests that proxy failures return immediately without retry
+// Health checks ensure tenant apps are ready, so no retry logic needed
+func TestProxyFailsImmediately(t *testing.T) {
 	var attempts int32
 	startTime := time.Now()
 
@@ -101,22 +91,22 @@ func TestProxyRetryTimeout(t *testing.T) {
 	elapsed := time.Since(startTime)
 	finalAttempts := atomic.LoadInt32(&attempts)
 
-	// Should have multiple attempts
-	if finalAttempts < 2 {
-		t.Errorf("Expected multiple retry attempts, got %d", finalAttempts)
+	// Should only make one attempt (no retry)
+	if finalAttempts != 1 {
+		t.Errorf("Expected exactly 1 attempt (no retry), got %d", finalAttempts)
 	}
 
-	// Should respect timeout (default is 10 seconds for proxy retry)
-	if elapsed > 12*time.Second {
-		t.Errorf("Retry took too long: %v (expected < 12s)", elapsed)
+	// Should fail quickly (no retry delays)
+	if elapsed > 1*time.Second {
+		t.Errorf("Proxy should fail immediately, took %v", elapsed)
 	}
 
-	// Should eventually give up with 502
+	// Should fail with 502
 	if recorder.Code != http.StatusBadGateway {
-		t.Errorf("Expected 502 after retry timeout, got %d", recorder.Code)
+		t.Errorf("Expected 502, got %d", recorder.Code)
 	}
 
-	t.Logf("Retry timeout test: %d attempts in %v", finalAttempts, elapsed)
+	t.Logf("Proxy failed immediately: %d attempt in %v", finalAttempts, elapsed)
 }
 
 // TestSlowRequests tests handling of slow backend responses
