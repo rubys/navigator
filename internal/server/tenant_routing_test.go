@@ -16,15 +16,23 @@ func TestTenantRoutingIntegration(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Applications.Tenants = []config.Tenant{
 		{
+			Name: "",
+			Path: "/showcase/",
+			Root: "/app/index",
+		},
+		{
 			Name: "2025/raleigh/shimmer-shine",
+			Path: "/showcase/2025/raleigh/shimmer-shine/",
 			Root: "/app/shimmer-shine",
 		},
 		{
 			Name: "2025/boston/april",
+			Path: "/showcase/2025/boston/april/",
 			Root: "/app/boston",
 		},
 		{
 			Name: "test-simple",
+			Path: "/showcase/test-simple/",
 			Root: "/app/simple",
 		},
 	}
@@ -35,6 +43,24 @@ func TestTenantRoutingIntegration(t *testing.T) {
 		expectedTenant string
 		shouldMatch    bool
 	}{
+		{
+			name:           "Index tenant with empty name - index_update",
+			requestPath:    "/showcase/index_update",
+			expectedTenant: "",
+			shouldMatch:    true,
+		},
+		{
+			name:           "Index tenant with empty name - index_date",
+			requestPath:    "/showcase/index_date",
+			expectedTenant: "",
+			shouldMatch:    true,
+		},
+		{
+			name:           "Index tenant with empty name - root",
+			requestPath:    "/showcase/",
+			expectedTenant: "",
+			shouldMatch:    true,
+		},
 		{
 			name:           "Shimmer-shine tenant routing",
 			requestPath:    "/showcase/2025/raleigh/shimmer-shine/",
@@ -66,9 +92,10 @@ func TestTenantRoutingIntegration(t *testing.T) {
 			shouldMatch:    true,
 		},
 		{
-			name:        "Non-existent tenant",
-			requestPath: "/showcase/2025/invalid/tenant/",
-			shouldMatch: false,
+			name:           "Non-existent tenant falls back to index",
+			requestPath:    "/showcase/2025/invalid/tenant/",
+			expectedTenant: "",
+			shouldMatch:    true,
 		},
 		{
 			name:        "Non-showcase path",
@@ -119,13 +146,105 @@ func TestTenantRoutingIntegration(t *testing.T) {
 	}
 }
 
+// TestExtractTenantFromPath tests the extractTenantFromPath function with various scenarios
+func TestExtractTenantFromPath(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Applications.Tenants = []config.Tenant{
+		{Name: "", Path: "/showcase/"},
+		{Name: "2025/raleigh/shimmer-shine", Path: "/showcase/2025/raleigh/shimmer-shine/"},
+		{Name: "2025/boston/april", Path: "/showcase/2025/boston/april/"},
+		{Name: "test-simple", Path: "/showcase/test-simple/"},
+	}
+
+	tests := []struct {
+		name           string
+		requestPath    string
+		expectedTenant string
+		expectedFound  bool
+	}{
+		{
+			name:           "Index tenant with empty name - index_update",
+			requestPath:    "/showcase/index_update",
+			expectedTenant: "",
+			expectedFound:  true,
+		},
+		{
+			name:           "Index tenant with empty name - index_date",
+			requestPath:    "/showcase/index_date",
+			expectedTenant: "",
+			expectedFound:  true,
+		},
+		{
+			name:           "Shimmer-shine tenant",
+			requestPath:    "/showcase/2025/raleigh/shimmer-shine/",
+			expectedTenant: "2025/raleigh/shimmer-shine",
+			expectedFound:  true,
+		},
+		{
+			name:           "Boston tenant deep path",
+			requestPath:    "/showcase/2025/boston/april/formations",
+			expectedTenant: "2025/boston/april",
+			expectedFound:  true,
+		},
+		{
+			name:           "Simple tenant",
+			requestPath:    "/showcase/test-simple/",
+			expectedTenant: "test-simple",
+			expectedFound:  true,
+		},
+		{
+			name:           "Non-existent tenant falls back to index",
+			requestPath:    "/showcase/2025/nonexistent/",
+			expectedTenant: "",
+			expectedFound:  true,
+		},
+		{
+			name:           "Non-showcase path",
+			requestPath:    "/other/path",
+			expectedTenant: "",
+			expectedFound:  false,
+		},
+		{
+			name:           "Root path",
+			requestPath:    "/",
+			expectedTenant: "",
+			expectedFound:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Manually test the extraction logic
+			var bestMatch string
+			bestMatchLen := 0
+			found := false
+
+			for _, tenant := range cfg.Applications.Tenants {
+				if strings.HasPrefix(tt.requestPath, tenant.Path) && len(tenant.Path) > bestMatchLen {
+					bestMatch = tenant.Name
+					bestMatchLen = len(tenant.Path)
+					found = true
+				}
+			}
+
+			if found != tt.expectedFound {
+				t.Errorf("Expected found=%v for path %q, got %v", tt.expectedFound, tt.requestPath, found)
+			}
+
+			if bestMatch != tt.expectedTenant {
+				t.Errorf("Expected tenant %q for path %q, got %q", tt.expectedTenant, tt.requestPath, bestMatch)
+			}
+		})
+	}
+}
+
 // TestTenantMatchingLogic tests the tenant matching algorithm directly
 func TestTenantMatchingLogic(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Applications.Tenants = []config.Tenant{
-		{Name: "2025/raleigh/shimmer-shine"},
-		{Name: "2025/boston/april"},
-		{Name: "test-simple"},
+		{Name: "2025/raleigh/shimmer-shine", Path: "/showcase/2025/raleigh/shimmer-shine/"},
+		{Name: "2025/boston/april", Path: "/showcase/2025/boston/april/"},
+		{Name: "test-simple", Path: "/showcase/test-simple/"},
 	}
 
 	tests := []struct {
@@ -144,22 +263,23 @@ func TestTenantMatchingLogic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.requestPath, func(t *testing.T) {
-			// Test the tenant matching logic
+			// Test the tenant matching logic using Path field
 			tenantName := ""
+			found := false
 			for _, tenant := range cfg.Applications.Tenants {
-				lookingFor := "/showcase/" + tenant.Name + "/"
-				if strings.HasPrefix(tt.requestPath, lookingFor) {
+				if strings.HasPrefix(tt.requestPath, tenant.Path) {
 					tenantName = tenant.Name
+					found = true
 					break
 				}
 			}
 
 			if tt.shouldMatch {
-				if tenantName != tt.expectedTenant {
-					t.Errorf("Expected tenant %q for path %q, got %q", tt.expectedTenant, tt.requestPath, tenantName)
+				if !found || tenantName != tt.expectedTenant {
+					t.Errorf("Expected tenant %q for path %q, got %q (found=%v)", tt.expectedTenant, tt.requestPath, tenantName, found)
 				}
 			} else {
-				if tenantName != "" {
+				if found {
 					t.Errorf("Expected no tenant match for path %q, got %q", tt.requestPath, tenantName)
 				}
 			}

@@ -217,6 +217,7 @@ type FrameworkConfig struct {
 // Tenant represents a tenant configuration
 type Tenant struct {
 	Name            string                 `yaml:"name"`
+	Path            string                 `yaml:"path"` // URL path prefix for tenant matching
 	Root            string                 `yaml:"root"`
 	PublicDir       string                 `yaml:"public_dir"`
 	Env             map[string]string      `yaml:"env"`

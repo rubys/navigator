@@ -170,6 +170,7 @@ func (p *ConfigParser) parseApplicationConfig() {
 
 		tenant := Tenant{
 			Name:            tenantName,
+			Path:            yamlTenant.Path, // Preserve original path for matching
 			Root:            yamlTenant.Root,
 			PublicDir:       yamlTenant.PublicDir,
 			Framework:       yamlTenant.Framework,

@@ -128,6 +128,15 @@ func (s *StaticFileHandler) TryFiles(w http.ResponseWriter, r *http.Request) boo
 		return s.tryStaticDirFiles(w, r, staticDir, extensions, path)
 	}
 
+	// If no static directory matched, skip paths that match tenant paths
+	// (those should be handled by web app proxy, not public directory fallback)
+	for _, tenant := range s.config.Applications.Tenants {
+		if strings.HasPrefix(path, tenant.Path) {
+			slog.Debug("tryFiles skipping - matches tenant path without static dir", "tenantPath", tenant.Path)
+			return false
+		}
+	}
+
 	// Fallback to public directory
 	return s.tryPublicDirFiles(w, r, extensions, path)
 }

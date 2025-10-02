@@ -211,14 +211,21 @@ func (h *Handler) handleRewrites(w http.ResponseWriter, r *http.Request) bool {
 // handleStandaloneProxy removed - use Routes.ReverseProxies instead
 
 // extractTenantFromPath extracts the tenant name from the URL path
-func (h *Handler) extractTenantFromPath(path string) string {
+// Returns (tenantName, found) where found indicates if a tenant was matched
+func (h *Handler) extractTenantFromPath(path string) (string, bool) {
+	// Find the longest matching tenant path (most specific match)
+	var bestMatch string
+	bestMatchLen := 0
+	found := false
+
 	for _, tenant := range h.config.Applications.Tenants {
-		lookingFor := "/showcase/" + tenant.Name + "/"
-		if strings.HasPrefix(path, lookingFor) {
-			return tenant.Name
+		if strings.HasPrefix(path, tenant.Path) && len(tenant.Path) > bestMatchLen {
+			bestMatch = tenant.Name
+			bestMatchLen = len(tenant.Path)
+			found = true
 		}
 	}
-	return ""
+	return bestMatch, found
 }
 
 // handleWebAppProxy proxies requests to web applications
@@ -226,11 +233,11 @@ func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request) {
 	recorder := w.(*ResponseRecorder)
 
 	// Extract tenant name from path
-	tenantName := h.extractTenantFromPath(r.URL.Path)
+	tenantName, found := h.extractTenantFromPath(r.URL.Path)
 
-	slog.Debug("Tenant extraction result", "tenantName", tenantName, "path", r.URL.Path)
+	slog.Debug("Tenant extraction result", "tenantName", tenantName, "found", found, "path", r.URL.Path)
 
-	if tenantName == "" {
+	if !found {
 		http.NotFound(w, r)
 		return
 	}
