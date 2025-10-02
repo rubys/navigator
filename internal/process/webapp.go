@@ -27,8 +27,8 @@ type WebApp struct {
 	Port             int
 	StartTime        time.Time
 	LastActivity     time.Time
-	Starting         bool // True while app is starting up
-	Stopping         bool // True while app is shutting down
+	Starting         bool          // True while app is starting up
+	Stopping         bool          // True while app is shutting down
 	readyChan        chan struct{} // Closed when app is ready to accept requests
 	mutex            sync.Mutex
 	cancel           context.CancelFunc
