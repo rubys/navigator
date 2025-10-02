@@ -396,21 +396,29 @@ func TestConfigParser_ParseAuthConfig(t *testing.T) {
 		t.Fatalf("Parse() error = %v", err)
 	}
 
-	// Check that auth patterns were created
-	if len(config.Server.AuthPatterns) < 2 {
-		t.Errorf("Expected at least 2 auth patterns, got %d", len(config.Server.AuthPatterns))
+	// Check that auth is enabled
+	if config.Server.Authentication != "/etc/htpasswd" {
+		t.Errorf("Expected htpasswd file '/etc/htpasswd', got %q", config.Server.Authentication)
 	}
 
-	// Verify one of the public path patterns
-	foundPublic := false
-	for _, pattern := range config.Server.AuthPatterns {
-		if pattern.Action == "off" {
-			foundPublic = true
-			break
-		}
+	// Check that public paths were added to AuthExclude
+	if len(config.Server.AuthExclude) < 2 {
+		t.Errorf("Expected at least 2 auth exclude patterns, got %d", len(config.Server.AuthExclude))
 	}
-	if !foundPublic {
-		t.Error("Expected to find public path pattern with action 'off'")
+
+	// Verify the public paths are in AuthExclude
+	expectedPaths := []string{"/public", "/health"}
+	for _, expectedPath := range expectedPaths {
+		found := false
+		for _, excludePath := range config.Server.AuthExclude {
+			if excludePath == expectedPath {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected to find %q in AuthExclude, but it was not found", expectedPath)
+		}
 	}
 }
 
