@@ -9,11 +9,12 @@ import (
 // Constants for configuration defaults and limits
 const (
 	// Timeout constants
-	DefaultIdleTimeout  = 10 * time.Minute
-	RailsStartupTimeout = 30 * time.Second
-	ProxyRetryTimeout   = 3 * time.Second // Match legacy navigator timeout
-	ProcessStopTimeout  = 10 * time.Second
-	RailsStartupDelay   = 5 * time.Second
+	DefaultIdleTimeout    = 10 * time.Minute
+	RailsStartupTimeout   = 30 * time.Second
+	DefaultStartupTimeout = 5 * time.Second // Default timeout before showing maintenance page
+	ProxyRetryTimeout     = 3 * time.Second // Match legacy navigator timeout
+	ProcessStopTimeout    = 10 * time.Second
+	RailsStartupDelay     = 5 * time.Second
 
 	// Port configuration
 	DefaultStartPort  = 4000
@@ -167,6 +168,7 @@ type Applications struct {
 	Server          map[string]string   `yaml:"server"`           // Framework server commands
 	Args            map[string][]string `yaml:"args"`             // Framework command arguments
 	HealthCheck     string              `yaml:"health_check"`     // Default health check endpoint (e.g., "/up")
+	StartupTimeout  string              `yaml:"startup_timeout"`  // Default timeout before showing maintenance page (e.g., "5s")
 	TrackWebSockets bool                `yaml:"track_websockets"` // Global default for WebSocket tracking (default: true)
 }
 
@@ -229,6 +231,7 @@ type Tenant struct {
 	Var             map[string]interface{} `yaml:"var"`
 	Hooks           TenantHooks            `yaml:"hooks"`
 	HealthCheck     string                 `yaml:"health_check"`     // Override health check endpoint for this tenant
+	StartupTimeout  string                 `yaml:"startup_timeout"`  // Override startup timeout for this tenant (e.g., "10s")
 	TrackWebSockets *bool                  `yaml:"track_websockets"` // Override WebSocket tracking (nil = use global default)
 }
 

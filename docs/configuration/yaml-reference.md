@@ -40,10 +40,45 @@ server:
 |-------|------|---------|-------------|
 | `listen` | integer/string | `3000` | Port to bind HTTP server |
 | `hostname` | string | `""` | Hostname for Host header matching |
-| `public_dir` | string | `"./public"` | Default directory for static files |
+| `public_dir` | string | `"./public"` | Default directory for static files and maintenance page |
 | `root_path` | string | `""` | Root URL path prefix (e.g., "/showcase") |
 | `authentication` | string | `""` | Path to htpasswd file for authentication |
 | `auth_exclude` | array | `[]` | Glob patterns for paths excluded from auth |
+
+### Maintenance Page
+
+Navigator automatically serves a maintenance page when:
+- An application is starting and exceeds the `startup_timeout`
+- A Fly-Replay target is unavailable
+- Sticky session routing fails to find the target machine
+
+The maintenance page is served from `{public_dir}/503.html` (e.g., `public/503.html`). If this file doesn't exist, Navigator serves a default maintenance page.
+
+**Recommended 503.html:**
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Service Starting (503)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="refresh" content="5">  <!-- Auto-refresh every 5 seconds -->
+  <style>
+    body {
+      font-family: arial, sans-serif;
+      text-align: center;
+      padding: 50px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Service Starting...</h1>
+  <p>The application is starting up. This page will refresh automatically.</p>
+</body>
+</html>
+```
+
+The `<meta http-equiv="refresh" content="5">` tag automatically reloads the page every 5 seconds, so users don't need to manually refresh while waiting for the application to become ready.
 
 ### server.idle
 
@@ -149,6 +184,10 @@ applications:
     timeout: 5m                   # Idle timeout (duration format)
     start_port: 4000              # Starting port for allocation
 
+  # Startup configuration
+  health_check: "/up"             # Default health check endpoint
+  startup_timeout: "5s"           # Timeout before showing maintenance page
+
   # WebSocket connection tracking (default: true)
   track_websockets: true          # Track WebSocket connections globally
 
@@ -180,6 +219,8 @@ applications:
       runtime: bundle             # Runtime command
       server: exec                # Server command
       args: ["puma", "-p", "${port}"]  # Server arguments
+      health_check: "/health"     # Override: custom health check endpoint
+      startup_timeout: "10s"      # Override: wait longer for this tenant
       track_websockets: false     # Override: disable WebSocket tracking
 
       # Tenant-specific lifecycle hooks
@@ -209,6 +250,28 @@ Global default health check endpoint for application readiness detection. Can be
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `health_check` | string | `"/"` | HTTP endpoint for health checks (e.g., "/up", "/health") |
+
+### applications.startup_timeout
+
+Global timeout for waiting for applications to become ready before serving the maintenance page. Can be overridden per-tenant.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `startup_timeout` | string | `"5s"` | Duration to wait for app startup (e.g., "5s", "10s", "30s") |
+
+When an application is starting, Navigator waits up to this duration for the health check to pass. If the timeout is reached, Navigator serves the configured maintenance page (typically `public/503.html`) instead of returning a 502 error. The maintenance page can include `<meta http-equiv="refresh" content="5">` to auto-refresh.
+
+**Example:**
+
+```yaml
+applications:
+  startup_timeout: "10s"    # Wait 10 seconds globally
+
+  tenants:
+    - name: slow-app
+      path: /slow/
+      startup_timeout: "30s"  # Override: wait 30 seconds for this tenant
+```
 
 ### applications.track_websockets
 

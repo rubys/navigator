@@ -210,6 +210,36 @@ func (h *Handler) handleRewrites(w http.ResponseWriter, r *http.Request) bool {
 // tryFiles removed - use staticHandler.TryFiles instead
 // handleStandaloneProxy removed - use Routes.ReverseProxies instead
 
+// getStartupTimeout determines the startup timeout for a tenant
+// Priority: tenant-specific > global applications config > default
+func (h *Handler) getStartupTimeout(tenant *config.Tenant) time.Duration {
+	// 1. Check tenant-specific override
+	if tenant != nil && tenant.StartupTimeout != "" {
+		timeout, err := time.ParseDuration(tenant.StartupTimeout)
+		if err == nil {
+			return timeout
+		}
+		slog.Warn("Invalid tenant startup_timeout, using default",
+			"tenant", tenant.Name,
+			"value", tenant.StartupTimeout,
+			"error", err)
+	}
+
+	// 2. Check global applications config
+	if h.config.Applications.StartupTimeout != "" {
+		timeout, err := time.ParseDuration(h.config.Applications.StartupTimeout)
+		if err == nil {
+			return timeout
+		}
+		slog.Warn("Invalid global startup_timeout, using default",
+			"value", h.config.Applications.StartupTimeout,
+			"error", err)
+	}
+
+	// 3. Use default
+	return config.DefaultStartupTimeout
+}
+
 // extractTenantFromPath extracts the tenant name from the URL path
 // Returns (tenantName, found) where found indicates if a tenant was matched
 func (h *Handler) extractTenantFromPath(path string) (string, bool) {
@@ -251,15 +281,18 @@ func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Determine startup timeout (tenant-specific override, then global, then default)
+	startupTimeout := h.getStartupTimeout(app.Tenant)
+
 	// Wait for app to be ready (with timeout)
 	select {
 	case <-app.ReadyChan():
 		// App is ready, continue with proxy
-	case <-time.After(5 * time.Second):
+	case <-time.After(startupTimeout):
 		// Timeout waiting for app to be ready, serve maintenance page
 		slog.Info("App still starting after timeout, serving maintenance page",
 			"tenant", tenantName,
-			"timeout", "5s")
+			"timeout", startupTimeout)
 		recorder.SetMetadata("tenant", tenantName)
 		recorder.SetMetadata("response_type", "maintenance")
 		ServeMaintenancePage(w, r, h.config)
