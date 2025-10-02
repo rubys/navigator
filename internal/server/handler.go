@@ -287,7 +287,15 @@ func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request) {
 	// Wait for app to be ready (with timeout)
 	select {
 	case <-app.ReadyChan():
-		// App is ready, continue with proxy
+		// App is ready, but check if client is still connected
+		if r.Context().Err() != nil {
+			// Client closed connection while waiting (similar to nginx 499)
+			recorder.SetMetadata("tenant", tenantName)
+			recorder.SetMetadata("response_type", "client_closed")
+			w.WriteHeader(499) // Use nginx convention for client closed connection
+			return
+		}
+		// Client still connected, continue with proxy
 	case <-time.After(startupTimeout):
 		// Timeout waiting for app to be ready, serve maintenance page
 		slog.Info("App still starting after timeout, serving maintenance page",
