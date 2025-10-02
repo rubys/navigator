@@ -149,6 +149,9 @@ applications:
     timeout: 5m                   # Idle timeout (duration format)
     start_port: 4000              # Starting port for allocation
 
+  # WebSocket connection tracking (default: true)
+  track_websockets: true          # Track WebSocket connections globally
+
   # Framework configuration (optional, can be per-tenant)
   framework:
     command: bin/rails
@@ -177,6 +180,7 @@ applications:
       runtime: bundle             # Runtime command
       server: exec                # Server command
       args: ["puma", "-p", "${port}"]  # Server arguments
+      track_websockets: false     # Override: disable WebSocket tracking
 
       # Tenant-specific lifecycle hooks
       hooks:
@@ -205,6 +209,16 @@ Global default health check endpoint for application readiness detection. Can be
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `health_check` | string | `"/"` | HTTP endpoint for health checks (e.g., "/up", "/health") |
+
+### applications.track_websockets
+
+Global setting for WebSocket connection tracking. When enabled, Navigator tracks active WebSocket connections to prevent apps from shutting down during idle timeouts. Can be overridden per-tenant.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `track_websockets` | boolean | `true` | Track WebSocket connections to prevent idle shutdown |
+
+**When to disable**: Tenants that proxy WebSockets to standalone servers (e.g., separate Action Cable) or don't handle WebSockets directly.
 
 ### applications.framework
 
@@ -238,6 +252,7 @@ List of tenant applications.
 | `server` | string | | Server command override |
 | `args` | array | | Server arguments override |
 | `health_check` | string | | Health check endpoint override (e.g., "/up") |
+| `track_websockets` | boolean | | Override WebSocket tracking (nil = use global) |
 | `hooks` | object | | Tenant-specific lifecycle hooks |
 
 **Note**: The `name` field is automatically derived from the `path` (e.g., `/showcase/2025/boston/` → `2025/boston`).

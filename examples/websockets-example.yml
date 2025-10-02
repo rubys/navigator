@@ -63,6 +63,11 @@ applications:
   server_exec: exec
   server_args: ["puma", "-p", "{{port}}"]
 
+  # WebSocket connection tracking
+  # Since this app proxies WebSocket requests to a standalone Action Cable server,
+  # we disable tracking to avoid unnecessary overhead
+  track_websockets: true  # Global default (can be overridden per-tenant)
+
   pools:
     max_size: 5
     timeout: 5m
@@ -71,6 +76,7 @@ applications:
   tenants:
     - name: main
       root: /app
+      track_websockets: false  # Disable tracking (WebSockets handled by standalone server)
       env:
         RAILS_ENV: production
         DATABASE_URL: sqlite3:db/production.sqlite3
@@ -95,3 +101,11 @@ applications:
 # - Scalability: API and WebSocket traffic can be scaled independently
 # - Flexibility: Easy to add/remove proxy routes without changing application code
 # - Monitoring: Each proxy route can be monitored and configured separately
+#
+# Note on WebSocket Configuration:
+# - `websocket: true` (in routes.reverse_proxies): Enables WebSocket upgrade support for proxy route
+# - `track_websockets: false` (in applications.tenants): Disables connection tracking for tenant
+#
+# The main Rails app has `track_websockets: false` because it doesn't handle WebSocket
+# connections directly - they're proxied to the standalone Action Cable server. This prevents
+# the app from being kept alive solely due to WebSocket connections it doesn't actually handle.

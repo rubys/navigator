@@ -158,15 +158,16 @@ type Config struct {
 
 // Applications represents application configuration
 type Applications struct {
-	Pools       Pools               `yaml:"pools"`
-	Tenants     []Tenant            `yaml:"tenants"`
-	Env         map[string]string   `yaml:"env"`
-	Hooks       TenantHooks         `yaml:"hooks"`
-	Defaults    map[string]Tenant   // For framework-specific defaults
-	Runtime     map[string]string   `yaml:"runtime"`      // Framework runtime commands
-	Server      map[string]string   `yaml:"server"`       // Framework server commands
-	Args        map[string][]string `yaml:"args"`         // Framework command arguments
-	HealthCheck string              `yaml:"health_check"` // Default health check endpoint (e.g., "/up")
+	Pools           Pools               `yaml:"pools"`
+	Tenants         []Tenant            `yaml:"tenants"`
+	Env             map[string]string   `yaml:"env"`
+	Hooks           TenantHooks         `yaml:"hooks"`
+	Defaults        map[string]Tenant   // For framework-specific defaults
+	Runtime         map[string]string   `yaml:"runtime"`          // Framework runtime commands
+	Server          map[string]string   `yaml:"server"`           // Framework server commands
+	Args            map[string][]string `yaml:"args"`             // Framework command arguments
+	HealthCheck     string              `yaml:"health_check"`     // Default health check endpoint (e.g., "/up")
+	TrackWebSockets bool                `yaml:"track_websockets"` // Global default for WebSocket tracking (default: true)
 }
 
 // Pools represents application pool configuration
@@ -215,18 +216,19 @@ type FrameworkConfig struct {
 
 // Tenant represents a tenant configuration
 type Tenant struct {
-	Name        string                 `yaml:"name"`
-	Root        string                 `yaml:"root"`
-	PublicDir   string                 `yaml:"public_dir"`
-	Env         map[string]string      `yaml:"env"`
-	Framework   string                 `yaml:"framework"`
-	Runtime     string                 `yaml:"runtime"`
-	Server      string                 `yaml:"server"`
-	Args        []string               `yaml:"args"`
-	AppManager  interface{}            // Will be *AppManager
-	Var         map[string]interface{} `yaml:"var"`
-	Hooks       TenantHooks            `yaml:"hooks"`
-	HealthCheck string                 `yaml:"health_check"` // Override health check endpoint for this tenant
+	Name            string                 `yaml:"name"`
+	Root            string                 `yaml:"root"`
+	PublicDir       string                 `yaml:"public_dir"`
+	Env             map[string]string      `yaml:"env"`
+	Framework       string                 `yaml:"framework"`
+	Runtime         string                 `yaml:"runtime"`
+	Server          string                 `yaml:"server"`
+	Args            []string               `yaml:"args"`
+	AppManager      interface{}            // Will be *AppManager
+	Var             map[string]interface{} `yaml:"var"`
+	Hooks           TenantHooks            `yaml:"hooks"`
+	HealthCheck     string                 `yaml:"health_check"`     // Override health check endpoint for this tenant
+	TrackWebSockets *bool                  `yaml:"track_websockets"` // Override WebSocket tracking (nil = use global default)
 }
 
 // YAMLConfig represents the raw YAML configuration structure
@@ -293,27 +295,29 @@ type YAMLConfig struct {
 			StartPort int    `yaml:"start_port"`
 		} `yaml:"pools"`
 		Tenants []struct {
-			Path        string                 `yaml:"path"`
-			Root        string                 `yaml:"root"`
-			PublicDir   string                 `yaml:"public_dir"`
-			Env         map[string]string      `yaml:"env"`
-			Framework   string                 `yaml:"framework"`
-			Runtime     string                 `yaml:"runtime"`
-			Server      string                 `yaml:"server"`
-			Args        []string               `yaml:"args"`
-			Var         map[string]interface{} `yaml:"var"`
-			HealthCheck string                 `yaml:"health_check"`
-			Hooks       struct {
+			Path            string                 `yaml:"path"`
+			Root            string                 `yaml:"root"`
+			PublicDir       string                 `yaml:"public_dir"`
+			Env             map[string]string      `yaml:"env"`
+			Framework       string                 `yaml:"framework"`
+			Runtime         string                 `yaml:"runtime"`
+			Server          string                 `yaml:"server"`
+			Args            []string               `yaml:"args"`
+			Var             map[string]interface{} `yaml:"var"`
+			HealthCheck     string                 `yaml:"health_check"`
+			TrackWebSockets *bool                  `yaml:"track_websockets"`
+			Hooks           struct {
 				Start []HookConfig `yaml:"start"`
 				Stop  []HookConfig `yaml:"stop"`
 			} `yaml:"hooks"`
 		} `yaml:"tenants"`
-		Env         map[string]string   `yaml:"env"`
-		Runtime     map[string]string   `yaml:"runtime"`
-		Server      map[string]string   `yaml:"server"`
-		Args        map[string][]string `yaml:"args"`
-		HealthCheck string              `yaml:"health_check"`
-		Hooks       struct {
+		Env             map[string]string   `yaml:"env"`
+		Runtime         map[string]string   `yaml:"runtime"`
+		Server          map[string]string   `yaml:"server"`
+		Args            map[string][]string `yaml:"args"`
+		HealthCheck     string              `yaml:"health_check"`
+		TrackWebSockets bool                `yaml:"track_websockets"`
+		Hooks           struct {
 			Start []HookConfig `yaml:"start"`
 			Stop  []HookConfig `yaml:"stop"`
 		} `yaml:"hooks"`

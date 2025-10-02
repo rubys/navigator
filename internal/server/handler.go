@@ -249,9 +249,15 @@ func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request) {
 	recorder.SetMetadata("response_type", "proxy")
 	recorder.SetMetadata("proxy_backend", fmt.Sprintf("tenant:%s", tenantName))
 
-	// Proxy to the web app with retry support and WebSocket tracking
+	// Determine if WebSocket tracking is enabled for this tenant
+	var wsPtr *int32
+	if app.ShouldTrackWebSockets(h.config.Applications.TrackWebSockets) {
+		wsPtr = app.GetActiveWebSocketsPtr()
+	}
+
+	// Proxy to the web app with retry support and optional WebSocket tracking
 	targetURL := fmt.Sprintf("http://localhost:%d", app.Port)
-	proxy.ProxyWithWebSocketSupport(w, r, targetURL, app.GetActiveWebSocketsPtr())
+	proxy.ProxyWithWebSocketSupport(w, r, targetURL, wsPtr)
 }
 
 // ResponseRecorder wraps http.ResponseWriter to capture response details

@@ -176,6 +176,90 @@ applications:
       force_max_concurrent_requests: 0
 ```
 
+## WebSocket Connection Tracking
+
+Navigator can track active WebSocket connections to prevent apps from shutting down during idle timeouts while connections are active. This feature is **enabled by default** but can be configured globally or per-tenant.
+
+### When to Disable Tracking
+
+Disable WebSocket tracking for tenants that:
+- Proxy WebSockets to standalone servers (e.g., separate Action Cable service)
+- Don't handle WebSocket connections directly
+- Have minimal memory/performance requirements
+
+### Global Configuration
+
+```yaml
+applications:
+  track_websockets: true  # Default: true (enabled)
+
+  tenants:
+    - name: web-app
+      # Inherits global setting (true)
+      path: /
+
+    - name: api-app
+      # Inherits global setting (true)
+      path: /api
+```
+
+### Per-Tenant Override
+
+```yaml
+applications:
+  track_websockets: true  # Global default
+
+  tenants:
+    # This app proxies WebSockets elsewhere - disable tracking
+    - name: web-app
+      path: /
+      track_websockets: false  # Override: disable tracking
+
+    # This app handles WebSockets directly - keep tracking enabled
+    - name: chat-app
+      path: /chat
+      track_websockets: true   # Override: explicitly enable
+
+    # This app doesn't specify - inherits global (true)
+    - name: api-app
+      path: /api
+```
+
+### Example: Reverse Proxy to Action Cable
+
+```yaml
+applications:
+  track_websockets: true  # Global default
+
+  tenants:
+    # Main Rails app - proxies /cable to standalone server
+    - name: web
+      path: /
+      track_websockets: false  # Don't track (proxies WebSockets elsewhere)
+
+# Reverse proxy to standalone Action Cable server
+routes:
+  reverse_proxies:
+    - name: action-cable
+      path: "^/cable"
+      target: "http://localhost:28080"
+      websocket: true  # Enable WebSocket support for proxy
+```
+
+### How Tracking Works
+
+When `track_websockets: true` (default):
+- Navigator counts active WebSocket connections per tenant
+- Apps with active connections won't stop during idle timeout
+- Prevents unexpected WebSocket disconnections
+- Small memory overhead for connection tracking
+
+When `track_websockets: false`:
+- No WebSocket connection counting
+- App stops normally after idle timeout
+- Slightly lower memory usage
+- Use when app doesn't handle WebSockets directly
+
 ## Connection Management
 
 ### Connection Limits

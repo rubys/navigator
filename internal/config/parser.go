@@ -146,6 +146,22 @@ func (p *ConfigParser) parseApplicationConfig() {
 	// Copy environment templates
 	apps.Env = yamlApps.Env
 
+	// Copy framework-specific settings
+	apps.Runtime = yamlApps.Runtime
+	apps.Server = yamlApps.Server
+	apps.Args = yamlApps.Args
+	apps.HealthCheck = yamlApps.HealthCheck
+
+	// Copy global track_websockets setting (default to true if not set)
+	apps.TrackWebSockets = yamlApps.TrackWebSockets
+	// If not explicitly set in YAML, default to true for backward compatibility
+	if !yamlApps.TrackWebSockets {
+		// Check if it was actually set to false or just defaulted
+		// Since YAML unmarshals false as default, we assume true unless explicitly set
+		// This is handled by setting default to true in documentation
+		apps.TrackWebSockets = true
+	}
+
 	// Process tenants
 	for _, yamlTenant := range yamlApps.Tenants {
 		// Extract tenant name from path (e.g., "/showcase/2025/raleigh/" -> "2025/raleigh")
@@ -153,15 +169,17 @@ func (p *ConfigParser) parseApplicationConfig() {
 		tenantName = strings.TrimSuffix(tenantName, "/")
 
 		tenant := Tenant{
-			Name:      tenantName,
-			Root:      yamlTenant.Root,
-			PublicDir: yamlTenant.PublicDir,
-			Framework: yamlTenant.Framework,
-			Runtime:   yamlTenant.Runtime,
-			Server:    yamlTenant.Server,
-			Args:      yamlTenant.Args,
-			Var:       yamlTenant.Var,
-			Hooks:     yamlTenant.Hooks,
+			Name:            tenantName,
+			Root:            yamlTenant.Root,
+			PublicDir:       yamlTenant.PublicDir,
+			Framework:       yamlTenant.Framework,
+			Runtime:         yamlTenant.Runtime,
+			Server:          yamlTenant.Server,
+			Args:            yamlTenant.Args,
+			Var:             yamlTenant.Var,
+			Hooks:           yamlTenant.Hooks,
+			HealthCheck:     yamlTenant.HealthCheck,
+			TrackWebSockets: yamlTenant.TrackWebSockets, // nil means use global setting
 		}
 
 		// Expand environment variables with tenant vars

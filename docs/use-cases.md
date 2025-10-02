@@ -159,21 +159,34 @@ server:
   public_dir: public
 
 applications:
+  # Disable WebSocket tracking for main app (proxies WebSockets elsewhere)
+  track_websockets: true  # Global default
+
   tenants:
     - name: main-app
       path: /
       working_dir: /app
+      track_websockets: false  # Override: this app proxies WebSockets to standalone server
 
-  standalone_servers:
+# Reverse proxy WebSocket requests to standalone Action Cable server
+routes:
+  reverse_proxies:
     - name: action-cable
-      match_path: /cable
-      command: bundle
-      args: [exec, puma, -p, "4001", cable/config.ru]
-      working_dir: /app
-      port: 4001
+      path: "^/cable"
+      target: "http://localhost:28080"
+      websocket: true
 ```
 
-See [websockets-example.yml](https://github.com/rubys/navigator/blob/main/examples/websockets-example.yml) for a complete example.
+### WebSocket Connection Tracking
+
+Navigator can track WebSocket connections to prevent apps from shutting down during idle timeouts. This is useful when apps handle WebSockets directly, but unnecessary when proxying to standalone servers.
+
+**When to disable tracking:**
+- Apps that proxy WebSockets to separate services (like example above)
+- Apps that don't handle WebSocket connections at all
+- When minimizing memory overhead is critical
+
+See [websockets-example.yml](https://github.com/rubys/navigator/blob/main/examples/websockets-example.yml) and [WebSocket Support documentation](features/websocket-support.md) for complete examples.
 
 ---
 

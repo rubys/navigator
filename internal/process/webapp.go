@@ -47,6 +47,15 @@ func (w *WebApp) GetActiveWebSocketCount() int32 {
 	return atomic.LoadInt32(&w.activeWebSockets)
 }
 
+// ShouldTrackWebSockets returns whether WebSocket tracking is enabled for this app
+// It checks the tenant-specific setting first, then falls back to the global setting
+func (w *WebApp) ShouldTrackWebSockets(globalSetting bool) bool {
+	if w.Tenant != nil && w.Tenant.TrackWebSockets != nil {
+		return *w.Tenant.TrackWebSockets
+	}
+	return globalSetting
+}
+
 // AppManager manages web application processes
 type AppManager struct {
 	apps           map[string]*WebApp

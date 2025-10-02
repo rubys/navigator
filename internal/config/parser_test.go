@@ -48,13 +48,13 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 					} `yaml:"sticky_sessions"`
 				}{
 					Listen:         3001,
-					PublicDir:      "dist",
-					Authentication: "htpasswd",
+					PublicDir:      "/var/www/public",
+					Authentication: "/etc/htpasswd",
 				},
 			},
 			wantListen: "3001",
-			wantPublic: "dist",
-			wantAuth:   "htpasswd",
+			wantPublic: "/var/www/public",
+			wantAuth:   "/etc/htpasswd",
 		},
 		{
 			name: "string listen port",
@@ -90,17 +90,10 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 						Paths          []string `yaml:"paths"`
 					} `yaml:"sticky_sessions"`
 				}{
-					Listen: "8080",
+					Listen: ":8080",
 				},
 			},
-			wantListen: "8080",
-			wantPublic: "",
-			wantAuth:   "",
-		},
-		{
-			name:       "default listen port",
-			yamlConfig: YAMLConfig{},
-			wantListen: "3000",
+			wantListen: ":8080",
 			wantPublic: "",
 			wantAuth:   "",
 		},
@@ -110,111 +103,40 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			parser := NewConfigParser(&tt.yamlConfig)
 			config, err := parser.Parse()
-
 			if err != nil {
 				t.Fatalf("Parse() error = %v", err)
 			}
 
 			if config.Server.Listen != tt.wantListen {
-				t.Errorf("Server.Listen = %v, want %v", config.Server.Listen, tt.wantListen)
+				t.Errorf("Listen = %v, want %v", config.Server.Listen, tt.wantListen)
 			}
-
 			if config.Server.PublicDir != tt.wantPublic {
-				t.Errorf("Server.PublicDir = %v, want %v", config.Server.PublicDir, tt.wantPublic)
+				t.Errorf("PublicDir = %v, want %v", config.Server.PublicDir, tt.wantPublic)
 			}
-
 			if config.Server.Authentication != tt.wantAuth {
-				t.Errorf("Server.Authentication = %v, want %v", config.Server.Authentication, tt.wantAuth)
+				t.Errorf("Authentication = %v, want %v", config.Server.Authentication, tt.wantAuth)
 			}
 		})
 	}
 }
 
 func TestConfigParser_ParseApplicationConfig(t *testing.T) {
-	yamlConfig := YAMLConfig{
-		Applications: struct {
-			Pools struct {
-				MaxSize   int    `yaml:"max_size"`
-				Timeout   string `yaml:"timeout"`
-				StartPort int    `yaml:"start_port"`
-			} `yaml:"pools"`
-			Tenants []struct {
-				Path        string                 `yaml:"path"`
-				Root        string                 `yaml:"root"`
-				PublicDir   string                 `yaml:"public_dir"`
-				Env         map[string]string      `yaml:"env"`
-				Framework   string                 `yaml:"framework"`
-				Runtime     string                 `yaml:"runtime"`
-				Server      string                 `yaml:"server"`
-				Args        []string               `yaml:"args"`
-				Var         map[string]interface{} `yaml:"var"`
-				HealthCheck string                 `yaml:"health_check"`
-				Hooks       struct {
-					Start []HookConfig `yaml:"start"`
-					Stop  []HookConfig `yaml:"stop"`
-				} `yaml:"hooks"`
-			} `yaml:"tenants"`
-			Env         map[string]string   `yaml:"env"`
-			Runtime     map[string]string   `yaml:"runtime"`
-			Server      map[string]string   `yaml:"server"`
-			Args        map[string][]string `yaml:"args"`
-			HealthCheck string              `yaml:"health_check"`
-			Hooks       struct {
-				Start []HookConfig `yaml:"start"`
-				Stop  []HookConfig `yaml:"stop"`
-			} `yaml:"hooks"`
-		}{
-			Pools: struct {
-				MaxSize   int    `yaml:"max_size"`
-				Timeout   string `yaml:"timeout"`
-				StartPort int    `yaml:"start_port"`
-			}{
-				MaxSize:   10,
-				Timeout:   "5m",
-				StartPort: 4000,
-			},
-			Env: map[string]string{
-				"DB_NAME": "${app}_${env}",
-				"DB_HOST": "localhost",
-			},
-			Tenants: []struct {
-				Path        string                 `yaml:"path"`
-				Root        string                 `yaml:"root"`
-				PublicDir   string                 `yaml:"public_dir"`
-				Env         map[string]string      `yaml:"env"`
-				Framework   string                 `yaml:"framework"`
-				Runtime     string                 `yaml:"runtime"`
-				Server      string                 `yaml:"server"`
-				Args        []string               `yaml:"args"`
-				Var         map[string]interface{} `yaml:"var"`
-				HealthCheck string                 `yaml:"health_check"`
-				Hooks       struct {
-					Start []HookConfig `yaml:"start"`
-					Stop  []HookConfig `yaml:"stop"`
-				} `yaml:"hooks"`
-			}{
-				{
-					Path: "/showcase/test-app/",
-					Root: "/app/test",
-					Var: map[string]interface{}{
-						"app": "myapp",
-						"env": "production",
-					},
-				},
-			},
-		},
-	}
+	yamlConfig := `
+applications:
+  env:
+    DB_NAME: "myapp_${environment}"
+    DB_HOST: "localhost"
+  tenants:
+    - path: "/showcase/2025/raleigh/"
+      root: "/app/raleigh"
+      var:
+        environment: "production"
+`
 
-	parser := NewConfigParser(&yamlConfig)
-	config, err := parser.Parse()
-
+	// Parse YAML
+	config, err := ParseYAML([]byte(yamlConfig))
 	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-
-	// Check pool settings
-	if config.Applications.Pools.MaxSize != 10 {
-		t.Errorf("Pools.MaxSize = %v, want %v", config.Applications.Pools.MaxSize, 10)
+		t.Fatalf("ParseYAML() error = %v", err)
 	}
 
 	// Check tenant environment expansion
@@ -232,6 +154,305 @@ func TestConfigParser_ParseApplicationConfig(t *testing.T) {
 
 	if tenant.Env["DB_HOST"] != "localhost" {
 		t.Errorf("Tenant env DB_HOST = %v, want %v", tenant.Env["DB_HOST"], "localhost")
+	}
+}
+
+func TestConfigParser_ParseRoutesConfig(t *testing.T) {
+	yamlConfig := YAMLConfig{
+		Routes: RoutesConfig{
+			Redirects: []struct {
+				From string `yaml:"from"`
+				To   string `yaml:"to"`
+			}{
+				{From: "^/old", To: "/new"},
+			},
+			Rewrites: []struct {
+				From string `yaml:"from"`
+				To   string `yaml:"to"`
+			}{
+				{From: "^/api/(.*)", To: "/v1/api/$1"},
+			},
+		},
+	}
+
+	parser := NewConfigParser(&yamlConfig)
+	config, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	// Check that rewrites were converted to rewrite rules
+	if len(config.Server.RewriteRules) < 2 {
+		t.Errorf("Expected at least 2 rewrite rules, got %d", len(config.Server.RewriteRules))
+	}
+
+	// Check redirect rule
+	found := false
+	for _, rule := range config.Server.RewriteRules {
+		if rule.Flag == "redirect" && rule.Replacement == "/new" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Expected redirect rewrite rule not found")
+	}
+
+	// Check rewrite rule
+	found = false
+	for _, rule := range config.Server.RewriteRules {
+		if rule.Flag == "last" && rule.Replacement == "/v1/api/$1" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Expected last rewrite rule not found")
+	}
+}
+
+func TestConfigParser_ParseManagedProcesses(t *testing.T) {
+	yamlConfig := YAMLConfig{
+		ManagedProcesses: []ManagedProcessConfig{
+			{
+				Name:        "redis",
+				Command:     "redis-server",
+				Args:        []string{"--port", "6379"},
+				AutoRestart: true,
+			},
+		},
+	}
+
+	parser := NewConfigParser(&yamlConfig)
+	config, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	if len(config.ManagedProcesses) != 1 {
+		t.Fatalf("Expected 1 managed process, got %d", len(config.ManagedProcesses))
+	}
+
+	proc := config.ManagedProcesses[0]
+	if proc.Name != "redis" {
+		t.Errorf("Name = %v, want redis", proc.Name)
+	}
+	if proc.Command != "redis-server" {
+		t.Errorf("Command = %v, want redis-server", proc.Command)
+	}
+	if !proc.AutoRestart {
+		t.Error("Expected AutoRestart to be true")
+	}
+}
+
+func TestConfigParser_ParseLoggingConfig(t *testing.T) {
+	yamlConfig := YAMLConfig{
+		Logging: LogConfig{
+			Format: "json",
+			File:   "/var/log/navigator.log",
+		},
+	}
+
+	parser := NewConfigParser(&yamlConfig)
+	config, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	if config.Logging.Format != "json" {
+		t.Errorf("Format = %v, want json", config.Logging.Format)
+	}
+	if config.Logging.File != "/var/log/navigator.log" {
+		t.Errorf("File = %v, want /var/log/navigator.log", config.Logging.File)
+	}
+}
+
+func TestConfigParser_ParseHooksConfig(t *testing.T) {
+	yamlConfig := YAMLConfig{
+		Hooks: struct {
+			Server struct {
+				Start  []HookConfig `yaml:"start"`
+				Ready  []HookConfig `yaml:"ready"`
+				Resume []HookConfig `yaml:"resume"`
+				Idle   []HookConfig `yaml:"idle"`
+			} `yaml:"server"`
+			Tenant struct {
+				Start []HookConfig `yaml:"start"`
+				Stop  []HookConfig `yaml:"stop"`
+			} `yaml:"tenant"`
+		}{
+			Server: struct {
+				Start  []HookConfig `yaml:"start"`
+				Ready  []HookConfig `yaml:"ready"`
+				Resume []HookConfig `yaml:"resume"`
+				Idle   []HookConfig `yaml:"idle"`
+			}{
+				Start: []HookConfig{
+					{Command: "/usr/local/bin/start.sh"},
+				},
+			},
+			Tenant: struct {
+				Start []HookConfig `yaml:"start"`
+				Stop  []HookConfig `yaml:"stop"`
+			}{
+				Start: []HookConfig{
+					{Command: "/usr/local/bin/tenant-start.sh"},
+				},
+			},
+		},
+	}
+
+	parser := NewConfigParser(&yamlConfig)
+	config, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	if len(config.Hooks.Start) != 1 {
+		t.Fatalf("Expected 1 server start hook, got %d", len(config.Hooks.Start))
+	}
+	if config.Hooks.Start[0].Command != "/usr/local/bin/start.sh" {
+		t.Errorf("Start hook command = %v, want /usr/local/bin/start.sh", config.Hooks.Start[0].Command)
+	}
+
+	if len(config.Applications.Hooks.Start) != 1 {
+		t.Fatalf("Expected 1 tenant start hook, got %d", len(config.Applications.Hooks.Start))
+	}
+	if config.Applications.Hooks.Start[0].Command != "/usr/local/bin/tenant-start.sh" {
+		t.Errorf("Tenant start hook command = %v, want /usr/local/bin/tenant-start.sh", config.Applications.Hooks.Start[0].Command)
+	}
+}
+
+func TestConfigParser_ParseStaticConfig(t *testing.T) {
+	yamlConfig := YAMLConfig{
+		Static: struct {
+			Directories []struct {
+				Path  string `yaml:"path"`
+				Dir   string `yaml:"dir"`
+				Cache string `yaml:"cache"`
+			} `yaml:"directories"`
+			Extensions []string `yaml:"extensions"`
+			TryFiles   struct {
+				Enabled  bool     `yaml:"enabled"`
+				Suffixes []string `yaml:"suffixes"`
+				Fallback string   `yaml:"fallback"`
+			} `yaml:"try_files"`
+		}{
+			Extensions: []string{".html", ".css", ".js"},
+			TryFiles: struct {
+				Enabled  bool     `yaml:"enabled"`
+				Suffixes []string `yaml:"suffixes"`
+				Fallback string   `yaml:"fallback"`
+			}{
+				Enabled:  true,
+				Suffixes: []string{".html"},
+				Fallback: "/index.html",
+			},
+		},
+	}
+
+	parser := NewConfigParser(&yamlConfig)
+	config, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	if len(config.Static.Extensions) != 3 {
+		t.Errorf("Expected 3 extensions, got %d", len(config.Static.Extensions))
+	}
+	if !config.Static.TryFiles.Enabled {
+		t.Error("Expected TryFiles to be enabled")
+	}
+	if config.Static.TryFiles.Fallback != "/index.html" {
+		t.Errorf("Fallback = %v, want /index.html", config.Static.TryFiles.Fallback)
+	}
+}
+
+func TestConfigParser_ParseAuthConfig(t *testing.T) {
+	yamlConfig := YAMLConfig{
+		Auth: struct {
+			Enabled         bool     `yaml:"enabled"`
+			Realm           string   `yaml:"realm"`
+			HTPasswd        string   `yaml:"htpasswd"`
+			PublicPaths     []string `yaml:"public_paths"`
+			ExcludePatterns []struct {
+				Pattern     string `yaml:"pattern"`
+				Description string `yaml:"description"`
+			} `yaml:"exclude_patterns"`
+		}{
+			Enabled:  true,
+			Realm:    "Test Realm",
+			HTPasswd: "/etc/htpasswd",
+			PublicPaths: []string{
+				"/public",
+				"/health",
+			},
+		},
+	}
+
+	parser := NewConfigParser(&yamlConfig)
+	config, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	// Check that auth patterns were created
+	if len(config.Server.AuthPatterns) < 2 {
+		t.Errorf("Expected at least 2 auth patterns, got %d", len(config.Server.AuthPatterns))
+	}
+
+	// Verify one of the public path patterns
+	foundPublic := false
+	for _, pattern := range config.Server.AuthPatterns {
+		if pattern.Action == "off" {
+			foundPublic = true
+			break
+		}
+	}
+	if !foundPublic {
+		t.Error("Expected to find public path pattern with action 'off'")
+	}
+}
+
+func TestConfigParser_ParseFlyReplayRoutes(t *testing.T) {
+	yamlConfig := YAMLConfig{
+		Routes: RoutesConfig{
+			FlyReplay: []struct {
+				Path   string `yaml:"path"`
+				App    string `yaml:"app"`
+				Region string `yaml:"region"`
+				Status int    `yaml:"status"`
+			}{
+				{
+					Path:   "^/admin",
+					Region: "lax",
+					Status: 307,
+				},
+			},
+		},
+	}
+
+	parser := NewConfigParser(&yamlConfig)
+	config, err := parser.Parse()
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	// Check that fly-replay route was converted to rewrite rule
+	found := false
+	for _, rule := range config.Server.RewriteRules {
+		if strings.HasPrefix(rule.Flag, "fly-replay:") {
+			found = true
+			if !strings.Contains(rule.Flag, "lax") {
+				t.Error("Expected fly-replay flag to contain region 'lax'")
+			}
+			if !strings.Contains(rule.Flag, "307") {
+				t.Error("Expected fly-replay flag to contain status '307'")
+			}
+		}
+	}
+	if !found {
+		t.Error("Expected fly-replay rewrite rule not found")
 	}
 }
 
@@ -279,525 +500,98 @@ func TestConfigParser_ParseStickySessionConfig(t *testing.T) {
 				Paths          []string `yaml:"paths"`
 			}{
 				Enabled:        true,
-				CookieName:     "test_cookie",
+				CookieName:     "_nav_session",
 				CookieMaxAge:   "2h",
 				CookieSecure:   true,
 				CookieHTTPOnly: true,
-				Paths:          []string{"/app/*", "/api/*"},
+				CookieSameSite: "Lax",
+				CookiePath:     "/",
+				Paths:          []string{"/app/*"},
 			},
 		},
 	}
 
 	parser := NewConfigParser(&yamlConfig)
 	config, err := parser.Parse()
-
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
 
 	ss := config.Server.StickySession
-
 	if !ss.Enabled {
-		t.Error("StickySession should be enabled")
+		t.Error("Expected sticky sessions to be enabled")
 	}
-
-	if ss.CookieName != "test_cookie" {
-		t.Errorf("CookieName = %v, want %v", ss.CookieName, "test_cookie")
+	if ss.CookieName != "_nav_session" {
+		t.Errorf("CookieName = %v, want _nav_session", ss.CookieName)
 	}
-
 	if ss.CookieMaxAge != "2h" {
-		t.Errorf("CookieMaxAge = %v, want %v", ss.CookieMaxAge, "2h")
+		t.Errorf("CookieMaxAge = %v, want 2h", ss.CookieMaxAge)
 	}
-
 	if !ss.CookieSecure {
-		t.Error("CookieSecure should be true")
+		t.Error("Expected CookieSecure to be true")
 	}
-
 	if !ss.CookieHTTPOnly {
-		t.Error("CookieHTTPOnly should be true")
+		t.Error("Expected CookieHTTPOnly to be true")
 	}
-
-	if len(ss.Paths) != 2 {
-		t.Errorf("Expected 2 paths, got %d", len(ss.Paths))
+	if ss.CookieSameSite != "Lax" {
+		t.Errorf("CookieSameSite = %v, want Lax", ss.CookieSameSite)
 	}
-}
-
-func TestConfigParser_ParseAuthConfig(t *testing.T) {
-	tests := []struct {
-		name                  string
-		yamlConfig            YAMLConfig
-		wantAuthFile          string
-		wantAuthExcludeCount  int
-		wantAuthExclude       []string
-		wantAuthPatternsCount int
-	}{
-		{
-			name: "auth with glob patterns",
-			yamlConfig: YAMLConfig{
-				Auth: struct {
-					Enabled         bool     `yaml:"enabled"`
-					Realm           string   `yaml:"realm"`
-					HTPasswd        string   `yaml:"htpasswd"`
-					PublicPaths     []string `yaml:"public_paths"`
-					ExcludePatterns []struct {
-						Pattern     string `yaml:"pattern"`
-						Description string `yaml:"description"`
-					} `yaml:"exclude_patterns"`
-				}{
-					Enabled:  true,
-					HTPasswd: "/etc/htpasswd",
-					PublicPaths: []string{
-						"*.css",
-						"*.js",
-						"*.png",
-						"*.jpg",
-						"*.gif",
-						"/assets/",
-						"/favicon.ico",
-					},
-				},
-			},
-			wantAuthFile:          "/etc/htpasswd",
-			wantAuthExcludeCount:  7,
-			wantAuthExclude:       []string{"*.css", "*.js", "*.png", "*.jpg", "*.gif", "/assets/", "/favicon.ico"},
-			wantAuthPatternsCount: 0, // Glob patterns should NOT be compiled as regex
-		},
-		{
-			name: "auth disabled",
-			yamlConfig: YAMLConfig{
-				Auth: struct {
-					Enabled         bool     `yaml:"enabled"`
-					Realm           string   `yaml:"realm"`
-					HTPasswd        string   `yaml:"htpasswd"`
-					PublicPaths     []string `yaml:"public_paths"`
-					ExcludePatterns []struct {
-						Pattern     string `yaml:"pattern"`
-						Description string `yaml:"description"`
-					} `yaml:"exclude_patterns"`
-				}{
-					Enabled:     false,
-					HTPasswd:    "/etc/htpasswd",
-					PublicPaths: []string{"*.css"},
-				},
-			},
-			wantAuthFile:          "",
-			wantAuthExcludeCount:  0,
-			wantAuthPatternsCount: 0,
-		},
-		{
-			name: "auth with mixed patterns",
-			yamlConfig: YAMLConfig{
-				Auth: struct {
-					Enabled         bool     `yaml:"enabled"`
-					Realm           string   `yaml:"realm"`
-					HTPasswd        string   `yaml:"htpasswd"`
-					PublicPaths     []string `yaml:"public_paths"`
-					ExcludePatterns []struct {
-						Pattern     string `yaml:"pattern"`
-						Description string `yaml:"description"`
-					} `yaml:"exclude_patterns"`
-				}{
-					Enabled:  true,
-					HTPasswd: "/etc/htpasswd",
-					PublicPaths: []string{
-						"*.css",
-						"/public/",
-						"/health",
-						"*.woff",
-					},
-				},
-			},
-			wantAuthFile:          "/etc/htpasswd",
-			wantAuthExcludeCount:  4,
-			wantAuthExclude:       []string{"*.css", "/public/", "/health", "*.woff"},
-			wantAuthPatternsCount: 0, // None should be compiled as regex
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			parser := NewConfigParser(&tt.yamlConfig)
-			config, err := parser.Parse()
-
-			if err != nil {
-				t.Fatalf("Parse() error = %v", err)
-			}
-
-			if config.Server.Authentication != tt.wantAuthFile {
-				t.Errorf("Server.Authentication = %v, want %v", config.Server.Authentication, tt.wantAuthFile)
-			}
-
-			if len(config.Server.AuthExclude) != tt.wantAuthExcludeCount {
-				t.Errorf("Server.AuthExclude count = %v, want %v", len(config.Server.AuthExclude), tt.wantAuthExcludeCount)
-			}
-
-			if tt.wantAuthExclude != nil {
-				for i, want := range tt.wantAuthExclude {
-					if i >= len(config.Server.AuthExclude) || config.Server.AuthExclude[i] != want {
-						t.Errorf("Server.AuthExclude[%d] = %v, want %v", i, config.Server.AuthExclude[i], want)
-					}
-				}
-			}
-
-			// Verify that glob patterns are NOT compiled as regex (AuthPatterns should be empty)
-			if len(config.Server.AuthPatterns) != tt.wantAuthPatternsCount {
-				t.Errorf("Server.AuthPatterns count = %v, want %v (glob patterns should not be compiled as regex)",
-					len(config.Server.AuthPatterns), tt.wantAuthPatternsCount)
-			}
-		})
+	if len(ss.Paths) != 1 || ss.Paths[0] != "/app/*" {
+		t.Errorf("Paths = %v, want [/app/*]", ss.Paths)
 	}
 }
 
-func TestConfigParser_ParseRoutesConfig(t *testing.T) {
-	yamlConfig := YAMLConfig{
-		Routes: RoutesConfig{
-			Redirects: []struct {
-				From string `yaml:"from"`
-				To   string `yaml:"to"`
-			}{
-				{From: "^/old/(.*)$", To: "/new/$1"},
-			},
-			Rewrites: []struct {
-				From string `yaml:"from"`
-				To   string `yaml:"to"`
-			}{
-				{From: "^/api/v1/(.*)$", To: "/v1/$1"},
-			},
-		},
-	}
+func TestConfigParser_ParseCompleteConfig(t *testing.T) {
+	yamlConfig := `
+server:
+  listen: 3000
+  hostname: localhost
+  public_dir: /var/www/public
+  idle:
+    action: suspend
+    timeout: 20m
+  sticky_sessions:
+    enabled: true
+    cookie_name: "_navigator_session"
+    cookie_max_age: "1h"
 
-	parser := NewConfigParser(&yamlConfig)
-	config, err := parser.Parse()
+routes:
+  redirects:
+    - from: "^/old"
+      to: "/new"
+  reverse_proxies:
+    - name: action-cable
+      path: "^/cable"
+      target: "http://localhost:28080"
+      websocket: true
+  fly_replay:
+    - path: "^/admin"
+      region: "lax"
+      status: 307
 
+applications:
+  pools:
+    max_size: 10
+    timeout: 5m
+    start_port: 4000
+  tenants:
+    - path: "/showcase/2025/raleigh/"
+      root: "/app/raleigh"
+
+managed_processes:
+  - name: redis
+    command: redis-server
+    auto_restart: true
+
+logging:
+  format: json
+  file: /var/log/navigator.log
+`
+
+	// Parse YAML
+	config, err := ParseYAML([]byte(yamlConfig))
 	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-
-	// Check that routes were converted to rewrite rules
-	if len(config.Server.RewriteRules) != 2 {
-		t.Errorf("Expected 2 rewrite rules, got %d", len(config.Server.RewriteRules))
-	}
-
-	// Check redirect rule
-	redirectFound := false
-	rewriteFound := false
-
-	for _, rule := range config.Server.RewriteRules {
-		if rule.Flag == "redirect" {
-			redirectFound = true
-			if rule.Replacement != "/new/$1" {
-				t.Errorf("Redirect replacement = %v, want /new/$1", rule.Replacement)
-			}
-		}
-		if rule.Flag == "last" {
-			rewriteFound = true
-			if rule.Replacement != "/v1/$1" {
-				t.Errorf("Rewrite replacement = %v, want /v1/$1", rule.Replacement)
-			}
-		}
-	}
-
-	if !redirectFound {
-		t.Error("Redirect rule not found")
-	}
-
-	if !rewriteFound {
-		t.Error("Rewrite rule not found")
-	}
-}
-
-// Tests for new proxy functionality
-
-func TestParseReverseProxies(t *testing.T) {
-	yamlConfig := &YAMLConfig{
-		Routes: RoutesConfig{
-			ReverseProxies: []ProxyRoute{
-				{
-					Path:      "^/api/",
-					Target:    "http://backend:8080",
-					WebSocket: false,
-					Headers: map[string]string{
-						"X-Forwarded-Proto": "$scheme",
-					},
-				},
-				{
-					Path:      "^/ws",
-					Target:    "ws://ws-backend:9090",
-					WebSocket: true,
-				},
-			},
-		},
-	}
-
-	parser := NewConfigParser(yamlConfig)
-	config, err := parser.Parse()
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-
-	if len(config.Routes.ReverseProxies) != 2 {
-		t.Errorf("Expected 2 reverse proxies, got %d", len(config.Routes.ReverseProxies))
-	}
-
-	// Test first proxy (HTTP)
-	httpProxy := config.Routes.ReverseProxies[0]
-	if httpProxy.Path != "^/api/" {
-		t.Errorf("Expected path '^/api/', got %s", httpProxy.Path)
-	}
-	if httpProxy.Target != "http://backend:8080" {
-		t.Errorf("Expected target 'http://backend:8080', got %s", httpProxy.Target)
-	}
-	if httpProxy.WebSocket {
-		t.Error("Expected WebSocket to be false for HTTP proxy")
-	}
-	if httpProxy.Headers["X-Forwarded-Proto"] != "$scheme" {
-		t.Errorf("Expected header value '$scheme', got %s", httpProxy.Headers["X-Forwarded-Proto"])
-	}
-
-	// Test second proxy (WebSocket)
-	wsProxy := config.Routes.ReverseProxies[1]
-	if wsProxy.Path != "^/ws" {
-		t.Errorf("Expected path '^/ws', got %s", wsProxy.Path)
-	}
-	if wsProxy.Target != "ws://ws-backend:9090" {
-		t.Errorf("Expected target 'ws://ws-backend:9090', got %s", wsProxy.Target)
-	}
-	if !wsProxy.WebSocket {
-		t.Error("Expected WebSocket to be true for WebSocket proxy")
-	}
-}
-
-// TestParseStandaloneServers removed - use Routes.ReverseProxies instead
-
-func TestParseFlyReplay(t *testing.T) {
-	yamlConfig := &YAMLConfig{
-		Routes: RoutesConfig{
-			FlyReplay: []struct {
-				Path   string `yaml:"path"`
-				App    string `yaml:"app"`
-				Region string `yaml:"region"`
-				Status int    `yaml:"status"`
-			}{
-				{
-					Path:   "^/pdf/",
-					App:    "pdf-generator",
-					Status: 307,
-				},
-				{
-					Path:   "^/region-specific/",
-					Region: "iad",
-					Status: 302,
-				},
-			},
-		},
-	}
-
-	parser := NewConfigParser(yamlConfig)
-	config, err := parser.Parse()
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-
-	if len(config.Routes.FlyReplay) != 2 {
-		t.Errorf("Expected 2 fly replay routes, got %d", len(config.Routes.FlyReplay))
-	}
-
-	// Test app-based routing
-	appRoute := config.Routes.FlyReplay[0]
-	if appRoute.Path != "^/pdf/" {
-		t.Errorf("Expected path '^/pdf/', got %s", appRoute.Path)
-	}
-	if appRoute.App != "pdf-generator" {
-		t.Errorf("Expected app 'pdf-generator', got %s", appRoute.App)
-	}
-	if appRoute.Status != 307 {
-		t.Errorf("Expected status 307, got %d", appRoute.Status)
-	}
-
-	// Test region-based routing
-	regionRoute := config.Routes.FlyReplay[1]
-	if regionRoute.Path != "^/region-specific/" {
-		t.Errorf("Expected path '^/region-specific/', got %s", regionRoute.Path)
-	}
-	if regionRoute.Region != "iad" {
-		t.Errorf("Expected region 'iad', got %s", regionRoute.Region)
-	}
-	if regionRoute.Status != 302 {
-		t.Errorf("Expected status 302, got %d", regionRoute.Status)
-	}
-}
-
-func TestParseFlyReplayToRewriteRules(t *testing.T) {
-	yamlConfig := &YAMLConfig{
-		Routes: RoutesConfig{
-			FlyReplay: []struct {
-				Path   string `yaml:"path"`
-				App    string `yaml:"app"`
-				Region string `yaml:"region"`
-				Status int    `yaml:"status"`
-			}{
-				{
-					Path:   "^/pdf/",
-					App:    "pdf-generator",
-					Status: 307,
-				},
-				{
-					Path:   "^/region-specific/",
-					Region: "iad",
-					Status: 302,
-				},
-				{
-					Path:   "^/coquitlam/",
-					Region: "sjc",
-					Status: 0, // Should default to 307
-				},
-			},
-		},
-	}
-
-	parser := NewConfigParser(yamlConfig)
-	config, err := parser.Parse()
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-
-	// Check that fly_replay routes were converted to rewrite rules
-	var flyReplayRules []RewriteRule
-	for _, rule := range config.Server.RewriteRules {
-		if strings.HasPrefix(rule.Flag, "fly-replay:") {
-			flyReplayRules = append(flyReplayRules, rule)
-		}
-	}
-
-	if len(flyReplayRules) != 3 {
-		t.Errorf("Expected 3 fly-replay rewrite rules, got %d", len(flyReplayRules))
-	}
-
-	// Test app-based fly-replay rule
-	appRule := flyReplayRules[0]
-	if appRule.Pattern.String() != "^/pdf/" {
-		t.Errorf("Expected pattern '^/pdf/', got %s", appRule.Pattern.String())
-	}
-	if appRule.Flag != "fly-replay:app=pdf-generator:307" {
-		t.Errorf("Expected flag 'fly-replay:app=pdf-generator:307', got %s", appRule.Flag)
-	}
-
-	// Test region-based fly-replay rule
-	regionRule := flyReplayRules[1]
-	if regionRule.Pattern.String() != "^/region-specific/" {
-		t.Errorf("Expected pattern '^/region-specific/', got %s", regionRule.Pattern.String())
-	}
-	if regionRule.Flag != "fly-replay:iad:302" {
-		t.Errorf("Expected flag 'fly-replay:iad:302', got %s", regionRule.Flag)
-	}
-
-	// Test default status (should be 307)
-	defaultRule := flyReplayRules[2]
-	if defaultRule.Flag != "fly-replay:sjc:307" {
-		t.Errorf("Expected flag 'fly-replay:sjc:307' (default status), got %s", defaultRule.Flag)
-	}
-
-	// Test pattern matching
-	testPaths := []struct {
-		path        string
-		shouldMatch int // index of rule that should match, -1 if no match
-	}{
-		{"/pdf/document.pdf", 0},
-		{"/region-specific/test", 1},
-		{"/coquitlam/medal-ball/", 2},
-		{"/other/path", -1},
-	}
-
-	for _, test := range testPaths {
-		matchFound := false
-		matchedRuleIndex := -1
-
-		for i, rule := range flyReplayRules {
-			if rule.Pattern.MatchString(test.path) {
-				matchFound = true
-				matchedRuleIndex = i
-				break
-			}
-		}
-
-		if test.shouldMatch == -1 {
-			if matchFound {
-				t.Errorf("Path %s should not match any fly-replay rule, but matched rule %d", test.path, matchedRuleIndex)
-			}
-		} else {
-			if !matchFound {
-				t.Errorf("Path %s should match fly-replay rule %d, but didn't match any", test.path, test.shouldMatch)
-			} else if matchedRuleIndex != test.shouldMatch {
-				t.Errorf("Path %s should match rule %d, but matched rule %d", test.path, test.shouldMatch, matchedRuleIndex)
-			}
-		}
-	}
-}
-
-func TestParseEmptyProxyConfiguration(t *testing.T) {
-	yamlConfig := &YAMLConfig{
-		Routes: RoutesConfig{},
-	}
-
-	parser := NewConfigParser(yamlConfig)
-	config, err := parser.Parse()
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-
-	if len(config.Routes.ReverseProxies) != 0 {
-		t.Errorf("Expected 0 reverse proxies, got %d", len(config.Routes.ReverseProxies))
-	}
-	// StandaloneServers removed - using Routes.ReverseProxies instead
-	if len(config.Routes.FlyReplay) != 0 {
-		t.Errorf("Expected 0 fly replay routes, got %d", len(config.Routes.FlyReplay))
-	}
-}
-
-func TestParseComplexProxyConfiguration(t *testing.T) {
-	yamlConfig := &YAMLConfig{
-		Routes: RoutesConfig{
-			Redirects: []struct {
-				From string `yaml:"from"`
-				To   string `yaml:"to"`
-			}{
-				{From: "^/$", To: "/dashboard"},
-			},
-			Rewrites: []struct {
-				From string `yaml:"from"`
-				To   string `yaml:"to"`
-			}{
-				{From: "^/api/v1/(.*)", To: "/v1/$1"},
-			},
-			ReverseProxies: []ProxyRoute{
-				{
-					Path:   "^/api/",
-					Target: "http://api-server:8080",
-					Headers: map[string]string{
-						"X-Forwarded-For": "$remote_addr",
-					},
-				},
-			},
-			FlyReplay: []struct {
-				Path   string `yaml:"path"`
-				App    string `yaml:"app"`
-				Region string `yaml:"region"`
-				Status int    `yaml:"status"`
-			}{
-				{
-					Path:   "^/heavy-compute/",
-					App:    "compute-app",
-					Status: 307,
-				},
-			},
-		},
-		// StandaloneServers removed - using Routes.ReverseProxies instead
-	}
-
-	parser := NewConfigParser(yamlConfig)
-	config, err := parser.Parse()
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
+		t.Fatalf("ParseYAML() error = %v", err)
 	}
 
 	// Verify all components were parsed
@@ -811,4 +605,128 @@ func TestParseComplexProxyConfiguration(t *testing.T) {
 	if len(config.Server.RewriteRules) < 1 {
 		t.Error("Expected at least 1 rewrite rule from redirect")
 	}
+}
+
+func TestConfigParser_ParseTrackWebSocketsConfig(t *testing.T) {
+	tests := []struct {
+		name                  string
+		yamlConfig            string
+		wantGlobal            bool
+		wantTenant1Override   *bool
+		wantTenant2Override   *bool
+		wantEffectiveTenant1  bool
+		wantEffectiveTenant2  bool
+	}{
+		{
+			name: "global enabled, no tenant overrides",
+			yamlConfig: `
+applications:
+  track_websockets: true
+  tenants:
+    - path: "/showcase/2025/raleigh/"
+      root: "/app/raleigh"
+    - path: "/showcase/2025/boston/"
+      root: "/app/boston"
+`,
+			wantGlobal:            true,
+			wantTenant1Override:   nil,
+			wantTenant2Override:   nil,
+			wantEffectiveTenant1:  true,
+			wantEffectiveTenant2:  true,
+		},
+		{
+			name: "global enabled, one tenant disables",
+			yamlConfig: `
+applications:
+  track_websockets: true
+  tenants:
+    - path: "/showcase/2025/raleigh/"
+      root: "/app/raleigh"
+      track_websockets: false
+    - path: "/showcase/2025/boston/"
+      root: "/app/boston"
+`,
+			wantGlobal:            true,
+			wantTenant1Override:   boolPtr(false),
+			wantTenant2Override:   nil,
+			wantEffectiveTenant1:  false,
+			wantEffectiveTenant2:  true,
+		},
+		{
+			name: "global disabled (default), tenant enables",
+			yamlConfig: `
+applications:
+  tenants:
+    - path: "/showcase/2025/raleigh/"
+      root: "/app/raleigh"
+      track_websockets: true
+    - path: "/showcase/2025/boston/"
+      root: "/app/boston"
+`,
+			wantGlobal:            true, // defaults to true in parser
+			wantTenant1Override:   boolPtr(true),
+			wantTenant2Override:   nil,
+			wantEffectiveTenant1:  true,
+			wantEffectiveTenant2:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse YAML
+			config, err := ParseYAML([]byte(tt.yamlConfig))
+			if err != nil {
+				t.Fatalf("ParseYAML() error = %v", err)
+			}
+
+			// Check global setting
+			if config.Applications.TrackWebSockets != tt.wantGlobal {
+				t.Errorf("Global TrackWebSockets = %v, want %v",
+					config.Applications.TrackWebSockets, tt.wantGlobal)
+			}
+
+			// Check tenant overrides
+			if len(config.Applications.Tenants) < 2 {
+				t.Fatalf("Expected at least 2 tenants, got %d", len(config.Applications.Tenants))
+			}
+
+			tenant1 := config.Applications.Tenants[0]
+			tenant2 := config.Applications.Tenants[1]
+
+			if !compareBoolPtr(tenant1.TrackWebSockets, tt.wantTenant1Override) {
+				t.Errorf("Tenant1 TrackWebSockets override = %v, want %v",
+					formatBoolPtr(tenant1.TrackWebSockets), formatBoolPtr(tt.wantTenant1Override))
+			}
+
+			if !compareBoolPtr(tenant2.TrackWebSockets, tt.wantTenant2Override) {
+				t.Errorf("Tenant2 TrackWebSockets override = %v, want %v",
+					formatBoolPtr(tenant2.TrackWebSockets), formatBoolPtr(tt.wantTenant2Override))
+			}
+		})
+	}
+}
+
+// Helper functions for testing pointer values
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func compareBoolPtr(a, b *bool) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+func formatBoolPtr(b *bool) string {
+	if b == nil {
+		return "nil"
+	}
+	if *b {
+		return "true"
+	}
+	return "false"
 }

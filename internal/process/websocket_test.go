@@ -174,3 +174,71 @@ func TestWebAppWebSocketIntegration(t *testing.T) {
 
 	t.Logf("Integration test passed with %d active WebSockets", retrievedApp.GetActiveWebSocketCount())
 }
+
+// TestWebAppShouldTrackWebSockets tests the WebSocket tracking decision logic
+func TestWebAppShouldTrackWebSockets(t *testing.T) {
+	tests := []struct {
+		name          string
+		tenantSetting *bool
+		globalSetting bool
+		want          bool
+	}{
+		{
+			name:          "tenant nil, global true",
+			tenantSetting: nil,
+			globalSetting: true,
+			want:          true,
+		},
+		{
+			name:          "tenant nil, global false",
+			tenantSetting: nil,
+			globalSetting: false,
+			want:          false,
+		},
+		{
+			name:          "tenant true, global false",
+			tenantSetting: boolPtr(true),
+			globalSetting: false,
+			want:          true,
+		},
+		{
+			name:          "tenant false, global true",
+			tenantSetting: boolPtr(false),
+			globalSetting: true,
+			want:          false,
+		},
+		{
+			name:          "tenant true, global true",
+			tenantSetting: boolPtr(true),
+			globalSetting: true,
+			want:          true,
+		},
+		{
+			name:          "tenant false, global false",
+			tenantSetting: boolPtr(false),
+			globalSetting: false,
+			want:          false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := &WebApp{
+				Tenant: &config.Tenant{
+					Name:            "test-tenant",
+					TrackWebSockets: tt.tenantSetting,
+				},
+			}
+
+			got := app.ShouldTrackWebSockets(tt.globalSetting)
+			if got != tt.want {
+				t.Errorf("ShouldTrackWebSockets() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Helper function for creating bool pointers
+func boolPtr(b bool) *bool {
+	return &b
+}
