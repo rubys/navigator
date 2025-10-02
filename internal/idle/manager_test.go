@@ -387,6 +387,48 @@ func TestUpdateConfig(t *testing.T) {
 	}
 }
 
+func TestUpdateConfigStartsTimer(t *testing.T) {
+	// Start with disabled idle management (simulating boot with empty config)
+	cfg := &config.Config{}
+	manager := NewManager(cfg)
+	if manager == nil {
+		t.Fatal("Failed to create IdleManager")
+		return
+	}
+	defer manager.Stop()
+
+	manager.EnableTestMode()
+
+	// Verify manager starts disabled
+	if manager.IsEnabled() {
+		t.Error("Expected manager to start disabled")
+	}
+
+	// Simulate config reload with idle management enabled
+	enabledCfg := &config.Config{}
+	enabledCfg.Server.Idle.Action = "suspend"
+	enabledCfg.Server.Idle.Timeout = "10ms"
+
+	manager.UpdateConfig(enabledCfg)
+
+	// Verify manager is now enabled
+	if !manager.IsEnabled() {
+		t.Error("Expected manager to be enabled after config update")
+	}
+
+	// Verify timer was started (should fire after 10ms since no requests)
+	time.Sleep(20 * time.Millisecond)
+
+	// Check that idle action would have been performed (idleActioned flag set)
+	manager.mutex.RLock()
+	actioned := manager.idleActioned
+	manager.mutex.RUnlock()
+
+	if !actioned {
+		t.Error("Expected idle timer to have fired after config reload with no active requests")
+	}
+}
+
 func TestStopMachine(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "stop"

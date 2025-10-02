@@ -55,6 +55,12 @@ func NewManager(cfg *config.Config) *Manager {
 		slog.Info("Machine idle management enabled",
 			"action", m.action,
 			"timeout", m.idleTimeout)
+
+		// Start idle timer immediately since activeRequests is 0 at boot
+		m.timer = time.AfterFunc(m.idleTimeout, m.handleIdle)
+		slog.Info("Started idle timer at boot",
+			"timeout", m.idleTimeout,
+			"action", m.action)
 	}
 
 	return m
@@ -101,6 +107,10 @@ func (m *Manager) RequestStarted() {
 		m.timer.Stop()
 		m.timer = nil
 	}
+
+	slog.Debug("Request started",
+		"activeRequests", m.activeRequests,
+		"enabled", m.enabled)
 }
 
 // RequestFinished decrements the active request counter and starts idle timer if needed
@@ -118,10 +128,14 @@ func (m *Manager) RequestFinished() {
 
 	m.lastActivity = time.Now()
 
+	slog.Debug("Request finished",
+		"activeRequests", m.activeRequests,
+		"enabled", m.enabled)
+
 	// If no more active requests, start idle timer
 	if m.activeRequests == 0 && m.timer == nil {
 		m.timer = time.AfterFunc(m.idleTimeout, m.handleIdle)
-		slog.Debug("Started idle timer",
+		slog.Info("Started idle timer",
 			"timeout", m.idleTimeout,
 			"action", m.action)
 	}
@@ -221,6 +235,7 @@ func (m *Manager) UpdateConfig(newConfig *config.Config) {
 
 	// Re-configure idle settings from new config
 	if newConfig.Server.Idle.Action != "" && (newConfig.Server.Idle.Action == "suspend" || newConfig.Server.Idle.Action == "stop") {
+		wasEnabled := m.enabled
 		m.enabled = true
 		m.action = newConfig.Server.Idle.Action
 
@@ -238,6 +253,14 @@ func (m *Manager) UpdateConfig(newConfig *config.Config) {
 		slog.Debug("Updated idle manager configuration",
 			"action", m.action,
 			"timeout", m.idleTimeout)
+
+		// If idle management was just enabled and there are no active requests, start timer
+		if !wasEnabled && m.activeRequests == 0 && m.timer == nil {
+			m.timer = time.AfterFunc(m.idleTimeout, m.handleIdle)
+			slog.Info("Started idle timer after config reload",
+				"timeout", m.idleTimeout,
+				"action", m.action)
+		}
 	} else {
 		m.enabled = false
 		// Cancel any pending idle timer if idle management is disabled
