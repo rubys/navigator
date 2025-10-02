@@ -100,7 +100,6 @@ func (m *AppManager) GetOrStartApp(tenantName string) (*WebApp, error) {
 	if exists {
 		app.mutex.Lock()
 		isStopping := app.Stopping
-		isStarting := app.Starting
 		app.LastActivity = time.Now()
 		// If app is stopping, cancel the shutdown by clearing the flag
 		if isStopping {
@@ -108,30 +107,9 @@ func (m *AppManager) GetOrStartApp(tenantName string) (*WebApp, error) {
 		}
 		app.mutex.Unlock()
 
-		if !isStarting {
-			return app, nil
-		}
-
-		// Wait if app is still starting (with timeout)
-		timeout := time.NewTimer(config.RailsStartupTimeout)
-		defer timeout.Stop()
-
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-timeout.C:
-				return nil, fmt.Errorf("timeout waiting for app %s to start", tenantName)
-			case <-ticker.C:
-				app.mutex.Lock()
-				isStarting := app.Starting
-				app.mutex.Unlock()
-				if !isStarting {
-					return app, nil
-				}
-			}
-		}
+		// Return immediately - let caller handle waiting with their own timeout
+		// This allows the handler to serve maintenance page if startup takes too long
+		return app, nil
 	}
 
 	// Start new app
@@ -142,36 +120,11 @@ func (m *AppManager) GetOrStartApp(tenantName string) (*WebApp, error) {
 	if app, exists := m.apps[tenantName]; exists {
 		app.mutex.Lock()
 		app.LastActivity = time.Now()
-		isStarting := app.Starting
 		app.mutex.Unlock()
 
-		if !isStarting {
-			return app, nil
-		}
-
-		// Another goroutine is starting the app, wait for it
-		m.mutex.Unlock()
-		timeout := time.NewTimer(config.RailsStartupTimeout)
-		defer timeout.Stop()
-
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-timeout.C:
-				m.mutex.Lock() // Re-acquire lock before returning
-				return nil, fmt.Errorf("timeout waiting for app %s to start", tenantName)
-			case <-ticker.C:
-				app.mutex.Lock()
-				isStarting := app.Starting
-				app.mutex.Unlock()
-				if !isStarting {
-					m.mutex.Lock() // Re-acquire lock before returning
-					return app, nil
-				}
-			}
-		}
+		// Return immediately - let caller handle waiting with their own timeout
+		// This allows the handler to serve maintenance page if startup takes too long
+		return app, nil
 	}
 
 	// Find tenant configuration
