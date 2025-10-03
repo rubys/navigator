@@ -397,7 +397,6 @@ routes:
       strip_path: true           # Remove prefix before proxying
       headers:                   # Custom headers
         X-Forwarded-Host: "$host"
-      websocket: false           # Enable WebSocket proxying
 
   fly_replay:                    # Fly.io replay routing
     - path: "^/api/"             # URL pattern
@@ -421,15 +420,17 @@ routes:
 
 Reverse proxy routes to external services.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | ✓ | Descriptive name for the route |
-| `path` | string | | Regular expression pattern (alternative to prefix) |
-| `prefix` | string | | Simple prefix match (alternative to path) |
-| `target` | string | ✓ | Target URL (supports `$1`, `$2` for capture groups) |
-| `strip_path` | boolean | | Remove matched prefix before proxying |
-| `headers` | object | | Custom headers (supports `$host`, `$remote_addr`, `$scheme`) |
-| `websocket` | boolean | | Enable WebSocket proxying |
+| Field | Type | Default | Required | Description |
+|-------|------|---------|----------|-------------|
+| `name` | string | - | ✓ | Descriptive name for the route |
+| `path` | string | - | | Regular expression pattern (alternative to prefix) |
+| `prefix` | string | - | | Simple prefix match (alternative to path) |
+| `target` | string | - | ✓ | Target URL (supports `$1`, `$2` for capture groups) |
+| `strip_path` | boolean | `false` | | Remove matched prefix before proxying |
+| `headers` | object | - | | Custom headers (supports `$host`, `$remote_addr`, `$scheme`) |
+| `websocket` | boolean | `false` | | Enable WebSocket proxying |
+
+**Note:** Either `path` (regex) or `prefix` (simple string) must be specified, but not both.
 
 **Capture Group Substitution:**
 
