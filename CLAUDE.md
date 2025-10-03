@@ -6,10 +6,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 Navigator is a Go-based web server for multi-tenant web applications. It provides framework independence, intelligent request routing, dynamic process management, authentication, static file serving, managed external processes, and support for deployment patterns like Microsoft Azure's Deployment Stamps and Fly.io's preferred instance routing.
 
+## Production Status
+
+**IMPORTANT**: The refactored Navigator (`cmd/navigator-refactored/`) is now in production and is the active development target.
+
+- **Active Development**: All new features and bug fixes should target `cmd/navigator-refactored/`
+- **Legacy Reference**: `cmd/navigator-legacy/` is preserved for reference only and should NOT be modified
+- **Transition Period**: The legacy version remains until we have sufficient production experience with the refactored version
+- **Do Not Touch**: Leave `cmd/navigator-legacy/` unchanged - it serves as a reference implementation only
+
 ## Current Implementation Status
 
 ✅ **Framework Independence**: Support for Rails, Django, Node.js, and other web frameworks
-✅ **Single-File Go Implementation**: Simple, self-contained Go application in `cmd/navigator/main.go`
+✅ **Modular Architecture**: Well-organized internal packages in `cmd/navigator-refactored/`
 ✅ **YAML Configuration Support**: Modern YAML-based configuration
 ✅ **Managed Processes**: External process management (Redis, Sidekiq, workers, etc.)
 ✅ **Dynamic Port Allocation**: Finds available ports instead of sequential assignment
@@ -30,9 +39,25 @@ Navigator is a Go-based web server for multi-tenant web applications. It provide
 
 ## Architecture
 
+### Code Organization
+
+Navigator has two implementations:
+
+1. **`cmd/navigator-refactored/`** - **PRODUCTION VERSION** ✅
+   - Modular, well-organized codebase
+   - Uses shared `internal/` packages
+   - **All development happens here**
+   - Currently deployed in production
+
+2. **`cmd/navigator-legacy/`** - **REFERENCE ONLY** 🔒
+   - Original single-file implementation
+   - **DO NOT MODIFY** - frozen for reference
+   - Kept until refactored version proves stable in production
+   - Will be removed once transition is complete
+
 ### Modular Package Structure
 
-Navigator is organized into focused internal packages for maintainability:
+The refactored navigator uses focused internal packages for maintainability:
 - **internal/server/**: HTTP handling, routing, static files, proxying
 - **internal/process/**: Web app and managed process lifecycle
 - **internal/config/**: Configuration loading and validation
@@ -129,6 +154,15 @@ server:
   listen: 3000
   hostname: localhost
   public_dir: public
+
+  # Static file configuration (modern approach)
+  cache_control:
+    overrides:
+      - path: /assets/
+        max_age: 24h
+  allowed_extensions: [html, css, js, png, jpg]  # optional, omit to allow all
+  try_files: [index.html, .html, .htm]           # enables try_files feature
+
   idle:
     action: suspend    # "suspend" or "stop" for Fly.io machines
     timeout: 20m       # Duration format: "30s", "5m", "1h30m"
@@ -147,18 +181,20 @@ applications:
 
 ### Building and Running
 
-```bash
-# Build Navigator
-make build
+**IMPORTANT**: Always work with the refactored navigator (`cmd/navigator-refactored/`).
 
-# Or build directly
-go build -mod=readonly -o bin/navigator cmd/navigator/main.go
+```bash
+# Build refactored Navigator (production version)
+go build -o bin/navigator cmd/navigator-refactored
 
 # Run with configuration file
 ./bin/navigator config/navigator.yml
 
 # Run with default config (looks for config/navigator.yml)
 ./bin/navigator
+
+# DO NOT build legacy navigator - it is reference only
+# go build cmd/navigator-legacy  ← DO NOT USE
 ```
 
 ### Development Workflow
@@ -172,9 +208,9 @@ go mod tidy
 go fmt ./...
 go vet ./...
 
-# Build for different platforms
-GOOS=linux GOARCH=amd64 go build -o navigator-linux cmd/navigator/main.go
-GOOS=darwin GOARCH=arm64 go build -o navigator-darwin-arm64 cmd/navigator/main.go
+# Build for different platforms (always use refactored version)
+GOOS=linux GOARCH=amd64 go build -o navigator-linux cmd/navigator-refactored
+GOOS=darwin GOARCH=arm64 go build -o navigator-darwin-arm64 cmd/navigator-refactored
 ```
 
 ## Key Features
@@ -212,9 +248,13 @@ Features:
 ### 3. Static File Optimization
 
 - **Direct serving**: Static files served without web framework overhead
-- **Try files**: File resolution with multiple extensions
+- **Simplified configuration**: Modern server-based configuration
+- **Try files**: File resolution with multiple extensions (configured via `try_files` array)
+- **Flexible extensions**: Serve specific file types or allow all files
 - **Content-Type detection**: Automatic MIME type setting
+- **Cache control**: Per-path cache header customization
 - **Public routes**: Serves studios, regions, docs without authentication
+- **Backward compatible**: Legacy `static` section still supported
 
 ### 4. Machine Idle Management (Fly.io)
 
@@ -647,12 +687,16 @@ delay := utils.ParseDurationWithContext(cfg.Delay, 0, map[string]interface{}{
 
 ## Contributing Guidelines
 
-1. **Modular design**: Place new functionality in appropriate internal packages
-2. **Use utility packages**: Adopt error constructors and logging helpers for consistency
-3. **Minimal dependencies**: Only add essential external packages
-4. **Testing**: Write tests for new functionality, ensure all tests pass
-5. **Documentation**: Update README.md, CLAUDE.md, REFACTORING.md, and docs/ as needed
-6. **Release process**: Use annotated tags for GitHub Actions releases
+**CRITICAL**: All development must target `cmd/navigator-refactored/` and its internal packages. Do NOT modify `cmd/navigator-legacy/`.
+
+1. **Target refactored navigator**: All changes go to `cmd/navigator-refactored/` and `internal/` packages
+2. **Leave legacy alone**: `cmd/navigator-legacy/` is frozen - do not modify it under any circumstances
+3. **Modular design**: Place new functionality in appropriate internal packages
+4. **Use utility packages**: Adopt error constructors and logging helpers for consistency
+5. **Minimal dependencies**: Only add essential external packages
+6. **Testing**: Write tests for new functionality, ensure all tests pass
+7. **Documentation**: Update README.md, CLAUDE.md, and docs/ as needed
+8. **Release process**: Use annotated tags for GitHub Actions releases
 
 ## Refactoring Guidelines
 

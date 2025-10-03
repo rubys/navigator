@@ -64,8 +64,18 @@ func (p *ConfigParser) parseServerConfig() {
 	p.config.Server.NamedHosts = p.yamlConfig.Server.NamedHosts
 	p.config.Server.Root = p.yamlConfig.Server.Root
 	p.config.Server.TryFiles = p.yamlConfig.Server.TryFiles
+	p.config.Server.AllowedExtensions = p.yamlConfig.Server.AllowedExtensions
 	p.config.Server.Authentication = p.yamlConfig.Server.Authentication
 	p.config.Server.AuthExclude = p.yamlConfig.Server.AuthExclude
+
+	// Parse cache control
+	p.config.Server.CacheControl.Default = p.yamlConfig.Server.CacheControl.Default
+	for _, override := range p.yamlConfig.Server.CacheControl.Overrides {
+		p.config.Server.CacheControl.Overrides = append(p.config.Server.CacheControl.Overrides, CacheControlOverride{
+			Path:   override.Path,
+			MaxAge: override.MaxAge,
+		})
+	}
 
 	// Parse listen port
 	switch v := p.yamlConfig.Server.Listen.(type) {
@@ -119,8 +129,9 @@ func (p *ConfigParser) parseAuthConfig() {
 }
 
 // parseStaticConfig parses static file configuration
+// Maintains backward compatibility with deprecated static section
 func (p *ConfigParser) parseStaticConfig() {
-	// Copy static directories
+	// Copy static directories for backward compatibility
 	for _, yamlDir := range p.yamlConfig.Static.Directories {
 		dir := StaticDir{
 			Path:  yamlDir.Path,
@@ -128,11 +139,28 @@ func (p *ConfigParser) parseStaticConfig() {
 			Cache: yamlDir.Cache,
 		}
 		p.config.Static.Directories = append(p.config.Static.Directories, dir)
+
+		// Migrate cache settings to new cache_control structure if not already set
+		if yamlDir.Cache != "" && len(p.config.Server.CacheControl.Overrides) == 0 {
+			p.config.Server.CacheControl.Overrides = append(p.config.Server.CacheControl.Overrides, CacheControlOverride{
+				Path:   yamlDir.Path,
+				MaxAge: yamlDir.Cache,
+			})
+		}
 	}
 
-	// Copy extensions and try_files
+	// Copy extensions and try_files for backward compatibility
 	p.config.Static.Extensions = p.yamlConfig.Static.Extensions
 	p.config.Static.TryFiles = p.yamlConfig.Static.TryFiles
+
+	// Migrate to new server-level settings if they weren't explicitly set
+	if len(p.config.Server.AllowedExtensions) == 0 && len(p.yamlConfig.Static.Extensions) > 0 {
+		p.config.Server.AllowedExtensions = p.yamlConfig.Static.Extensions
+	}
+
+	if len(p.config.Server.TryFiles) == 0 && p.yamlConfig.Static.TryFiles.Enabled && len(p.yamlConfig.Static.TryFiles.Suffixes) > 0 {
+		p.config.Server.TryFiles = p.yamlConfig.Static.TryFiles.Suffixes
+	}
 }
 
 // parseApplicationConfig parses application pool and tenant configuration

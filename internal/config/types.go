@@ -118,21 +118,35 @@ type RoutesConfig struct {
 	} `yaml:"fly_replay"`
 }
 
+// CacheControlOverride represents cache control configuration for specific paths
+type CacheControlOverride struct {
+	Path   string `yaml:"path"`
+	MaxAge string `yaml:"max_age"` // Duration format: "24h", "1h"
+}
+
+// CacheControl represents cache control configuration
+type CacheControl struct {
+	Default   string                 `yaml:"default"`   // Default cache duration
+	Overrides []CacheControlOverride `yaml:"overrides"` // Path-specific overrides
+}
+
 // Config represents the main configuration
 type Config struct {
 	Server struct {
-		Listen         string   `yaml:"listen"`
-		Hostname       string   `yaml:"hostname"`
-		PublicDir      string   `yaml:"public_dir"`
-		RootPath       string   `yaml:"root_path"`
-		NamedHosts     []string `yaml:"named_hosts"`
-		Root           string   `yaml:"root"`
-		TryFiles       []string `yaml:"try_files"`
-		Authentication string   `yaml:"authentication"`
-		AuthExclude    []string `yaml:"auth_exclude"`
-		RewriteRules   []RewriteRule
-		AuthPatterns   []AuthPattern
-		Idle           struct {
+		Listen            string   `yaml:"listen"`
+		Hostname          string   `yaml:"hostname"`
+		PublicDir         string   `yaml:"public_dir"`
+		RootPath          string   `yaml:"root_path"`
+		NamedHosts        []string `yaml:"named_hosts"`
+		Root              string   `yaml:"root"`
+		TryFiles          []string `yaml:"try_files"`
+		AllowedExtensions []string `yaml:"allowed_extensions"`
+		CacheControl      CacheControl
+		Authentication    string   `yaml:"authentication"`
+		AuthExclude       []string `yaml:"auth_exclude"`
+		RewriteRules      []RewriteRule
+		AuthPatterns      []AuthPattern
+		Idle              struct {
 			Action  string `yaml:"action"`  // "suspend" or "stop"
 			Timeout string `yaml:"timeout"` // Duration string like "30s", "5m"
 		} `yaml:"idle"`
@@ -148,7 +162,7 @@ type Config struct {
 			cookieMaxAge   time.Duration
 		} `yaml:"sticky_sessions"`
 	} `yaml:"server"`
-	Static              StaticConfig           `yaml:"static"`
+	Static              StaticConfig           `yaml:"static"` // Deprecated: kept for backward compatibility
 	Routes              RoutesConfig           `yaml:"routes"`
 	Applications        Applications           `yaml:"applications"`
 	ManagedProcesses    []ManagedProcessConfig `yaml:"managed_processes"`
@@ -248,15 +262,23 @@ type YAMLConfig struct {
 		} `yaml:"exclude_patterns"`
 	} `yaml:"auth"`
 	Server struct {
-		Listen         interface{} `yaml:"listen"`
-		Hostname       string      `yaml:"hostname"`
-		PublicDir      string      `yaml:"public_dir"`
-		RootPath       string      `yaml:"root_path"`
-		NamedHosts     []string    `yaml:"named_hosts"`
-		Root           string      `yaml:"root"`
-		TryFiles       []string    `yaml:"try_files"`
-		Authentication string      `yaml:"authentication"`
-		AuthExclude    []string    `yaml:"auth_exclude"`
+		Listen            interface{} `yaml:"listen"`
+		Hostname          string      `yaml:"hostname"`
+		PublicDir         string      `yaml:"public_dir"`
+		RootPath          string      `yaml:"root_path"`
+		NamedHosts        []string    `yaml:"named_hosts"`
+		Root              string      `yaml:"root"`
+		TryFiles          []string    `yaml:"try_files"`
+		AllowedExtensions []string    `yaml:"allowed_extensions"`
+		CacheControl      struct {
+			Default   string `yaml:"default"`
+			Overrides []struct {
+				Path   string `yaml:"path"`
+				MaxAge string `yaml:"max_age"`
+			} `yaml:"overrides"`
+		} `yaml:"cache_control"`
+		Authentication string   `yaml:"authentication"`
+		AuthExclude    []string `yaml:"auth_exclude"`
 		Rewrites       []struct {
 			Pattern     string   `yaml:"pattern"`
 			Replacement string   `yaml:"replacement"`

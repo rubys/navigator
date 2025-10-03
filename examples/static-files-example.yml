@@ -1,52 +1,36 @@
 # Static File Serving Example Configuration
-# This configuration demonstrates how to serve static files from different directories
-# with proper URL path to filesystem mapping using the prefix field
+# This configuration demonstrates the modern, simplified approach to serving
+# static files with Navigator's server-based configuration.
 
 server:
   listen: 3000
   hostname: localhost
-  public_dir: public
+  public_dir: public  # All static files served from this directory
 
-# Static file serving configuration
-static:
-  directories:
-    # Serve CSS, JS, and asset files with long cache duration
-    - path: /assets/
-      dir: assets/
-      cache: 24h
+  # Cache control configuration (optional)
+  # Customize cache headers for specific URL paths
+  cache_control:
+    overrides:
+      # Long cache for versioned assets
+      - path: /assets/
+        max_age: 24h
 
-    # Serve documentation files without explicit cache
-    - path: /docs/
-      dir: docs/
+      # Medium cache for images
+      - path: /images/
+        max_age: 12h
 
-    # Serve studio pages (pre-rendered HTML files)
-    - path: /studios/
-      dir: studios/
+      # Long cache for fonts
+      - path: /fonts/
+        max_age: 30d
 
-    # Serve images and media files
-    - path: /images/
-      dir: images/
-      cache: 12h
+      # Short cache for root-level files
+      - path: /
+        max_age: 1h
 
-    # Serve fonts with long cache duration
-    - path: /fonts/
-      dir: fonts/
-      cache: 30d
-
-    # Serve year-based content (e.g., /2024/, /2025/)
-    - path: /2024/
-      dir: 2024/
-
-    - path: /2025/
-      dir: 2025/
-
-    # Serve root-level files (favicon.ico, robots.txt, etc.)
-    - path: /
-      dir: .
-      cache: 1h
-
-  # File extensions that should be served as static files
-  extensions:
+  # File extensions allowed for static serving (optional)
+  # If omitted, ALL files in public_dir are allowed
+  # Specify this to restrict which file types can be served
+  allowed_extensions:
     - html
     - htm
     - css
@@ -66,17 +50,16 @@ static:
     - ttf
     - eot
 
-  # Try files configuration for SPA-like behavior
+  # Try files configuration (optional)
+  # If present, enables try_files feature for SPA-like behavior
+  # If absent, feature is disabled
   try_files:
-    enabled: true
-    suffixes:
-      - index.html
-      - .html
-      - .htm
-      - .txt
-      - .xml
-      - .json
-    fallback: /404.html
+    - index.html  # Try index.html first
+    - .html       # Then try adding .html extension
+    - .htm        # Then try adding .htm extension
+    - .txt        # Then try adding .txt extension
+    - .xml        # Then try adding .xml extension
+    - .json       # Then try adding .json extension
 
 # Example URL mappings this configuration creates:
 #
@@ -87,10 +70,9 @@ static:
 # URL: /2024/events/boston.html → File: public/2024/events/boston.html
 # URL: /favicon.ico             → File: public/favicon.ico
 #
-# The dir field maps the URL path to the filesystem directory:
-# - path: The URL prefix to match (/assets/)
-# - dir: The local directory relative to public_dir (assets/)
-# - cache: Optional cache duration for Cache-Control headers
+# All paths are relative to public_dir (public/)
+# Try files attempts each suffix in order until a file is found
+# If no file matches, request falls back to the application
 
 applications:
   pools:
@@ -98,3 +80,19 @@ applications:
     timeout: 5m
     start_port: 4000
   tenants: []
+
+# BACKWARD COMPATIBILITY NOTE:
+# The old `static` section is still supported for existing configurations:
+#
+# static:
+#   directories:
+#     - path: /assets/
+#       dir: assets/
+#       cache: 24h
+#   extensions: [html, css, js]
+#   try_files:
+#     enabled: true
+#     suffixes: [.html, .htm]
+#
+# However, the new server-based configuration (shown above) is recommended
+# for simpler, more intuitive configuration.

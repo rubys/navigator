@@ -13,18 +13,44 @@ When a request comes in, Navigator attempts to serve files in this order:
 
 ## Configuration
 
+Navigator supports two configuration approaches:
+
+### Modern Server-Based Configuration (Recommended)
+
+The simplified approach configures try files directly in the `server` section:
+
+```yaml
+server:
+  public_dir: public  # Base directory for static files
+
+  # Try files configuration - if present, feature is enabled
+  try_files: [index.html, .html, .htm, .txt, .xml, .json]
+
+  # Optional: restrict allowed file extensions
+  allowed_extensions: [html, htm, txt, xml, json, css, js]
+```
+
+**Key points:**
+- If `try_files` is present, the feature is **enabled**
+- If `try_files` is absent, the feature is **disabled**
+- Each suffix is tried in order until a file is found
+- If no file matches, request falls back to the application
+
+### Legacy Configuration (Backward Compatible)
+
+The original `static` section is still supported:
+
 ```yaml
 static:
   try_files:
     enabled: true
-    suffixes: ["index.html", ".html", ".htm", ".txt", ".xml", ".json"]
-    fallback: rails  # or "404" for 404 error
-  
+    suffixes: [index.html, .html, .htm, .txt, .xml, .json]
+
   directories:
     - path: /assets/
-      root: public/assets/
+      dir: assets/
     - path: /docs/
-      root: public/docs/
+      dir: docs/
 ```
 
 ## Use Cases
@@ -34,14 +60,14 @@ static:
 Perfect for serving documentation, marketing pages, or static content:
 
 ```yaml
-# Serve docs directly without Rails
-static:
-  try_files:
-    enabled: true
-    suffixes: [".html", ".htm", "index.html"]
-  directories:
-    - path: /docs/
-      root: public/docs/
+server:
+  public_dir: public
+
+  # Enable try files for docs
+  try_files: [index.html, .html, .htm]
+
+  # Optional: restrict to documentation file types
+  allowed_extensions: [html, htm, json, txt]
 ```
 
 **Example requests**:
@@ -54,12 +80,13 @@ static:
 Serve the same content in multiple formats:
 
 ```yaml
-static:
-  try_files:
-    suffixes: [".html", ".xml", ".json", ".txt"]
-  directories:
-    - path: /content/
-      root: public/content/
+server:
+  public_dir: public
+
+  # Try multiple format suffixes
+  try_files: [.html, .xml, .json, .txt]
+
+  allowed_extensions: [html, xml, json, txt]
 ```
 
 **Example**:
@@ -72,20 +99,20 @@ static:
 Support Single Page Applications with catch-all routing:
 
 ```yaml
-static:
-  try_files:
-    enabled: true
-    suffixes: ["index.html"]
-    fallback: rails
-  directories:
-    - path: /app/
-      root: public/spa/
+server:
+  public_dir: public/spa
+
+  # Try index.html for SPA routing
+  try_files: [index.html]
+
+  # Allow all SPA assets
+  allowed_extensions: [html, js, css, png, jpg, svg, woff, woff2]
 ```
 
 **Behavior**:
 - Static assets served directly
 - Unknown routes fall back to `index.html` (SPA router handles routing)
-- API routes still go to Rails
+- API routes can still go to Rails via path-specific routing
 
 ## Performance Benefits
 
@@ -102,19 +129,24 @@ Try files provides significant performance improvements:
 Navigator serves the showcase application with try files enabled:
 
 ```yaml
-static:
-  try_files:
-    enabled: true
-    suffixes: ["index.html", ".html", ".htm"]
-    fallback: rails
-  
-  directories:
-    - path: /showcase/studios/
-      root: public/studios/
-    - path: /showcase/regions/
-      root: public/regions/
-    - path: /showcase/docs/
-      root: public/docs/
+server:
+  public_dir: public
+
+  # Try files in order
+  try_files: [index.html, .html, .htm]
+
+  # Allow static content types
+  allowed_extensions: [html, htm, css, js, png, jpg, svg]
+
+  # Cache static content
+  cache_control:
+    overrides:
+      - path: /studios/
+        max_age: 1h
+      - path: /regions/
+        max_age: 1h
+      - path: /docs/
+        max_age: 24h
 ```
 
 **File structure**:
@@ -135,68 +167,93 @@ public/
 ```
 
 **Request examples**:
-- `GET /showcase/studios/boston` → `public/studios/boston.html` (direct)
-- `GET /showcase/regions/midwest` → `public/regions/midwest.html` (direct)
-- `GET /showcase/docs/` → `public/docs/index.html` (with suffix)
-- `GET /showcase/admin/users` → Rails application (fallback)
+- `GET /studios/boston` → `public/studios/boston.html` (via .html suffix)
+- `GET /regions/midwest` → `public/regions/midwest.html` (via .html suffix)
+- `GET /docs/` → `public/docs/index.html` (via index.html suffix)
+- `GET /admin/users` → Rails application (fallback)
 
 ## Configuration Options
 
-### enabled
-Enable or disable try files feature.
-- **Type**: Boolean
-- **Default**: `false`
+### Modern Configuration (server.try_files)
 
-### suffixes
-List of file suffixes to try when exact match fails.
-- **Type**: Array of strings
-- **Default**: `[]`
-- **Example**: `["index.html", ".html", ".htm", ".txt"]`
+**Location**: `server.try_files`
 
-### fallback
-What to do when no file is found.
-- **Type**: String
-- **Options**: `rails`, `404`
-- **Default**: `rails`
+**Type**: Array of strings (or omitted)
+
+**Behavior**:
+- **Present**: Try files feature is enabled
+- **Absent**: Try files feature is disabled
+
+**Example values**:
+```yaml
+# Enable with multiple suffixes
+try_files: [index.html, .html, .htm, .txt]
+
+# Enable with single suffix
+try_files: [.html]
+
+# Disable (omit entirely)
+# try_files: ...
+```
+
+**Order matters**: Suffixes are tried in the order specified. Put most specific first.
+
+### Legacy Configuration (static.try_files)
+
+For backward compatibility, the legacy format is still supported:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable/disable try files |
+| `suffixes` | array | `[]` | Suffixes to try |
 
 ## Best Practices
 
 ### 1. Order Suffixes by Priority
 ```yaml
-suffixes: ["index.html", ".html", ".htm", ".txt"]
-# Most specific first, most general last
+server:
+  try_files: [index.html, .html, .htm, .txt]
+  # Most specific first, most general last
 ```
 
-### 2. Use Appropriate Fallback
+### 2. Combine with Caching
 ```yaml
-# For mixed static/dynamic sites
-fallback: rails
+server:
+  public_dir: public
+  try_files: [.html]
 
-# For pure static sites
-fallback: 404
+  # Add cache headers for static content
+  cache_control:
+    overrides:
+      - path: /docs/
+        max_age: 1h
 ```
 
-### 3. Combine with Caching
+### 3. Restrict File Types for Security
 ```yaml
-static:
-  try_files:
-    enabled: true
-    suffixes: [".html"]
-  directories:
-    - path: /docs/
-      root: public/docs/
-      cache: 3600  # Cache for 1 hour
+server:
+  try_files: [.html, .htm]
+
+  # Only serve safe file types
+  allowed_extensions: [html, htm, css, js, png, jpg]
 ```
 
-### 4. Separate Static from Dynamic
+### 4. Use Different Settings for Different Environments
 ```yaml
-# Serve docs statically
-- path: /docs/
-  root: public/docs/
-  
-# Serve app routes via Rails  
-- path: /app/
-  # No root specified = goes to Rails
+# Production: strict and cached
+server:
+  try_files: [.html]
+  allowed_extensions: [html, css, js, png, jpg]
+  cache_control:
+    overrides:
+      - path: /
+        max_age: 24h
+
+# Development: permissive and uncached
+server:
+  try_files: [.html, .htm, .txt]
+  # No allowed_extensions = all files allowed
+  # No cache_control = no caching
 ```
 
 ## Debugging Try Files
@@ -222,15 +279,18 @@ DEBUG Serving static file: public/docs/installation.html
 **Problem**: Try files not working for expected paths
 
 **Solution**:
-1. Verify file exists in specified root directory
-2. Check path mapping in configuration
-3. Ensure try_files is enabled
+1. Verify file exists in `public_dir`
+2. Ensure `try_files` is present in configuration
+3. Check that file extension is in `allowed_extensions` (if specified)
 4. Check file permissions
 
 ```bash
 # Test file resolution
 ls -la public/docs/installation.html
 curl -I http://localhost:3000/docs/installation
+
+# Check configuration
+grep -A5 "try_files:" navigator.yml
 ```
 
 ### Wrong Content Type
@@ -252,16 +312,20 @@ installation      # → text/plain (generic)
 **Problem**: Static files still slow despite try files
 
 **Solution**:
-1. Ensure files are in correct directory structure
+1. Ensure files are in `public_dir`
 2. Add appropriate caching headers
-3. Use extensions for better content type detection
+3. Use proper file extensions for content type detection
 
 ```yaml
-static:
-  directories:
-    - path: /docs/
-      root: public/docs/
-      cache: 86400  # Cache for 24 hours
+server:
+  public_dir: public
+  try_files: [.html]
+
+  # Add caching for performance
+  cache_control:
+    overrides:
+      - path: /docs/
+        max_age: 24h
 ```
 
 ## See Also

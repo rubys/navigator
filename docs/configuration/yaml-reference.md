@@ -135,42 +135,115 @@ auth:
 - MD5-crypt
 - Plain text (not recommended)
 
-## static
+## Static File Configuration
 
-Static file serving configuration.
+Navigator supports two approaches for static file configuration:
+
+### Modern Server-Based Configuration (Recommended)
+
+The simplified approach configures static files directly in the `server` section:
+
+```yaml
+server:
+  public_dir: /var/www/public     # Root directory for static files
+
+  # Cache control for specific paths (optional)
+  cache_control:
+    overrides:
+      - path: /assets/
+        max_age: 24h              # Duration format: "24h", "1d", "30d"
+      - path: /images/
+        max_age: 12h
+
+  # Allowed file extensions (optional)
+  # If omitted, ALL files are allowed
+  allowed_extensions: [html, css, js, png, jpg]
+
+  # Try files configuration (optional)
+  # If present, feature is enabled; if absent, disabled
+  try_files: [index.html, .html, .htm]
+```
+
+#### server.cache_control
+
+Per-path cache header customization.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `overrides` | array | List of path-specific cache configurations |
+| `overrides[].path` | string | URL path prefix to match |
+| `overrides[].max_age` | string | Cache duration (e.g., "24h", "1d", "30d") |
+
+#### server.allowed_extensions
+
+Optional list of file extensions allowed for static serving.
+
+| Value | Behavior |
+|-------|----------|
+| Omitted | All files in `public_dir` can be served |
+| List of extensions | Only files with these extensions can be served |
+
+**Examples:**
+- `allowed_extensions: [html, css, js]` - Only HTML, CSS, JS files
+- Omit field entirely - All files allowed
+
+#### server.try_files
+
+Optional list of suffixes to try when resolving file paths.
+
+| Value | Behavior |
+|-------|----------|
+| Present | Try files feature enabled, attempts each suffix in order |
+| Absent | Try files feature disabled |
+
+**Example:**
+```yaml
+try_files: [index.html, .html, .htm]
+```
+
+For request `/studios/boston`:
+1. Try `public/studios/boston` (exact match)
+2. Try `public/studios/boston/index.html`
+3. Try `public/studios/boston.html`
+4. Try `public/studios/boston.htm`
+5. Fall back to application
+
+### Legacy Static Configuration (Backward Compatible)
+
+The original `static` section is still supported for existing configurations:
 
 ```yaml
 static:
   directories:                    # Static directory mappings
     - path: "/assets/"            # URL path
-      root: "public/assets/"      # Filesystem path
-      cache: 86400                # Cache header in seconds
+      dir: "assets/"              # Directory relative to public_dir
+      cache: 24h                  # Cache duration (duration format)
   extensions: [css, js, png, jpg] # File extensions to serve
   try_files:
     enabled: true                 # Enable try_files behavior
     suffixes: [".html", ".htm"]   # Suffixes to try
-    fallback: rails               # Fallback to Rails if no file found
 ```
 
-### directories
+#### static.directories
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `path` | string | URL path prefix (must start/end with /) |
-| `root` | string | Filesystem directory path |
-| `cache` | integer | Cache-Control max-age in seconds |
+| `dir` | string | Directory path relative to `public_dir` |
+| `cache` | string | Cache-Control max-age (duration format) |
 
-### extensions
+#### static.extensions
 
 List of file extensions to serve directly from filesystem.
 
-### try_files
+#### static.try_files
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `enabled` | boolean | `false` | Enable try_files behavior |
 | `suffixes` | array | `[]` | File suffixes to try |
-| `fallback` | string | `"rails"` | Fallback when no file found |
+
+**Migration Note:** The new server-based configuration is simpler and more intuitive. We recommend migrating to it when updating configurations.
 
 ## applications
 
@@ -563,14 +636,16 @@ applications:
 ```yaml
 server:
   listen: 3000
+  public_dir: /var/www/public
   authentication: /etc/navigator/htpasswd
   auth_exclude: ["/assets/", "*.css", "*.js"]
 
-static:
-  directories:
-    - path: /assets/
-      dir: assets/
-      cache: 24h
+  # Modern static file configuration
+  cache_control:
+    overrides:
+      - path: /assets/
+        max_age: 24h
+  allowed_extensions: [html, css, js, png, jpg, gif]
 
 applications:
   pools:

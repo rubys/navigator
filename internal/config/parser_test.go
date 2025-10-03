@@ -17,15 +17,23 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 			name: "basic server config",
 			yamlConfig: YAMLConfig{
 				Server: struct {
-					Listen         interface{} `yaml:"listen"`
-					Hostname       string      `yaml:"hostname"`
-					PublicDir      string      `yaml:"public_dir"`
-					RootPath       string      `yaml:"root_path"`
-					NamedHosts     []string    `yaml:"named_hosts"`
-					Root           string      `yaml:"root"`
-					TryFiles       []string    `yaml:"try_files"`
-					Authentication string      `yaml:"authentication"`
-					AuthExclude    []string    `yaml:"auth_exclude"`
+					Listen            interface{} `yaml:"listen"`
+					Hostname          string      `yaml:"hostname"`
+					PublicDir         string      `yaml:"public_dir"`
+					RootPath          string      `yaml:"root_path"`
+					NamedHosts        []string    `yaml:"named_hosts"`
+					Root              string      `yaml:"root"`
+					TryFiles          []string    `yaml:"try_files"`
+					AllowedExtensions []string    `yaml:"allowed_extensions"`
+					CacheControl      struct {
+						Default   string `yaml:"default"`
+						Overrides []struct {
+							Path   string `yaml:"path"`
+							MaxAge string `yaml:"max_age"`
+						} `yaml:"overrides"`
+					} `yaml:"cache_control"`
+					Authentication string   `yaml:"authentication"`
+					AuthExclude    []string `yaml:"auth_exclude"`
 					Rewrites       []struct {
 						Pattern     string   `yaml:"pattern"`
 						Replacement string   `yaml:"replacement"`
@@ -60,15 +68,23 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 			name: "string listen port",
 			yamlConfig: YAMLConfig{
 				Server: struct {
-					Listen         interface{} `yaml:"listen"`
-					Hostname       string      `yaml:"hostname"`
-					PublicDir      string      `yaml:"public_dir"`
-					RootPath       string      `yaml:"root_path"`
-					NamedHosts     []string    `yaml:"named_hosts"`
-					Root           string      `yaml:"root"`
-					TryFiles       []string    `yaml:"try_files"`
-					Authentication string      `yaml:"authentication"`
-					AuthExclude    []string    `yaml:"auth_exclude"`
+					Listen            interface{} `yaml:"listen"`
+					Hostname          string      `yaml:"hostname"`
+					PublicDir         string      `yaml:"public_dir"`
+					RootPath          string      `yaml:"root_path"`
+					NamedHosts        []string    `yaml:"named_hosts"`
+					Root              string      `yaml:"root"`
+					TryFiles          []string    `yaml:"try_files"`
+					AllowedExtensions []string    `yaml:"allowed_extensions"`
+					CacheControl      struct {
+						Default   string `yaml:"default"`
+						Overrides []struct {
+							Path   string `yaml:"path"`
+							MaxAge string `yaml:"max_age"`
+						} `yaml:"overrides"`
+					} `yaml:"cache_control"`
+					Authentication string   `yaml:"authentication"`
+					AuthExclude    []string `yaml:"auth_exclude"`
 					Rewrites       []struct {
 						Pattern     string   `yaml:"pattern"`
 						Replacement string   `yaml:"replacement"`
@@ -467,15 +483,23 @@ func TestConfigParser_ParseFlyReplayRoutes(t *testing.T) {
 func TestConfigParser_ParseStickySessionConfig(t *testing.T) {
 	yamlConfig := YAMLConfig{
 		Server: struct {
-			Listen         interface{} `yaml:"listen"`
-			Hostname       string      `yaml:"hostname"`
-			PublicDir      string      `yaml:"public_dir"`
-			RootPath       string      `yaml:"root_path"`
-			NamedHosts     []string    `yaml:"named_hosts"`
-			Root           string      `yaml:"root"`
-			TryFiles       []string    `yaml:"try_files"`
-			Authentication string      `yaml:"authentication"`
-			AuthExclude    []string    `yaml:"auth_exclude"`
+			Listen            interface{} `yaml:"listen"`
+			Hostname          string      `yaml:"hostname"`
+			PublicDir         string      `yaml:"public_dir"`
+			RootPath          string      `yaml:"root_path"`
+			NamedHosts        []string    `yaml:"named_hosts"`
+			Root              string      `yaml:"root"`
+			TryFiles          []string    `yaml:"try_files"`
+			AllowedExtensions []string    `yaml:"allowed_extensions"`
+			CacheControl      struct {
+				Default   string `yaml:"default"`
+				Overrides []struct {
+					Path   string `yaml:"path"`
+					MaxAge string `yaml:"max_age"`
+				} `yaml:"overrides"`
+			} `yaml:"cache_control"`
+			Authentication string   `yaml:"authentication"`
+			AuthExclude    []string `yaml:"auth_exclude"`
 			Rewrites       []struct {
 				Pattern     string   `yaml:"pattern"`
 				Replacement string   `yaml:"replacement"`

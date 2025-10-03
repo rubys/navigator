@@ -23,11 +23,6 @@ pools:
 auth:
   enabled: false
 
-# Static file serving (optional)
-static:
-  directories: []
-  extensions: []
-
 # Rails applications (required)
 applications:
   tenants:
@@ -185,13 +180,20 @@ applications:
 Serve static files directly for better performance:
 
 ```yaml
-static:
-  directories:
-    - path: /assets/          # URL path
-      root: public/assets/    # Filesystem path
-      cache: 86400           # Cache for 24 hours
-      
-  extensions: [css, js, png, jpg, gif, ico]
+server:
+  public_dir: ./public
+
+  # Cache static assets
+  cache_control:
+    overrides:
+      - path: /assets/
+        max_age: 24h      # Duration format: "24h", "1d", etc.
+
+  # Allow specific file types (optional)
+  allowed_extensions: [css, js, png, jpg, gif, ico]
+
+  # Enable try files for .html extension (optional)
+  try_files: [.html]
 ```
 
 ### Performance Benefits
@@ -237,11 +239,10 @@ server:
   listen: 3000
   public_dir: ./public
 
-pools:
-  max_size: 3
-  idle_timeout: 60        # Shorter timeout for development
-  
 applications:
+  pools:
+    max_size: 3
+    timeout: 1m        # Shorter timeout for development
   global_env:
     RAILS_ENV: development
     
@@ -262,16 +263,12 @@ server:
   listen: 3000
   public_dir: /var/www/app/public
 
-pools:
-  max_size: 5
-  idle_timeout: 180
-
-static:
-  directories:
-    - path: /assets/
-      root: /var/www/app/public/assets/
-      cache: 3600          # 1 hour cache for staging
-  extensions: [css, js, png, jpg, gif]
+  # Cache static files for 1 hour
+  cache_control:
+    overrides:
+      - path: /assets/
+        max_age: 1h
+  allowed_extensions: [css, js, png, jpg, gif]
 
 auth:
   enabled: true
@@ -280,11 +277,15 @@ auth:
   public_paths: ["/assets/", "*.css", "*.js"]
 
 applications:
+  pools:
+    max_size: 5
+    timeout: 3m
+
   global_env:
     RAILS_ENV: staging
     DATABASE_URL: "${STAGING_DATABASE_URL}"
     SECRET_KEY_BASE: "${STAGING_SECRET_KEY}"
-    
+
   tenants:
     - name: staging
       path: /
@@ -299,27 +300,22 @@ server:
   hostname: myapp.com
   public_dir: /var/www/app/public
 
-pools:
-  max_size: 20
-  idle_timeout: 600        # 10 minutes for production
-
-static:
-  directories:
-    - path: /assets/
-      root: /var/www/app/public/assets/
-      cache: 31536000      # 1 year for fingerprinted assets
-    - path: /images/
-      root: /var/www/app/public/images/
-      cache: 86400         # 1 day for images
-  extensions: [css, js, map, png, jpg, gif, ico, svg, woff, woff2]
+  # Cache control for production
+  cache_control:
+    overrides:
+      - path: /assets/
+        max_age: 365d     # 1 year for fingerprinted assets
+      - path: /images/
+        max_age: 1d       # 1 day for images
+  allowed_extensions: [css, js, map, png, jpg, gif, ico, svg, woff, woff2]
 
 auth:
   enabled: true
   realm: "Production Application"
   htpasswd: /etc/navigator/htpasswd
-  public_paths: 
+  public_paths:
     - /assets/
-    - /images/ 
+    - /images/
     - /robots.txt
     - /favicon.ico
     - "*.css"
@@ -327,13 +323,17 @@ auth:
     - "*.woff*"
 
 applications:
+  pools:
+    max_size: 20
+    timeout: 10m        # 10 minutes for production
+
   global_env:
     RAILS_ENV: production
     RAILS_SERVE_STATIC_FILES: "false"  # Navigator handles static files
     DATABASE_URL: "${DATABASE_URL}"
     SECRET_KEY_BASE: "${SECRET_KEY_BASE}"
     REDIS_URL: "${REDIS_URL}"
-    
+
   tenants:
     - name: production
       path: /
@@ -407,14 +407,16 @@ applications:
 
 ```yaml
 # High traffic site
-pools:
-  max_size: 30
-  idle_timeout: 1800  # 30 minutes
+applications:
+  pools:
+    max_size: 30
+    timeout: 30m  # 30 minutes
 
-# Low traffic site  
-pools:
-  max_size: 5
-  idle_timeout: 120   # 2 minutes
+# Low traffic site
+applications:
+  pools:
+    max_size: 5
+    timeout: 2m   # 2 minutes
 ```
 
 ### 4. Use Absolute Paths in Production
@@ -452,17 +454,21 @@ server:
 
 ### Static Files Not Served
 
-1. **Check path mapping**:
+1. **Check public_dir**:
    ```yaml
-   static:
-     directories:
-       - path: /assets/              # URL path
-         root: public/assets/        # Must match filesystem
+   server:
+     public_dir: /var/www/app/public  # Must be correct path
    ```
 
 2. **Verify files exist**:
    ```bash
    ls -la /var/www/app/public/assets/
+   ```
+
+3. **Check allowed_extensions** (if specified):
+   ```yaml
+   server:
+     allowed_extensions: [css, js, png, jpg]  # Ensure file type is included
    ```
 
 ### Port Conflicts

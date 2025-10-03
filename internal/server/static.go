@@ -1,11 +1,13 @@
 package server
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/rubys/navigator/internal/config"
 )
@@ -80,28 +82,45 @@ func (s *StaticFileHandler) ServeStatic(w http.ResponseWriter, r *http.Request) 
 		recorder.SetMetadata("file_path", fsPath)
 	}
 
-	// Set content type and serve the file
+	// Set content type and cache control headers
 	SetContentType(w, fsPath)
+	s.setCacheControl(w, r.URL.Path)
+
+	// Serve the file
 	http.ServeFile(w, r, fsPath)
 	slog.Debug("Serving static file", "path", path, "fsPath", fsPath)
 	return true
 }
 
-// hasStaticExtension checks if the path has a common static file extension
+// hasStaticExtension checks if the path has a static file extension
 func (s *StaticFileHandler) hasStaticExtension(path string) bool {
 	ext := strings.TrimPrefix(filepath.Ext(path), ".")
 	if ext == "" {
 		return false
 	}
 
-	// Common static file extensions
-	staticExts := []string{"js", "css", "png", "jpg", "jpeg", "gif", "svg", "ico", "pdf", "txt", "xml", "json", "woff", "woff2", "ttf", "eot"}
-	for _, staticExt := range staticExts {
-		if ext == staticExt {
-			return true
+	// Use configured allowed extensions (new config)
+	if len(s.config.Server.AllowedExtensions) > 0 {
+		for _, allowedExt := range s.config.Server.AllowedExtensions {
+			if ext == allowedExt {
+				return true
+			}
 		}
+		return false
 	}
-	return false
+
+	// Fall back to deprecated static.extensions (backward compatibility)
+	if len(s.config.Static.Extensions) > 0 {
+		for _, staticExt := range s.config.Static.Extensions {
+			if ext == staticExt {
+				return true
+			}
+		}
+		return false
+	}
+
+	// If no extensions configured, allow all files (new default behavior)
+	return true
 }
 
 // TryFiles attempts to find and serve files with different extensions
@@ -237,10 +256,54 @@ func (s *StaticFileHandler) serveFile(w http.ResponseWriter, r *http.Request, fs
 	// Set appropriate content type
 	SetContentType(w, fsPath)
 
+	// Set cache control headers
+	s.setCacheControl(w, r.URL.Path)
+
 	// Serve the file
 	http.ServeFile(w, r, fsPath)
 	slog.Info("Serving file via tryFiles", "requestPath", requestPath, "fsPath", fsPath)
 	return true
+}
+
+// setCacheControl sets Cache-Control headers based on configuration
+func (s *StaticFileHandler) setCacheControl(w http.ResponseWriter, path string) {
+	// Find the most specific cache control override
+	var maxAge string
+	bestMatchLen := 0
+
+	for _, override := range s.config.Server.CacheControl.Overrides {
+		if strings.HasPrefix(path, override.Path) && len(override.Path) > bestMatchLen {
+			maxAge = override.MaxAge
+			bestMatchLen = len(override.Path)
+		}
+	}
+
+	// Fall back to deprecated static directories cache (backward compatibility)
+	if maxAge == "" {
+		for _, staticDir := range s.config.Static.Directories {
+			if strings.HasPrefix(path, staticDir.Path) && len(staticDir.Path) > bestMatchLen {
+				maxAge = staticDir.Cache
+				bestMatchLen = len(staticDir.Path)
+			}
+		}
+	}
+
+	// Use default if no override matched
+	if maxAge == "" {
+		maxAge = s.config.Server.CacheControl.Default
+	}
+
+	// Set Cache-Control header if configured
+	if maxAge != "" && maxAge != "0" && maxAge != "0s" {
+		// Parse duration and convert to seconds
+		if duration, err := time.ParseDuration(maxAge); err == nil {
+			seconds := int(duration.Seconds())
+			w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", seconds))
+		} else {
+			// If not a duration, assume it's already in seconds
+			w.Header().Set("Cache-Control", "public, max-age="+maxAge)
+		}
+	}
 }
 
 // ServeFallback serves a fallback file when no tenants are configured
