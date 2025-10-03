@@ -752,3 +752,96 @@ func TestWebSocketProxyFallback(t *testing.T) {
 		})
 	}
 }
+
+// TestReverseProxyCaptureGroupSubstitution tests $1, $2 substitution in target URLs
+func TestReverseProxyCaptureGroupSubstitution(t *testing.T) {
+	// Create test backend that echoes the path it receives
+	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"received_path":"` + r.URL.Path + `"}`))
+	}))
+	defer backendServer.Close()
+
+	// Configuration with capture group substitution in target
+	cfg := &config.Config{
+		Routes: config.RoutesConfig{
+			ReverseProxies: []config.ProxyRoute{
+				{
+					Name:   "capture-group-proxy",
+					Path:   "^/showcase/studios/([a-z]+)/request$",
+					Target: backendServer.URL + "/showcase/studios/$1/request",
+					Headers: map[string]string{
+						"X-Forwarded-Host": "$host",
+					},
+				},
+				{
+					Name:   "multi-capture-proxy",
+					Path:   "^/api/v([0-9]+)/users/([0-9]+)$",
+					Target: backendServer.URL + "/internal/api/v$1/user/$2",
+				},
+			},
+		},
+	}
+
+	appManager := &process.AppManager{}
+	idleManager := &idle.Manager{}
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
+
+	tests := []struct {
+		name         string
+		requestPath  string
+		expectedPath string
+		description  string
+	}{
+		{
+			name:         "Single capture group substitution",
+			requestPath:  "/showcase/studios/coquitlam/request",
+			expectedPath: "/showcase/studios/coquitlam/request",
+			description:  "Should substitute $1 with 'coquitlam'",
+		},
+		{
+			name:         "Single capture group with different studio",
+			requestPath:  "/showcase/studios/boston/request",
+			expectedPath: "/showcase/studios/boston/request",
+			description:  "Should substitute $1 with 'boston'",
+		},
+		{
+			name:         "Multiple capture groups",
+			requestPath:  "/api/v2/users/123",
+			expectedPath: "/internal/api/v2/user/123",
+			description:  "Should substitute $1 with '2' and $2 with '123'",
+		},
+		{
+			name:         "Multiple capture groups - different values",
+			requestPath:  "/api/v1/users/456",
+			expectedPath: "/internal/api/v1/user/456",
+			description:  "Should substitute $1 with '1' and $2 with '456'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.requestPath, nil)
+			req.Host = "navigator.example.com"
+			recorder := httptest.NewRecorder()
+
+			handler.ServeHTTP(recorder, req)
+
+			if recorder.Code != http.StatusOK {
+				t.Errorf("%s: expected status 200, got %d", tt.description, recorder.Code)
+				return
+			}
+
+			body := recorder.Body.String()
+			expectedBody := `{"received_path":"` + tt.expectedPath + `"}`
+
+			if body != expectedBody {
+				t.Errorf("%s:\nExpected backend to receive path: %s\nActual path received: %s",
+					tt.description, tt.expectedPath, body)
+			} else {
+				t.Logf("%s: %s → backend received %s ✓", tt.description, tt.requestPath, tt.expectedPath)
+			}
+		})
+	}
+}

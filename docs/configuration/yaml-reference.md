@@ -389,7 +389,16 @@ routes:
       replacement: "/new/$1"     # Replacement string
       redirect: true             # HTTP redirect vs rewrite
       status: 301               # HTTP status code
-      
+
+  reverse_proxies:               # Reverse proxy routes
+    - name: "api-backend"        # Route name
+      path: "^/api/"             # URL pattern (regex)
+      target: "https://api.example.com"  # Target URL
+      strip_path: true           # Remove prefix before proxying
+      headers:                   # Custom headers
+        X-Forwarded-Host: "$host"
+      websocket: false           # Enable WebSocket proxying
+
   fly_replay:                    # Fly.io replay routing
     - path: "^/api/"             # URL pattern
       region: "syd"              # Target region
@@ -407,6 +416,40 @@ routes:
 | `replacement` | string | ✓ | Replacement string |
 | `redirect` | boolean | | Send HTTP redirect vs internal rewrite |
 | `status` | integer | | HTTP status code for redirects |
+
+### reverse_proxies
+
+Reverse proxy routes to external services.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ✓ | Descriptive name for the route |
+| `path` | string | | Regular expression pattern (alternative to prefix) |
+| `prefix` | string | | Simple prefix match (alternative to path) |
+| `target` | string | ✓ | Target URL (supports `$1`, `$2` for capture groups) |
+| `strip_path` | boolean | | Remove matched prefix before proxying |
+| `headers` | object | | Custom headers (supports `$host`, `$remote_addr`, `$scheme`) |
+| `websocket` | boolean | | Enable WebSocket proxying |
+
+**Capture Group Substitution:**
+
+Use regex capture groups in `path` and reference them in `target` with `$1`, `$2`, etc.
+
+```yaml
+routes:
+  reverse_proxies:
+    # Single capture group
+    - name: user-api
+      path: "^/users/([0-9]+)$"
+      target: "https://api.example.com/v1/user/$1"
+
+    # Multiple capture groups
+    - name: archive-proxy
+      path: "^/archive/([0-9]{4})/([0-9]{2})/(.*)$"
+      target: "https://archive.example.com/$1-$2/$3"
+```
+
+Request `/users/123` → Proxies to `https://api.example.com/v1/user/123`
 
 ### fly_replay
 

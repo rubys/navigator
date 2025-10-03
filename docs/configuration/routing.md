@@ -67,6 +67,127 @@ routes:
       replacement: "/$1"
 ```
 
+## Reverse Proxy Routing
+
+Route requests to external services or APIs using reverse proxy:
+
+```yaml
+routes:
+  reverse_proxies:
+    # Simple proxy to external service
+    - name: api-backend
+      path: "^/api/"
+      target: https://api.example.com
+      strip_path: true
+      headers:
+        X-Forwarded-Host: "$host"
+        X-Real-IP: "$remote_addr"
+
+    # Proxy with capture group substitution
+    - name: studio-requests
+      path: "^/showcase/studios/([a-z]+)/request$"
+      target: https://backend.example.com/showcase/studios/$1/request
+      headers:
+        X-Forwarded-Host: "$host"
+
+    # Multiple capture groups
+    - name: versioned-api
+      path: "^/api/v([0-9]+)/users/([0-9]+)$"
+      target: https://backend.example.com/internal/v$1/user/$2
+
+    # WebSocket proxy
+    - name: websocket-server
+      prefix: /cable
+      target: http://localhost:28080
+      websocket: true
+```
+
+### Reverse Proxy Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | string | - | Descriptive name for the route |
+| `path` | string | - | Regular expression pattern to match URLs |
+| `prefix` | string | - | Simple prefix match (alternative to `path`) |
+| `target` | string | - | Target URL (supports `$1`, `$2` for capture groups) |
+| `strip_path` | boolean | `false` | Remove matched prefix before proxying |
+| `headers` | object | - | Custom headers to add (supports variables) |
+| `websocket` | boolean | `false` | Enable WebSocket proxying |
+
+### Capture Group Substitution
+
+Use regex capture groups in the `path` and reference them in the `target` URL:
+
+```yaml
+routes:
+  reverse_proxies:
+    # Single capture group
+    - name: user-proxy
+      path: "^/users/([0-9]+)$"
+      target: https://api.example.com/v1/user/$1
+
+    # Multiple capture groups
+    - name: date-based-proxy
+      path: "^/archive/([0-9]{4})/([0-9]{2})/(.*)$"
+      target: https://archive.example.com/$1-$2/$3
+```
+
+**How it works:**
+- Request: `GET /users/123`
+- Pattern matches with `$1 = "123"`
+- Proxies to: `https://api.example.com/v1/user/123`
+
+**Multiple captures:**
+- Request: `GET /archive/2024/03/report.pdf`
+- Pattern matches with `$1 = "2024"`, `$2 = "03"`, `$3 = "report.pdf"`
+- Proxies to: `https://archive.example.com/2024-03/report.pdf`
+
+### Header Variables
+
+Custom headers support variable substitution:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `$host` | Request hostname | `example.com` |
+| `$remote_addr` | Client IP address | `203.0.113.45` |
+| `$scheme` | Request scheme | `https` |
+
+```yaml
+routes:
+  reverse_proxies:
+    - name: backend-proxy
+      path: "^/backend/"
+      target: https://internal.example.com
+      headers:
+        X-Forwarded-Host: "$host"
+        X-Forwarded-Proto: "$scheme"
+        X-Real-IP: "$remote_addr"
+        X-Custom-Header: "static-value"
+```
+
+### Path Stripping
+
+Remove the matched prefix before sending to target:
+
+```yaml
+routes:
+  reverse_proxies:
+    # With strip_path
+    - name: api-proxy
+      prefix: /api/
+      target: https://backend.example.com
+      strip_path: true
+    # Request: /api/users → Proxies to: https://backend.example.com/users
+
+    # Without strip_path (default)
+    - name: full-path-proxy
+      prefix: /service/
+      target: https://backend.example.com
+    # Request: /service/users → Proxies to: https://backend.example.com/service/users
+```
+
+**Note:** When using capture group substitution in the target, the path is already fully specified, so `strip_path` is ignored.
+
 ## Fly-Replay Routing
 
 Route requests to specific Fly.io regions, applications, or machines for optimal performance:

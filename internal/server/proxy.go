@@ -65,9 +65,27 @@ func (h *Handler) handleReverseProxies(w http.ResponseWriter, r *http.Request) b
 
 // handleHTTPProxy handles regular HTTP reverse proxy
 func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route *config.ProxyRoute) {
-	targetURL, err := url.Parse(route.Target)
+	// Check if target contains capture group variables ($1, $2, etc.)
+	targetTemplate := route.Target
+	hasSubstitution := strings.Contains(targetTemplate, "$")
+
+	// If we have regex pattern with substitution, do the replacement
+	if hasSubstitution && route.Path != "" {
+		if pattern, err := regexp.Compile(route.Path); err == nil {
+			matches := pattern.FindStringSubmatch(r.URL.Path)
+			if len(matches) > 0 {
+				// Replace $1, $2, etc. with capture groups
+				for i := 1; i < len(matches); i++ {
+					placeholder := "$" + string(rune('0'+i))
+					targetTemplate = strings.ReplaceAll(targetTemplate, placeholder, matches[i])
+				}
+			}
+		}
+	}
+
+	targetURL, err := url.Parse(targetTemplate)
 	if err != nil {
-		slog.Error("Invalid proxy target URL", "target", route.Target, "error", err)
+		slog.Error("Invalid proxy target URL", "target", targetTemplate, "error", err)
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
 	}
@@ -89,8 +107,13 @@ func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route 
 			req.Header.Set(key, headerValue)
 		}
 
-		// Strip path if configured
-		if route.StripPath {
+		// If target has capture group substitution, we've already built the full path
+		// Don't append the original path - just use the target path as-is
+		if hasSubstitution {
+			req.URL.Path = targetURL.Path
+			req.URL.RawPath = ""
+		} else if route.StripPath {
+			// Strip path if configured (only when not using substitution)
 			if route.Prefix != "" {
 				// Simple prefix stripping
 				req.URL.Path = strings.TrimPrefix(req.URL.Path, route.Prefix)
@@ -100,7 +123,7 @@ func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route 
 			} else if route.Path != "" {
 				// Regex-based path stripping using capture groups
 				if pattern, err := regexp.Compile(route.Path); err == nil {
-					matches := pattern.FindStringSubmatch(req.URL.Path)
+					matches := pattern.FindStringSubmatch(r.URL.Path)
 					if len(matches) > 1 {
 						// Use first capture group as the new path
 						req.URL.Path = "/" + matches[1]
