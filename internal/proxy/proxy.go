@@ -3,6 +3,7 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
 	"net"
@@ -15,6 +16,34 @@ import (
 
 	"github.com/rubys/navigator/internal/config"
 )
+
+// MetadataSetter is an interface for response writers that support metadata
+type MetadataSetter interface {
+	SetMetadata(key string, value interface{})
+}
+
+// createProxyErrorHandler creates a shared error handler for reverse proxy errors
+// Detects client disconnects and logs them as 499 instead of 502
+func createProxyErrorHandler(targetURL string) func(http.ResponseWriter, *http.Request, error) {
+	return func(w http.ResponseWriter, r *http.Request, err error) {
+		// Check if client disconnected during the request
+		if r.Context().Err() == context.Canceled {
+			// Client closed connection (similar to nginx 499)
+			slog.Debug("Client disconnected during proxy", "target", targetURL, "error", err)
+
+			// Update metadata if ResponseWriter supports it
+			if recorder, ok := w.(MetadataSetter); ok {
+				recorder.SetMetadata("response_type", "client_closed")
+			}
+
+			w.WriteHeader(499)
+			return
+		}
+		// Actual proxy error
+		slog.Error("Proxy error", "target", targetURL, "error", err)
+		http.Error(w, "Bad Gateway", http.StatusBadGateway)
+	}
+}
 
 // HandleProxy handles proxying requests to a target URL
 func HandleProxy(w http.ResponseWriter, r *http.Request, targetURL string) {
@@ -45,10 +74,7 @@ func HandleProxy(w http.ResponseWriter, r *http.Request, targetURL string) {
 	}
 
 	// Set error handler
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		slog.Error("Proxy error", "target", targetURL, "error", err)
-		http.Error(w, "Bad Gateway", http.StatusBadGateway)
-	}
+	proxy.ErrorHandler = createProxyErrorHandler(targetURL)
 
 	// Perform the proxy request
 	proxy.ServeHTTP(w, r)
@@ -273,10 +299,7 @@ func ProxyWithWebSocketSupport(w http.ResponseWriter, r *http.Request, targetURL
 	}
 
 	// Set error handler
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		slog.Error("Proxy error", "target", targetURL, "error", err)
-		http.Error(w, "Bad Gateway", http.StatusBadGateway)
-	}
+	proxy.ErrorHandler = createProxyErrorHandler(targetURL)
 
 	// Check if this is a WebSocket request and tracking is enabled
 	if IsWebSocketRequest(r) && activeWebSockets != nil {

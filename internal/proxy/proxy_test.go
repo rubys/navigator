@@ -3,6 +3,7 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -670,5 +671,78 @@ func BenchmarkProxyWithWebSocketSupport(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		recorder := httptest.NewRecorder()
 		ProxyWithWebSocketSupport(recorder, req, backend.URL, nil)
+	}
+}
+
+// mockMetadataRecorder implements MetadataSetter for testing
+type mockMetadataRecorder struct {
+	*httptest.ResponseRecorder
+	metadata map[string]interface{}
+}
+
+func (m *mockMetadataRecorder) SetMetadata(key string, value interface{}) {
+	if m.metadata == nil {
+		m.metadata = make(map[string]interface{})
+	}
+	m.metadata[key] = value
+}
+
+func TestClientDisconnectDuringProxy(t *testing.T) {
+	// Create a slow backend that takes longer than client timeout
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("OK"))
+	}))
+	defer backend.Close()
+
+	// Create a request with a canceled context (simulating client disconnect)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately to simulate client disconnect
+	req := httptest.NewRequest("GET", "/test", nil).WithContext(ctx)
+
+	// Use mock recorder that implements MetadataSetter
+	recorder := &mockMetadataRecorder{
+		ResponseRecorder: httptest.NewRecorder(),
+		metadata:         make(map[string]interface{}),
+	}
+
+	// Set initial metadata (like handler.go does)
+	recorder.SetMetadata("response_type", "proxy")
+
+	// Proxy the request - should detect client disconnect
+	ProxyWithWebSocketSupport(recorder, req, backend.URL, nil)
+
+	// Verify status code is 499 (client closed connection)
+	if recorder.Code != 499 {
+		t.Errorf("Expected status 499 for client disconnect, got %d", recorder.Code)
+	}
+
+	// Verify metadata was updated to "client_closed"
+	if recorder.metadata["response_type"] != "client_closed" {
+		t.Errorf("Expected response_type 'client_closed', got %v", recorder.metadata["response_type"])
+	}
+}
+
+func TestClientDisconnectWithHandleProxy(t *testing.T) {
+	// Create a backend
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer backend.Close()
+
+	// Create a request with canceled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest("GET", "/test", nil).WithContext(ctx)
+
+	recorder := httptest.NewRecorder()
+
+	// Proxy should detect disconnect and return 499
+	HandleProxy(recorder, req, backend.URL)
+
+	if recorder.Code != 499 {
+		t.Errorf("Expected status 499 for client disconnect, got %d", recorder.Code)
 	}
 }
