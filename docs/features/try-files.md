@@ -13,11 +13,7 @@ When a request comes in, Navigator attempts to serve files in this order:
 
 ## Configuration
 
-Navigator supports two configuration approaches:
-
-### Modern Server-Based Configuration (Recommended)
-
-The simplified approach configures try files directly in the `server` section:
+Try files are configured directly in the `server` section:
 
 ```yaml
 server:
@@ -35,23 +31,6 @@ server:
 - If `try_files` is absent, the feature is **disabled**
 - Each suffix is tried in order until a file is found
 - If no file matches, request falls back to the application
-
-### Legacy Configuration (Backward Compatible)
-
-The original `static` section is still supported:
-
-```yaml
-static:
-  try_files:
-    enabled: true
-    suffixes: [index.html, .html, .htm, .txt, .xml, .json]
-
-  directories:
-    - path: /assets/
-      dir: assets/
-    - path: /docs/
-      dir: docs/
-```
 
 ## Use Cases
 
@@ -174,8 +153,6 @@ public/
 
 ## Configuration Options
 
-### Modern Configuration (server.try_files)
-
 **Location**: `server.try_files`
 
 **Type**: Array of strings (or omitted)
@@ -197,15 +174,6 @@ try_files: [.html]
 ```
 
 **Order matters**: Suffixes are tried in the order specified. Put most specific first.
-
-### Legacy Configuration (static.try_files)
-
-For backward compatibility, the legacy format is still supported:
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Enable/disable try files |
-| `suffixes` | array | `[]` | Suffixes to try |
 
 ## Best Practices
 

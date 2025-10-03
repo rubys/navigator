@@ -248,13 +248,12 @@ Features:
 ### 3. Static File Optimization
 
 - **Direct serving**: Static files served without web framework overhead
-- **Simplified configuration**: Modern server-based configuration
+- **Server-based configuration**: All static file settings in `server` section
 - **Try files**: File resolution with multiple extensions (configured via `try_files` array)
 - **Flexible extensions**: Serve specific file types or allow all files
 - **Content-Type detection**: Automatic MIME type setting
 - **Cache control**: Per-path cache header customization
 - **Public routes**: Serves studios, regions, docs without authentication
-- **Backward compatible**: Legacy `static` section still supported
 
 ### 4. Machine Idle Management (Fly.io)
 

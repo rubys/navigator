@@ -46,7 +46,6 @@ func NewConfigParser(yamlConfig *YAMLConfig) *ConfigParser {
 func (p *ConfigParser) Parse() (*Config, error) {
 	p.parseServerConfig()
 	p.parseAuthConfig()
-	p.parseStaticConfig()
 	p.parseRoutesConfig()
 	p.parseApplicationConfig()
 	p.parseManagedProcesses()
@@ -126,41 +125,6 @@ func (p *ConfigParser) parseAuthConfig() {
 
 	// Note: AuthExclude patterns are handled as glob patterns in auth.go's ShouldExcludeFromAuth()
 	// We don't compile them as regex here since they use glob syntax (e.g., *.css, *.js)
-}
-
-// parseStaticConfig parses static file configuration
-// Maintains backward compatibility with deprecated static section
-func (p *ConfigParser) parseStaticConfig() {
-	// Copy static directories for backward compatibility
-	for _, yamlDir := range p.yamlConfig.Static.Directories {
-		dir := StaticDir{
-			Path:  yamlDir.Path,
-			Dir:   yamlDir.Dir,
-			Cache: yamlDir.Cache,
-		}
-		p.config.Static.Directories = append(p.config.Static.Directories, dir)
-
-		// Migrate cache settings to new cache_control structure if not already set
-		if yamlDir.Cache != "" && len(p.config.Server.CacheControl.Overrides) == 0 {
-			p.config.Server.CacheControl.Overrides = append(p.config.Server.CacheControl.Overrides, CacheControlOverride{
-				Path:   yamlDir.Path,
-				MaxAge: yamlDir.Cache,
-			})
-		}
-	}
-
-	// Copy extensions and try_files for backward compatibility
-	p.config.Static.Extensions = p.yamlConfig.Static.Extensions
-	p.config.Static.TryFiles = p.yamlConfig.Static.TryFiles
-
-	// Migrate to new server-level settings if they weren't explicitly set
-	if len(p.config.Server.AllowedExtensions) == 0 && len(p.yamlConfig.Static.Extensions) > 0 {
-		p.config.Server.AllowedExtensions = p.yamlConfig.Static.Extensions
-	}
-
-	if len(p.config.Server.TryFiles) == 0 && p.yamlConfig.Static.TryFiles.Enabled && len(p.yamlConfig.Static.TryFiles.Suffixes) > 0 {
-		p.config.Server.TryFiles = p.yamlConfig.Static.TryFiles.Suffixes
-	}
 }
 
 // parseApplicationConfig parses application pool and tenant configuration

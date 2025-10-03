@@ -458,8 +458,8 @@ func TestConfigFilePathLogic(t *testing.T) {
 	}
 }
 
-func TestStaticDirectoryConfigReload(t *testing.T) {
-	// Create a temporary config file with static directories
+func TestServerConfigReload(t *testing.T) {
+	// Create a temporary config file with server settings
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, "test-config.yml")
 
@@ -468,14 +468,13 @@ server:
   listen: "3001"
   hostname: "test-host"
   public_dir: "public"
-static:
-  directories:
-    - path: "/showcase/assets/"
-      dir: "assets/"
-    - path: "/showcase/studios/"
-      dir: "studios/"
-    - path: "/showcase/"
-      dir: "."
+  allowed_extensions:
+    - html
+    - css
+    - js
+  try_files:
+    - ".html"
+    - ".htm"
 applications:
   tenants: []
 logging:
@@ -487,21 +486,10 @@ logging:
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
 
-	// Create initial config with minimal static directories (simulating maintenance config)
+	// Create initial config with different server settings
 	cfg := &config.Config{}
 	cfg.Server.Listen = "3000"
 	cfg.Server.Hostname = "localhost"
-	cfg.Static.Directories = []config.StaticDir{
-		{Path: "/", Dir: ""},
-	}
-
-	// Verify initial state has only 1 static directory
-	if len(cfg.Static.Directories) != 1 {
-		t.Fatalf("Expected 1 initial static directory, got %d", len(cfg.Static.Directories))
-	}
-	if cfg.Static.Directories[0].Path != "/" {
-		t.Errorf("Expected initial static directory path '/', got '%s'", cfg.Static.Directories[0].Path)
-	}
 
 	// Create real managers to avoid nil pointer issues
 	appManager := process.NewAppManager(cfg)
@@ -518,7 +506,7 @@ logging:
 		idleManager:    idleManager,
 	}
 
-	// Test reload with config containing multiple static directories
+	// Test reload with config containing updated server settings
 	lifecycle.handleReload()
 
 	// Verify config was updated
@@ -526,29 +514,23 @@ logging:
 		t.Fatal("Expected non-nil config after reload")
 	}
 
-	// Verify static directories were updated (this was the bug)
-	if len(lifecycle.cfg.Static.Directories) != 3 {
-		t.Errorf("Expected 3 static directories after reload, got %d", len(lifecycle.cfg.Static.Directories))
+	// Verify server configuration was updated
+	if lifecycle.cfg.Server.Listen != "3001" {
+		t.Errorf("Expected listen port '3001' after reload, got '%s'", lifecycle.cfg.Server.Listen)
 	}
 
-	// Verify specific directories are present
-	expectedDirs := map[string]string{
-		"/showcase/assets/":  "assets/",
-		"/showcase/studios/": "studios/",
-		"/showcase/":         ".",
+	if lifecycle.cfg.Server.Hostname != "test-host" {
+		t.Errorf("Expected hostname 'test-host' after reload, got '%s'", lifecycle.cfg.Server.Hostname)
 	}
 
-	actualDirs := make(map[string]string)
-	for _, dir := range lifecycle.cfg.Static.Directories {
-		actualDirs[dir.Path] = dir.Dir
+	if lifecycle.cfg.Server.PublicDir != "public" {
+		t.Errorf("Expected public_dir 'public' after reload, got '%s'", lifecycle.cfg.Server.PublicDir)
 	}
 
-	for expectedPath, expectedDir := range expectedDirs {
-		if actualDir, exists := actualDirs[expectedPath]; !exists {
-			t.Errorf("Expected static directory '%s' not found after reload", expectedPath)
-		} else if actualDir != expectedDir {
-			t.Errorf("Expected static directory '%s' to map to '%s', got '%s'", expectedPath, expectedDir, actualDir)
-		}
+	// Verify try_files was updated
+	expectedTryFiles := []string{".html", ".htm"}
+	if len(lifecycle.cfg.Server.TryFiles) != len(expectedTryFiles) {
+		t.Errorf("Expected %d try_files after reload, got %d", len(expectedTryFiles), len(lifecycle.cfg.Server.TryFiles))
 	}
 
 	// basicAuth should be nil because no authentication is configured
@@ -556,5 +538,5 @@ logging:
 		t.Error("Expected nil auth when no auth is configured")
 	}
 
-	t.Log("Static directory configuration reload test passed")
+	t.Log("Server configuration reload test passed")
 }

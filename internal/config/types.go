@@ -88,17 +88,6 @@ type TenantHooks struct {
 	Stop  []HookConfig `yaml:"stop"`
 }
 
-// StaticConfig represents static file configuration
-type StaticConfig struct {
-	Directories []StaticDir `yaml:"directories"`
-	Extensions  []string    `yaml:"extensions"`
-	TryFiles    struct {
-		Enabled  bool     `yaml:"enabled"`
-		Suffixes []string `yaml:"suffixes"`
-		Fallback string   `yaml:"fallback"`
-	} `yaml:"try_files"`
-}
-
 // RoutesConfig represents routes configuration
 type RoutesConfig struct {
 	Redirects []struct {
@@ -162,7 +151,6 @@ type Config struct {
 			cookieMaxAge   time.Duration
 		} `yaml:"sticky_sessions"`
 	} `yaml:"server"`
-	Static              StaticConfig           `yaml:"static"` // Deprecated: kept for backward compatibility
 	Routes              RoutesConfig           `yaml:"routes"`
 	Applications        Applications           `yaml:"applications"`
 	ManagedProcesses    []ManagedProcessConfig `yaml:"managed_processes"`
@@ -191,15 +179,6 @@ type Pools struct {
 	MaxSize   int    `yaml:"max_size"`
 	Timeout   string `yaml:"timeout"` // Duration string like "5m", "10m"
 	StartPort int    `yaml:"start_port"`
-}
-
-// StaticDir represents static directory configuration
-type StaticDir struct {
-	Path        string   `yaml:"path"`
-	Dir         string   `yaml:"dir"`
-	TryFiles    []string `yaml:"try_files"`
-	Cache       string   `yaml:"cache"` // Duration format: "24h", "1h"
-	AuthExclude []string `yaml:"auth_exclude"`
 }
 
 // ProxyRoute represents a proxy route configuration
@@ -300,19 +279,6 @@ type YAMLConfig struct {
 			Paths          []string `yaml:"paths"`
 		} `yaml:"sticky_sessions"`
 	} `yaml:"server"`
-	Static struct {
-		Directories []struct {
-			Path  string `yaml:"path"`
-			Dir   string `yaml:"dir"`
-			Cache string `yaml:"cache"` // Duration format: "24h", "1h"
-		} `yaml:"directories"`
-		Extensions []string `yaml:"extensions"`
-		TryFiles   struct {
-			Enabled  bool     `yaml:"enabled"`
-			Suffixes []string `yaml:"suffixes"`
-			Fallback string   `yaml:"fallback"`
-		} `yaml:"try_files"`
-	} `yaml:"static"`
 	Routes       RoutesConfig `yaml:"routes"`
 	Applications struct {
 		Pools struct {

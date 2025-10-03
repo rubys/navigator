@@ -339,51 +339,6 @@ func TestConfigParser_ParseHooksConfig(t *testing.T) {
 	}
 }
 
-func TestConfigParser_ParseStaticConfig(t *testing.T) {
-	yamlConfig := YAMLConfig{
-		Static: struct {
-			Directories []struct {
-				Path  string `yaml:"path"`
-				Dir   string `yaml:"dir"`
-				Cache string `yaml:"cache"`
-			} `yaml:"directories"`
-			Extensions []string `yaml:"extensions"`
-			TryFiles   struct {
-				Enabled  bool     `yaml:"enabled"`
-				Suffixes []string `yaml:"suffixes"`
-				Fallback string   `yaml:"fallback"`
-			} `yaml:"try_files"`
-		}{
-			Extensions: []string{".html", ".css", ".js"},
-			TryFiles: struct {
-				Enabled  bool     `yaml:"enabled"`
-				Suffixes []string `yaml:"suffixes"`
-				Fallback string   `yaml:"fallback"`
-			}{
-				Enabled:  true,
-				Suffixes: []string{".html"},
-				Fallback: "/index.html",
-			},
-		},
-	}
-
-	parser := NewConfigParser(&yamlConfig)
-	config, err := parser.Parse()
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-
-	if len(config.Static.Extensions) != 3 {
-		t.Errorf("Expected 3 extensions, got %d", len(config.Static.Extensions))
-	}
-	if !config.Static.TryFiles.Enabled {
-		t.Error("Expected TryFiles to be enabled")
-	}
-	if config.Static.TryFiles.Fallback != "/index.html" {
-		t.Errorf("Fallback = %v, want /index.html", config.Static.TryFiles.Fallback)
-	}
-}
-
 func TestConfigParser_ParseAuthConfig(t *testing.T) {
 	yamlConfig := YAMLConfig{
 		Auth: struct {

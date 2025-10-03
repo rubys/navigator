@@ -137,11 +137,7 @@ auth:
 
 ## Static File Configuration
 
-Navigator supports two approaches for static file configuration:
-
-### Modern Server-Based Configuration (Recommended)
-
-The simplified approach configures static files directly in the `server` section:
+Static files are configured directly in the `server` section:
 
 ```yaml
 server:
@@ -207,43 +203,6 @@ For request `/studios/boston`:
 3. Try `public/studios/boston.html`
 4. Try `public/studios/boston.htm`
 5. Fall back to application
-
-### Legacy Static Configuration (Backward Compatible)
-
-The original `static` section is still supported for existing configurations:
-
-```yaml
-static:
-  directories:                    # Static directory mappings
-    - path: "/assets/"            # URL path
-      dir: "assets/"              # Directory relative to public_dir
-      cache: 24h                  # Cache duration (duration format)
-  extensions: [css, js, png, jpg] # File extensions to serve
-  try_files:
-    enabled: true                 # Enable try_files behavior
-    suffixes: [".html", ".htm"]   # Suffixes to try
-```
-
-#### static.directories
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `path` | string | URL path prefix (must start/end with /) |
-| `dir` | string | Directory path relative to `public_dir` |
-| `cache` | string | Cache-Control max-age (duration format) |
-
-#### static.extensions
-
-List of file extensions to serve directly from filesystem.
-
-#### static.try_files
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Enable try_files behavior |
-| `suffixes` | array | `[]` | File suffixes to try |
-
-**Migration Note:** The new server-based configuration is simpler and more intuitive. We recommend migrating to it when updating configurations.
 
 ## applications
 
@@ -640,7 +599,7 @@ server:
   authentication: /etc/navigator/htpasswd
   auth_exclude: ["/assets/", "*.css", "*.js"]
 
-  # Modern static file configuration
+  # Static file configuration
   cache_control:
     overrides:
       - path: /assets/

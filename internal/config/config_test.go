@@ -262,36 +262,26 @@ applications:
 	}
 }
 
-func TestStaticConfigWithTryFiles(t *testing.T) {
+func TestServerConfigWithTryFiles(t *testing.T) {
 	testConfig := `
 server:
   listen: 3000
   public_dir: /Users/test/public
-
-static:
-  directories:
-    - path: "/showcase/studios/"
-      dir: "studios/"
-      cache: "24h"
-    - path: "/showcase/docs/"
-      dir: "docs/"
-  extensions:
+  try_files:
+    - "index.html"
+    - ".html"
+    - ".htm"
+  allowed_extensions:
     - html
     - css
     - js
-  try_files:
-    enabled: true
-    suffixes:
-      - "index.html"
-      - ".html"
-      - ".htm"
 
 applications:
   pools:
     max_size: 10
 `
 
-	tmpFile, err := os.CreateTemp("", "navigator-static-test-*.yml")
+	tmpFile, err := os.CreateTemp("", "navigator-server-test-*.yml")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -307,52 +297,22 @@ applications:
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Verify static directories parsing
-	if len(config.Static.Directories) != 2 {
-		t.Errorf("Expected 2 static directories, got %d", len(config.Static.Directories))
+	// Verify try_files configuration at server level
+	expectedTryFiles := []string{"index.html", ".html", ".htm"}
+	if len(config.Server.TryFiles) != len(expectedTryFiles) {
+		t.Errorf("Expected %d try_files, got %d", len(expectedTryFiles), len(config.Server.TryFiles))
 	}
 
-	// Check first static directory
-	dir0 := config.Static.Directories[0]
-	if dir0.Path != "/showcase/studios/" {
-		t.Errorf("Expected first directory path /showcase/studios/, got %s", dir0.Path)
-	}
-	if dir0.Dir != "studios/" {
-		t.Errorf("Expected first directory dir studios/, got %s", dir0.Dir)
-	}
-	if dir0.Cache != "24h" {
-		t.Errorf("Expected first directory cache 24h, got %s", dir0.Cache)
-	}
-
-	// Check second static directory
-	dir1 := config.Static.Directories[1]
-	if dir1.Path != "/showcase/docs/" {
-		t.Errorf("Expected second directory path /showcase/docs/, got %s", dir1.Path)
-	}
-	if dir1.Dir != "docs/" {
-		t.Errorf("Expected second directory dir docs/, got %s", dir1.Dir)
-	}
-
-	// Verify try_files configuration
-	if !config.Static.TryFiles.Enabled {
-		t.Error("Expected try_files to be enabled")
-	}
-
-	expectedSuffixes := []string{"index.html", ".html", ".htm"}
-	if len(config.Static.TryFiles.Suffixes) != len(expectedSuffixes) {
-		t.Errorf("Expected %d try_files suffixes, got %d", len(expectedSuffixes), len(config.Static.TryFiles.Suffixes))
-	}
-
-	for i, expected := range expectedSuffixes {
-		if i >= len(config.Static.TryFiles.Suffixes) || config.Static.TryFiles.Suffixes[i] != expected {
-			t.Errorf("Expected suffix[%d] to be %s, got %s", i, expected, config.Static.TryFiles.Suffixes[i])
+	for i, expected := range expectedTryFiles {
+		if i >= len(config.Server.TryFiles) || config.Server.TryFiles[i] != expected {
+			t.Errorf("Expected try_files[%d] to be %s, got %s", i, expected, config.Server.TryFiles[i])
 		}
 	}
 
-	// Verify extensions
+	// Verify allowed extensions at server level
 	expectedExtensions := []string{"html", "css", "js"}
-	if len(config.Static.Extensions) != len(expectedExtensions) {
-		t.Errorf("Expected %d extensions, got %d", len(expectedExtensions), len(config.Static.Extensions))
+	if len(config.Server.AllowedExtensions) != len(expectedExtensions) {
+		t.Errorf("Expected %d extensions, got %d", len(expectedExtensions), len(config.Server.AllowedExtensions))
 	}
 }
 
@@ -391,38 +351,31 @@ server:
 	}
 }
 
-func TestStaticConfigWithDurations(t *testing.T) {
-	// Test config with static directories and cache durations
+func TestServerConfigWithCacheControl(t *testing.T) {
+	// Test config with server-level cache control
 	testConfig := `
 server:
   listen: 3000
   hostname: localhost
   public_dir: public
-
-static:
-  directories:
-    - path: "/assets/"
-      dir: "assets/"
-      cache: "24h"
-    - path: "/docs/"
-      dir: "docs/"
-      cache: "1h"
-    - path: "/images/"
-      dir: "images/"
-      cache: "30m"
-    - path: "/temp/"
-      dir: "temp/"
-      cache: ""  # Empty string for no cache
-  extensions:
+  cache_control:
+    default: "public, max-age=86400"
+    overrides:
+      - path: "/assets/"
+        max_age: "public, max-age=86400"
+      - path: "/docs/"
+        max_age: "public, max-age=3600"
+      - path: "/images/"
+        max_age: "public, max-age=1800"
+      - path: "/temp/"
+        max_age: "no-cache"
+  allowed_extensions:
     - html
     - css
     - js
   try_files:
-    enabled: true
-    suffixes:
-      - ".html"
-      - ".htm"
-    fallback: "/404.html"
+    - ".html"
+    - ".htm"
 
 routes:
   rewrites:
@@ -439,7 +392,7 @@ applications:
   tenants: []
 `
 
-	tmpFile, err := os.CreateTemp("", "navigator-static-test-*.yml")
+	tmpFile, err := os.CreateTemp("", "navigator-cache-test-*.yml")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -455,58 +408,30 @@ applications:
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Verify static directories are parsed correctly
-	if len(config.Static.Directories) != 4 {
-		t.Errorf("Expected 4 static directories, got %d", len(config.Static.Directories))
+	// Verify cache control configuration
+	if config.Server.CacheControl.Default != "public, max-age=86400" {
+		t.Errorf("Expected default cache control 'public, max-age=86400', got %s", config.Server.CacheControl.Default)
 	}
 
-	// Check first directory with 24h cache
-	dir1 := config.Static.Directories[0]
-	if dir1.Path != "/assets/" {
-		t.Errorf("Expected path /assets/, got %s", dir1.Path)
-	}
-	if dir1.Dir != "assets/" {
-		t.Errorf("Expected dir assets/, got %s", dir1.Dir)
-	}
-	if dir1.Cache != "24h" {
-		t.Errorf("Expected cache 24h, got %s", dir1.Cache)
+	if len(config.Server.CacheControl.Overrides) != 4 {
+		t.Errorf("Expected 4 cache overrides, got %d", len(config.Server.CacheControl.Overrides))
 	}
 
-	// Check second directory with 1h cache
-	dir2 := config.Static.Directories[1]
-	if dir2.Cache != "1h" {
-		t.Errorf("Expected cache 1h, got %s", dir2.Cache)
-	}
-
-	// Check third directory with 30m cache
-	dir3 := config.Static.Directories[2]
-	if dir3.Cache != "30m" {
-		t.Errorf("Expected cache 30m, got %s", dir3.Cache)
-	}
-
-	// Check fourth directory with empty cache
-	dir4 := config.Static.Directories[3]
-	if dir4.Cache != "" {
-		t.Errorf("Expected empty cache, got %s", dir4.Cache)
-	}
-
-	// Verify static extensions
+	// Verify allowed extensions at server level
 	expectedExtensions := []string{"html", "css", "js"}
-	if len(config.Static.Extensions) != len(expectedExtensions) {
-		t.Errorf("Expected %d extensions, got %d", len(expectedExtensions), len(config.Static.Extensions))
+	if len(config.Server.AllowedExtensions) != len(expectedExtensions) {
+		t.Errorf("Expected %d extensions, got %d", len(expectedExtensions), len(config.Server.AllowedExtensions))
 	}
 	for i, ext := range expectedExtensions {
-		if i >= len(config.Static.Extensions) || config.Static.Extensions[i] != ext {
-			t.Errorf("Expected extension %s at index %d, got %s", ext, i, config.Static.Extensions[i])
+		if i >= len(config.Server.AllowedExtensions) || config.Server.AllowedExtensions[i] != ext {
+			t.Errorf("Expected extension %s at index %d, got %s", ext, i, config.Server.AllowedExtensions[i])
 		}
 	}
 
-	// Verify try_files configuration
-	if !config.Static.TryFiles.Enabled {
-		t.Error("Expected try_files to be enabled")
-	}
-	if config.Static.TryFiles.Fallback != "/404.html" {
-		t.Errorf("Expected fallback /404.html, got %s", config.Static.TryFiles.Fallback)
+	// Verify try_files configuration at server level
+	expectedTryFiles := []string{".html", ".htm"}
+	if len(config.Server.TryFiles) != len(expectedTryFiles) {
+		t.Errorf("Expected %d try_files, got %d", len(expectedTryFiles), len(config.Server.TryFiles))
 	}
 
 	// Verify routes configuration
@@ -528,19 +453,9 @@ server:
   hostname: localhost
   root_path: /
   public_dir: public
-
-auth:
-  enabled: false
-
-applications:
-  tenants: []
-
-static:
-  directories:
-    - path: /
-      dir: .
-      cache: 0
-  extensions:
+  cache_control:
+    default: "no-cache"
+  allowed_extensions:
     - html
     - css
     - js
@@ -548,10 +463,13 @@ static:
     - jpg
     - svg
     - ico
-  try_files:
-    enabled: true
-    suffixes: []
-    fallback: /503.html
+  try_files: []
+
+auth:
+  enabled: false
+
+applications:
+  tenants: []
 
 routes:
   rewrites:
@@ -603,11 +521,6 @@ pools:
 		t.Errorf("Expected 0 tenants for maintenance mode, got %d", len(config.Applications.Tenants))
 	}
 
-	// Verify static fallback is configured
-	if config.Static.TryFiles.Fallback != "/503.html" {
-		t.Errorf("Expected fallback /503.html, got %s", config.Static.TryFiles.Fallback)
-	}
-
 	// Verify rewrite rules are present
 	if len(config.Routes.Rewrites) != 1 {
 		t.Errorf("Expected 1 rewrite rule, got %d", len(config.Routes.Rewrites))
@@ -623,13 +536,9 @@ pools:
 		}
 	}
 
-	// Verify static directories have cache values as strings
-	if len(config.Static.Directories) > 0 {
-		dir := config.Static.Directories[0]
-		// Cache should be "0" (string) not 0 (int)
-		if dir.Cache != "0" {
-			t.Errorf("Expected cache as string '0', got %v (%T)", dir.Cache, dir.Cache)
-		}
+	// Verify cache control is set to no-cache
+	if config.Server.CacheControl.Default != "no-cache" {
+		t.Errorf("Expected cache control 'no-cache', got %s", config.Server.CacheControl.Default)
 	}
 }
 
@@ -648,18 +557,8 @@ server:
     cookie_name: "_navigator_session"
     cookie_max_age: "2h"
     cookie_secure: true
-
-static:
-  directories:
-    - path: "/assets/"
-      dir: "assets/"
-      cache: "24h"
-    - path: "/temp/"
-      dir: "temp/"
-      cache: "0"  # String zero
-  extensions:
-    - html
-    - css
+  cache_control:
+    default: "public, max-age=86400"
 
 applications:
   pools:
@@ -715,18 +614,6 @@ hooks:
 	// Sticky session cookie max age
 	if config.Server.StickySession.CookieMaxAge != "2h" {
 		t.Errorf("Expected cookie max age '2h', got '%s'", config.Server.StickySession.CookieMaxAge)
-	}
-
-	// Static cache durations
-	if len(config.Static.Directories) >= 1 {
-		if config.Static.Directories[0].Cache != "24h" {
-			t.Errorf("Expected static cache '24h', got '%s'", config.Static.Directories[0].Cache)
-		}
-	}
-	if len(config.Static.Directories) >= 2 {
-		if config.Static.Directories[1].Cache != "0" {
-			t.Errorf("Expected static cache '0', got '%s'", config.Static.Directories[1].Cache)
-		}
 	}
 
 	// Application pool timeout

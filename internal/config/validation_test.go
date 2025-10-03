@@ -285,19 +285,7 @@ server:
   idle:
     action: suspend
     timeout: "8760h"  # 1 year
-
-static:
-  directories:` + func() string {
-				var dirs []string
-				for i := 0; i < 100; i++ {
-					dirs = append(dirs, `
-    - path: /static`+string(rune('a'+i%26))+`/
-      dir: static`+string(rune('a'+i%26))+`/
-      cache: "24h"`)
-				}
-				return strings.Join(dirs, "")
-			}() + `
-  extensions:` + func() string {
+  allowed_extensions:` + func() string {
 				exts := []string{"html", "css", "js", "png", "jpg", "gif", "svg", "pdf", "txt", "json"}
 				for i := 0; i < 50; i++ {
 					exts = append(exts, "ext"+string(rune('a'+i%26)))
@@ -388,9 +376,6 @@ applications:
     max_size: 0
     start_port: 0
   tenants: []
-static:
-  directories: []
-  extensions: []
 routes:
   reverse_proxies: []
 managed_processes: []
@@ -684,16 +669,12 @@ server:
   idle:
     action: suspend
     timeout: 20m
-
-static:
-  directories:
-    - path: /assets/
-      dir: assets/
-      cache: 24h
-  extensions:
+  allowed_extensions:
     - html
     - css
     - js
+  cache_control:
+    default: "public, max-age=86400"
 
 routes:
   reverse_proxies:

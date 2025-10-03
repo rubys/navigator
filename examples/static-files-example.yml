@@ -80,19 +80,3 @@ applications:
     timeout: 5m
     start_port: 4000
   tenants: []
-
-# BACKWARD COMPATIBILITY NOTE:
-# The old `static` section is still supported for existing configurations:
-#
-# static:
-#   directories:
-#     - path: /assets/
-#       dir: assets/
-#       cache: 24h
-#   extensions: [html, css, js]
-#   try_files:
-#     enabled: true
-#     suffixes: [.html, .htm]
-#
-# However, the new server-based configuration (shown above) is recommended
-# for simpler, more intuitive configuration.
