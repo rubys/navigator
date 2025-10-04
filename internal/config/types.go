@@ -160,9 +160,9 @@ type MaintenanceConfig struct {
 // Config represents the main configuration
 type Config struct {
 	Server struct {
-		Listen       string   `yaml:"listen"`
-		Hostname     string   `yaml:"hostname"`
-		RootPath     string   `yaml:"root_path"`
+		Listen       string `yaml:"listen"`
+		Hostname     string `yaml:"hostname"`
+		RootPath     string `yaml:"root_path"`
 		RewriteRules []RewriteRule
 		Static       StaticConfig
 		Idle         struct {
