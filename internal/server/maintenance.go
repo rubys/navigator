@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/rubys/navigator/internal/config"
 )
@@ -18,12 +19,20 @@ func ServeMaintenancePage(w http.ResponseWriter, r *http.Request, config *config
 
 	// Try to serve custom 503.html if available
 	publicDir := "public" // Default fallback
-	if config.Server.PublicDir != "" {
-		publicDir = config.Server.PublicDir
+	if config.Server.Static.PublicDir != "" {
+		publicDir = config.Server.Static.PublicDir
 	}
 
-	// Check for custom 503.html
+	// Check for custom 503.html - use configured maintenance page if set
 	maintenancePage := fmt.Sprintf("%s/503.html", publicDir)
+	if config.Maintenance.Page != "" {
+		// If it's an absolute path, use it directly, otherwise append to publicDir
+		if strings.HasPrefix(config.Maintenance.Page, "/") {
+			maintenancePage = fmt.Sprintf("%s%s", publicDir, config.Maintenance.Page)
+		} else {
+			maintenancePage = config.Maintenance.Page
+		}
+	}
 	if content, err := os.ReadFile(maintenancePage); err == nil {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")

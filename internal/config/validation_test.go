@@ -281,21 +281,22 @@ func TestConfigurationLimits(t *testing.T) {
 server:
   listen: 65535
   hostname: ` + strings.Repeat("a", 253) + `.com
-  public_dir: ` + strings.Repeat("very-long-path/", 20) + `
-  idle:
-    action: suspend
-    timeout: "8760h"  # 1 year
-  allowed_extensions:` + func() string {
+  static:
+    public_dir: ` + strings.Repeat("very-long-path/", 20) + `
+    allowed_extensions:` + func() string {
 				exts := []string{"html", "css", "js", "png", "jpg", "gif", "svg", "pdf", "txt", "json"}
 				for i := 0; i < 50; i++ {
 					exts = append(exts, "ext"+string(rune('a'+i%26)))
 				}
 				result := ""
 				for _, ext := range exts {
-					result += "\n    - " + ext
+					result += "\n      - " + ext
 				}
 				return result
 			}() + `
+  idle:
+    action: suspend
+    timeout: "8760h"  # 1 year
 
 routes:
   reverse_proxies:` + func() string {
@@ -665,16 +666,17 @@ func BenchmarkConfigValidation(b *testing.B) {
 server:
   listen: 3000
   hostname: localhost
-  public_dir: public
+  static:
+    public_dir: public
+    allowed_extensions:
+      - html
+      - css
+      - js
+    cache_control:
+      default: "public, max-age=86400"
   idle:
     action: suspend
     timeout: 20m
-  allowed_extensions:
-    - html
-    - css
-    - js
-  cache_control:
-    default: "public, max-age=86400"
 
 routes:
   reverse_proxies:

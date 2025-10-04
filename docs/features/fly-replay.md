@@ -21,11 +21,12 @@ When a request matches a fly-replay rule, Navigator:
 
 ```yaml
 routes:
-  fly_replay:
-    - path: "^/api/heavy/"
-      region: fra          # Route to Frankfurt region
-      status: 307
-      methods: [GET, POST]
+  fly:
+    replay:
+      - path: "^/api/heavy/"
+        region: fra          # Route to Frankfurt region
+        status: 307
+        methods: [GET, POST]
 ```
 
 ### Multi-Target Routing Types
@@ -38,21 +39,22 @@ Route requests to specific Fly.io regions:
 
 ```yaml
 routes:
-  fly_replay:
-    # Route Australian users to Sydney
-    - path: "^/au/"
-      region: syd
-      status: 307
-      
-    # Route European users to Frankfurt  
-    - path: "^/eu/"
-      region: fra
-      status: 307
-      
-    # Route Asian users to Singapore
-    - path: "^/asia/"
-      region: sin
-      status: 307
+  fly:
+    replay:
+      # Route Australian users to Sydney
+      - path: "^/au/"
+        region: syd
+        status: 307
+
+      # Route European users to Frankfurt
+      - path: "^/eu/"
+        region: fra
+        status: 307
+
+      # Route Asian users to Singapore
+      - path: "^/asia/"
+        region: sin
+        status: 307
 ```
 
 #### 2. Application-Based Routing
@@ -61,21 +63,22 @@ Route requests to specific Fly.io applications:
 
 ```yaml
 routes:
-  fly_replay:
-    # Route PDF generation to specialized app
-    - path: "^/.*\\.pdf$"
-      app: pdf-generator
-      status: 307
-      
-    # Route image processing to image service
-    - path: "^/images/resize/"
-      app: image-processor
-      status: 307
-      
-    # Route search requests to search service
-    - path: "^/search/"
-      app: search-engine
-      status: 307
+  fly:
+    replay:
+      # Route PDF generation to specialized app
+      - path: "^/.*\\.pdf$"
+        app: pdf-generator
+        status: 307
+
+      # Route image processing to image service
+      - path: "^/images/resize/"
+        app: image-processor
+        status: 307
+
+      # Route search requests to search service
+      - path: "^/search/"
+        app: search-engine
+        status: 307
 ```
 
 #### 3. Machine-Specific Routing
@@ -84,18 +87,19 @@ Route requests to specific machine instances:
 
 ```yaml
 routes:
-  fly_replay:
-    # Route high-priority requests to specific machine
-    - path: "^/priority/"
-      machine: "48e403dc711e18"
-      app: priority-handler
-      status: 307
-      
-    # Route admin requests to admin machine
-    - path: "^/admin/"
-      machine: "e24a0123456789"
-      app: admin-console
-      status: 307
+  fly:
+    replay:
+      # Route high-priority requests to specific machine
+      - path: "^/priority/"
+        machine: "48e403dc711e18"
+        app: priority-handler
+        status: 307
+
+      # Route admin requests to admin machine
+      - path: "^/admin/"
+        machine: "e24a0123456789"
+        app: admin-console
+        status: 307
 ```
 
 ## Fly.io Regions
@@ -124,21 +128,22 @@ routes:
 
 ```yaml
 routes:
-  fly_replay:
-    # Americas
-    - path: "^/(us|ca|mx)/"
-      region: ord
-      methods: [GET]
-      
-    # Europe  
-    - path: "^/(uk|de|fr|it|es)/"
-      region: fra
-      methods: [GET]
-      
-    # Asia Pacific
-    - path: "^/(au|nz|sg|jp)/"
-      region: syd
-      methods: [GET]
+  fly:
+    replay:
+      # Americas
+      - path: "^/(us|ca|mx)/"
+        region: ord
+        methods: [GET]
+
+      # Europe
+      - path: "^/(uk|de|fr|it|es)/"
+        region: fra
+        methods: [GET]
+
+      # Asia Pacific
+      - path: "^/(au|nz|sg|jp)/"
+        region: syd
+        methods: [GET]
 ```
 
 ## Smart Fallback Behavior
@@ -149,10 +154,11 @@ Navigator automatically uses reverse proxy instead of Fly-Replay when:
 
 ```yaml
 routes:
-  fly_replay:
-    - path: "^/upload/"
-      region: fra
-      # Large file uploads automatically use reverse proxy
+  fly:
+    replay:
+      - path: "^/upload/"
+        region: fra
+        # Large file uploads automatically use reverse proxy
 ```
 
 Navigator detects:
@@ -164,11 +170,12 @@ Navigator detects:
 
 ```yaml
 routes:
-  fly_replay:
-    - path: "^/api/"
-      region: fra
-      methods: [GET, HEAD]  # Only safe methods use replay
-      # POST/PUT/DELETE automatically use reverse proxy
+  fly:
+    replay:
+      - path: "^/api/"
+        region: fra
+        methods: [GET, HEAD]  # Only safe methods use replay
+        # POST/PUT/DELETE automatically use reverse proxy
 ```
 
 ### 3. WebSocket Upgrades
@@ -184,53 +191,56 @@ WebSocket connections require persistent connections, so Navigator automatically
 
 ```yaml
 routes:
-  fly_replay:
-    # Route based on URL patterns suggesting geography
-    - path: "^/stores/sydney/"
-      region: syd
-      
-    - path: "^/stores/london/"
-      region: lhr
-      
-    - path: "^/stores/newyork/"
-      region: iad
+  fly:
+    replay:
+      # Route based on URL patterns suggesting geography
+      - path: "^/stores/sydney/"
+        region: syd
+
+      - path: "^/stores/london/"
+        region: lhr
+
+      - path: "^/stores/newyork/"
+        region: iad
 ```
 
 ### Service-Specific Applications
 
 ```yaml
 routes:
-  fly_replay:
-    # PDF processing service
-    - path: "^/documents/.+\\.pdf$"
-      app: pdf-service
-      
-    # Image optimization service  
-    - path: "^/media/optimize/"
-      app: image-optimizer
-      
-    # Heavy computation service
-    - path: "^/compute/"
-      app: compute-cluster
-      region: fra  # Use high-CPU region
+  fly:
+    replay:
+      # PDF processing service
+      - path: "^/documents/.+\\.pdf$"
+        app: pdf-service
+
+      # Image optimization service
+      - path: "^/media/optimize/"
+        app: image-optimizer
+
+      # Heavy computation service
+      - path: "^/compute/"
+        app: compute-cluster
+        region: fra  # Use high-CPU region
 ```
 
 ### Load Balancing Scenarios
 
 ```yaml
 routes:
-  fly_replay:
-    # Route specific customers to dedicated instances
-    - path: "^/enterprise/customer1/"
-      machine: "dedicated-1"
-      app: enterprise-app
-      
-    - path: "^/enterprise/customer2/"
-      machine: "dedicated-2"  
-      app: enterprise-app
-      
-    # Standard customers use default routing
-    # (no fly_replay rule = normal load balancing)
+  fly:
+    replay:
+      # Route specific customers to dedicated instances
+      - path: "^/enterprise/customer1/"
+        machine: "dedicated-1"
+        app: enterprise-app
+
+      - path: "^/enterprise/customer2/"
+        machine: "dedicated-2"
+        app: enterprise-app
+
+      # Standard customers use default routing
+      # (no fly_replay rule = normal load balancing)
 ```
 
 ## Fallback Proxy Configuration
@@ -265,39 +275,42 @@ export FLY_APP_NAME=your-app-name
 
 ```yaml
 routes:
-  fly_replay:
-    # Specific patterns first (faster matching)
-    - path: "^/api/v2/heavy-compute"
-      region: fra
-      
-    # General patterns last
-    - path: "^/api/"
-      region: ord
+  fly:
+    replay:
+      # Specific patterns first (faster matching)
+      - path: "^/api/v2/heavy-compute"
+        region: fra
+
+      # General patterns last
+      - path: "^/api/"
+        region: ord
 ```
 
 ### Method Filtering
 
 ```yaml
 routes:
-  fly_replay:
-    # Only apply expensive routing to read operations
-    - path: "^/reports/"
-      region: fra
-      methods: [GET, HEAD]  # Skip POST/PUT/DELETE
+  fly:
+    replay:
+      # Only apply expensive routing to read operations
+      - path: "^/reports/"
+        region: fra
+        methods: [GET, HEAD]  # Skip POST/PUT/DELETE
 ```
 
 ### Conditional Routing
 
 ```yaml
 routes:
-  fly_replay:
-    # Route large computations to powerful region
-    - path: "^/compute/heavy/"
-      region: fra
-      
-    # Route quick operations to closest region
-    - path: "^/compute/quick/"
-      region: ord
+  fly:
+    replay:
+      # Route large computations to powerful region
+      - path: "^/compute/heavy/"
+        region: fra
+
+      # Route quick operations to closest region
+      - path: "^/compute/quick/"
+        region: ord
 ```
 
 ## Monitoring and Debugging
@@ -356,61 +369,65 @@ When Navigator sends a Fly-Replay response:
 ```yaml
 # Deploy same app to multiple regions
 routes:
-  fly_replay:
-    # Route users to closest region based on path
-    - path: "^/us-east/"
-      region: iad
-    - path: "^/us-west/"  
-      region: lax
-    - path: "^/europe/"
-      region: fra
-    - path: "^/asia/"
-      region: sin
+  fly:
+    replay:
+      # Route users to closest region based on path
+      - path: "^/us-east/"
+        region: iad
+      - path: "^/us-west/"
+        region: lax
+      - path: "^/europe/"
+        region: fra
+      - path: "^/asia/"
+        region: sin
 ```
 
 ### 2. Microservices Architecture
 
 ```yaml
 routes:
-  fly_replay:
-    # Route to specialized services
-    - path: "^/auth/"
-      app: auth-service
-    - path: "^/payments/"
-      app: payment-service  
-    - path: "^/notifications/"
-      app: notification-service
+  fly:
+    replay:
+      # Route to specialized services
+      - path: "^/auth/"
+        app: auth-service
+      - path: "^/payments/"
+        app: payment-service
+      - path: "^/notifications/"
+        app: notification-service
 ```
 
 ### 3. Resource-Heavy Operations
 
 ```yaml
 routes:
-  fly_replay:
-    # Route CPU-intensive operations to powerful machines
-    - path: "^/process/video/"
-      machine: "high-cpu-1"
-      app: video-processor
-      
-    # Route memory-intensive operations  
-    - path: "^/process/data/"
-      machine: "high-memory-1"
-      app: data-processor
+  fly:
+    replay:
+      # Route CPU-intensive operations to powerful machines
+      - path: "^/process/video/"
+        machine: "high-cpu-1"
+        app: video-processor
+
+      # Route memory-intensive operations
+      - path: "^/process/data/"
+        machine: "high-memory-1"
+        app: data-processor
 ```
 
 ### 4. Customer Isolation
 
 ```yaml
 routes:
-  fly_replay:
-    # Enterprise customers on dedicated machines
-    - path: "^/enterprise/acme-corp/"
-      machine: "acme-dedicated"
-      app: enterprise-platform
-      
-    - path: "^/enterprise/big-co/"
-      machine: "bigco-dedicated"
-      app: enterprise-platform
+  fly:
+    replay:
+      # Enterprise customers on dedicated machines
+      - path: "^/enterprise/acme-corp/"
+        machine: "acme-dedicated"
+        app: enterprise-platform
+
+      - path: "^/enterprise/big-co/"
+        machine: "bigco-dedicated"
+        app: enterprise-platform
 ```
 
 ## Troubleshooting
@@ -427,7 +444,7 @@ routes:
    ```bash
    # Required for region fallback
    echo $FLY_APP_NAME
-   
+
    # Check internal DNS resolution
    nslookup fra.your-app.internal
    ```
@@ -435,10 +452,11 @@ routes:
 3. **Check request method**:
    ```yaml
    routes:
-     fly_replay:
-       - path: "^/api/"
-         region: fra
-         methods: [GET, HEAD]  # Ensure method is included
+     fly:
+       replay:
+         - path: "^/api/"
+           region: fra
+           methods: [GET, HEAD]  # Ensure method is included
    ```
 
 ### Fallback Proxy Issues
@@ -464,18 +482,20 @@ routes:
    ```yaml
    # Put specific patterns first
    routes:
-     fly_replay:
-       - path: "^/api/v2/specific-endpoint"  # Specific first
-       - path: "^/api/"                      # General last
+     fly:
+       replay:
+         - path: "^/api/v2/specific-endpoint"  # Specific first
+         - path: "^/api/"                      # General last
    ```
 
 2. **Limit method scope**:
    ```yaml
    routes:
-     fly_replay:
-       - path: "^/heavy-compute/"
-         region: fra
-         methods: [GET]  # Don't route all methods
+     fly:
+       replay:
+         - path: "^/heavy-compute/"
+           region: fra
+           methods: [GET]  # Don't route all methods
    ```
 
 ## Security Considerations

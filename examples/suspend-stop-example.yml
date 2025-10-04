@@ -5,7 +5,10 @@
 server:
   listen: 3000
   hostname: localhost
-  public_dir: public
+
+  # Static file configuration
+  static:
+    public_dir: public
 
   # Idle configuration for Fly.io machines
   idle:

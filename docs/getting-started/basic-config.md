@@ -11,9 +11,10 @@ Navigator uses YAML configuration files with a clear, hierarchical structure:
 server:
   listen: 3000
   hostname: localhost
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
-# Process pool management  
+# Process pool management
 pools:
   max_size: 10
   idle_timeout: 300
@@ -39,7 +40,8 @@ The `server` section defines how Navigator listens for HTTP requests:
 server:
   listen: 3000              # Port to bind (required)
   hostname: "localhost"     # Hostname for routing (optional)
-  public_dir: "./public"    # Default public directory (optional)
+  static:
+    public_dir: "./public"  # Default public directory (optional)
 ```
 
 ### Common Server Settings
@@ -181,19 +183,20 @@ Serve static files directly for better performance:
 
 ```yaml
 server:
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
-  # Cache static assets
-  cache_control:
-    overrides:
-      - path: /assets/
-        max_age: 24h      # Duration format: "24h", "1d", etc.
+    # Cache static assets
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 24h      # Duration format: "24h", "1d", etc.
 
-  # Allow specific file types (optional)
-  allowed_extensions: [css, js, png, jpg, gif, ico]
+    # Allow specific file types (optional)
+    allowed_extensions: [css, js, png, jpg, gif, ico]
 
-  # Enable try files for .html extension (optional)
-  try_files: [.html]
+    # Enable try files for .html extension (optional)
+    try_files: [.html]
 ```
 
 ### Performance Benefits
@@ -237,7 +240,8 @@ htpasswd /etc/navigator/htpasswd user2
 ```yaml title="config/navigator-dev.yml"
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
 applications:
   pools:
@@ -245,7 +249,7 @@ applications:
     timeout: 1m        # Shorter timeout for development
   global_env:
     RAILS_ENV: development
-    
+
   tenants:
     - name: dev
       path: /
@@ -261,14 +265,15 @@ auth:
 ```yaml title="config/navigator-staging.yml"
 server:
   listen: 3000
-  public_dir: /var/www/app/public
+  static:
+    public_dir: /var/www/app/public
 
-  # Cache static files for 1 hour
-  cache_control:
-    overrides:
-      - path: /assets/
-        max_age: 1h
-  allowed_extensions: [css, js, png, jpg, gif]
+    # Cache static files for 1 hour
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 1h
+    allowed_extensions: [css, js, png, jpg, gif]
 
 auth:
   enabled: true
@@ -298,16 +303,17 @@ applications:
 server:
   listen: 3000
   hostname: myapp.com
-  public_dir: /var/www/app/public
+  static:
+    public_dir: /var/www/app/public
 
-  # Cache control for production
-  cache_control:
-    overrides:
-      - path: /assets/
-        max_age: 365d     # 1 year for fingerprinted assets
-      - path: /images/
-        max_age: 1d       # 1 day for images
-  allowed_extensions: [css, js, map, png, jpg, gif, ico, svg, woff, woff2]
+    # Cache control for production
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 365d     # 1 year for fingerprinted assets
+        - path: /images/
+          max_age: 1d       # 1 day for images
+    allowed_extensions: [css, js, map, png, jpg, gif, ico, svg, woff, woff2]
 
 auth:
   enabled: true
@@ -457,7 +463,8 @@ server:
 1. **Check public_dir**:
    ```yaml
    server:
-     public_dir: /var/www/app/public  # Must be correct path
+     static:
+       public_dir: /var/www/app/public  # Must be correct path
    ```
 
 2. **Verify files exist**:
@@ -468,7 +475,8 @@ server:
 3. **Check allowed_extensions** (if specified):
    ```yaml
    server:
-     allowed_extensions: [css, js, png, jpg]  # Ensure file type is included
+     static:
+       allowed_extensions: [css, js, png, jpg]  # Ensure file type is included
    ```
 
 ### Port Conflicts

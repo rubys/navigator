@@ -403,7 +403,7 @@ logging:
 
 	// Test auth loading with no auth file (should not error)
 	var basicAuth *auth.BasicAuth
-	if cfg.Server.Authentication != "" {
+	if cfg.Auth.Enabled && cfg.Auth.HTPasswd != "" {
 		// This branch shouldn't execute since we didn't configure auth
 		t.Error("Expected no authentication configured")
 	}
@@ -467,14 +467,15 @@ func TestServerConfigReload(t *testing.T) {
 server:
   listen: "3001"
   hostname: "test-host"
-  public_dir: "public"
-  allowed_extensions:
-    - html
-    - css
-    - js
-  try_files:
-    - ".html"
-    - ".htm"
+  static:
+    public_dir: "public"
+    allowed_extensions:
+      - html
+      - css
+      - js
+    try_files:
+      - ".html"
+      - ".htm"
 applications:
   tenants: []
 logging:
@@ -523,14 +524,14 @@ logging:
 		t.Errorf("Expected hostname 'test-host' after reload, got '%s'", lifecycle.cfg.Server.Hostname)
 	}
 
-	if lifecycle.cfg.Server.PublicDir != "public" {
-		t.Errorf("Expected public_dir 'public' after reload, got '%s'", lifecycle.cfg.Server.PublicDir)
+	if lifecycle.cfg.Server.Static.PublicDir != "public" {
+		t.Errorf("Expected public_dir 'public' after reload, got '%s'", lifecycle.cfg.Server.Static.PublicDir)
 	}
 
 	// Verify try_files was updated
 	expectedTryFiles := []string{".html", ".htm"}
-	if len(lifecycle.cfg.Server.TryFiles) != len(expectedTryFiles) {
-		t.Errorf("Expected %d try_files after reload, got %d", len(expectedTryFiles), len(lifecycle.cfg.Server.TryFiles))
+	if len(lifecycle.cfg.Server.Static.TryFiles) != len(expectedTryFiles) {
+		t.Errorf("Expected %d try_files after reload, got %d", len(expectedTryFiles), len(lifecycle.cfg.Server.Static.TryFiles))
 	}
 
 	// basicAuth should be nil because no authentication is configured

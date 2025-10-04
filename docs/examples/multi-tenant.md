@@ -16,14 +16,22 @@ Different applications on different URL paths:
 ```yaml title="navigator.yml"
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
+
+    # Cache configuration
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 24h
+    allowed_extensions: [css, js, png, jpg, gif]
 
 applications:
   # Shared environment variables
   global_env:
     RAILS_ENV: production
     RAILS_LOG_TO_STDOUT: "true"
-    
+
   tenants:
     # Customer 1: Boston
     - name: boston
@@ -33,8 +41,8 @@ applications:
         DATABASE_NAME: app_boston
         TENANT_NAME: "Boston Studio"
         STORAGE_PATH: /storage/boston
-    
-    # Customer 2: Chicago  
+
+    # Customer 2: Chicago
     - name: chicago
       path: /chicago/
       working_dir: /var/www/app
@@ -42,7 +50,7 @@ applications:
         DATABASE_NAME: app_chicago
         TENANT_NAME: "Chicago Studio"
         STORAGE_PATH: /storage/chicago
-    
+
     # Customer 3: Dallas
     - name: dallas
       path: /dallas/
@@ -51,14 +59,6 @@ applications:
         DATABASE_NAME: app_dallas
         TENANT_NAME: "Dallas Studio"
         STORAGE_PATH: /storage/dallas
-
-# Serve static files for all tenants
-static:
-  directories:
-    - path: /assets/
-      root: /var/www/app/public/assets/
-      cache: 86400
-  extensions: [css, js, png, jpg, gif]
 
 # Resource limits
 pools:
@@ -74,7 +74,8 @@ Using template variables for cleaner configuration:
 ```yaml title="navigator.yml"
 server:
   listen: 3000
-  public_dir: /var/www/app/public
+  static:
+    public_dir: /var/www/app/public
 
 applications:
   # Template for all tenants
@@ -84,7 +85,7 @@ applications:
     TENANT_ID: "${tenant_id}"
     TENANT_NAME: "${tenant_name}"
     STORAGE_ROOT: "/storage/${tenant_id}"
-    
+
   tenants:
     - name: tenant-001
       path: /tenant/001/
@@ -92,14 +93,14 @@ applications:
         database: "app_tenant_001"
         tenant_id: "001"
         tenant_name: "Acme Corp"
-    
+
     - name: tenant-002
       path: /tenant/002/
       var:
         database: "app_tenant_002"
         tenant_id: "002"
         tenant_name: "TechStart Inc"
-    
+
     - name: tenant-003
       path: /tenant/003/
       var:
@@ -116,12 +117,13 @@ Using a reverse proxy to route subdomains:
 server:
   listen: 3000
   hostname: "*.myapp.com"
-  public_dir: /var/www/app/public
+  static:
+    public_dir: /var/www/app/public
 
 applications:
   global_env:
     RAILS_ENV: production
-    
+
   tenants:
     # Route based on Host header
     - name: boston
@@ -131,7 +133,7 @@ applications:
       env:
         DATABASE_NAME: app_boston
         SUBDOMAIN: boston
-    
+
     - name: chicago
       path: /
       match_header: "Host: chicago.myapp.com"
@@ -148,7 +150,8 @@ Perfect for annual events or conferences:
 ```yaml title="navigator.yml"
 server:
   listen: 3000
-  public_dir: /var/www/showcase/public
+  static:
+    public_dir: /var/www/showcase/public
 
 applications:
   env:
@@ -157,7 +160,7 @@ applications:
     RAILS_APP_YEAR: "${year}"
     RAILS_APP_CITY: "${city}"
     EVENT_LOGO: "/logos/${year}-${city}.png"
-    
+
   tenants:
     # 2024 Events
     - name: 2024-boston
@@ -166,14 +169,14 @@ applications:
         database: "showcase_2024_boston"
         year: "2024"
         city: "boston"
-    
+
     - name: 2024-seattle
       path: /2024/seattle/
       var:
         database: "showcase_2024_seattle"
         year: "2024"
         city: "seattle"
-    
+
     # 2025 Events
     - name: 2025-boston
       path: /2025/boston/
@@ -181,7 +184,7 @@ applications:
         database: "showcase_2025_boston"
         year: "2025"
         city: "boston"
-    
+
     - name: 2025-miami
       path: /2025/miami/
       var:
@@ -415,13 +418,14 @@ applications:
 
 ```yaml
 routes:
-  fly_replay:
-    - path: "^/asia/"
-      region: sin  # Singapore
-    - path: "^/europe/"
-      region: fra  # Frankfurt
-    - path: "^/americas/"
-      region: ord  # Chicago
+  fly:
+    replay:
+      - path: "^/asia/"
+        region: sin  # Singapore
+      - path: "^/europe/"
+        region: fra  # Frankfurt
+      - path: "^/americas/"
+        region: ord  # Chicago
 ```
 
 ## Troubleshooting

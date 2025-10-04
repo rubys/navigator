@@ -13,14 +13,14 @@ import (
 
 // HandleStickySession handles sticky session routing using Fly-Replay
 func HandleStickySession(w http.ResponseWriter, r *http.Request, config *config.Config) bool {
-	if !config.Server.StickySession.Enabled {
+	if !config.StickySession.Enabled {
 		return false
 	}
 
 	// Check if path requires sticky sessions
-	if len(config.Server.StickySession.Paths) > 0 {
+	if len(config.StickySession.Paths) > 0 {
 		matched := false
-		for _, pattern := range config.Server.StickySession.Paths {
+		for _, pattern := range config.StickySession.Paths {
 			if matched, _ = filepath.Match(pattern, r.URL.Path); matched {
 				break
 			}
@@ -40,7 +40,7 @@ func HandleStickySession(w http.ResponseWriter, r *http.Request, config *config.
 
 	// Get or set sticky session cookie
 	targetMachine := ""
-	cookie, err := r.Cookie(config.Server.StickySession.CookieName)
+	cookie, err := r.Cookie(config.StickySession.CookieName)
 	if err == nil {
 		targetMachine = cookie.Value
 		slog.Debug("Found sticky session cookie", "machine", targetMachine, "currentMachine", currentMachineID)
@@ -77,24 +77,24 @@ func HandleStickySession(w http.ResponseWriter, r *http.Request, config *config.
 // SetStickySessionCookie sets a sticky session cookie for the given machine ID
 func SetStickySessionCookie(w http.ResponseWriter, machineID string, config *config.Config) {
 	maxAge := 3600 // Default 1 hour
-	if config.Server.StickySession.CookieMaxAge != "" {
-		if duration, err := time.ParseDuration(config.Server.StickySession.CookieMaxAge); err == nil {
+	if config.StickySession.CookieMaxAge != "" {
+		if duration, err := time.ParseDuration(config.StickySession.CookieMaxAge); err == nil {
 			maxAge = int(duration.Seconds())
 		}
 	}
 
 	cookie := &http.Cookie{
-		Name:     config.Server.StickySession.CookieName,
+		Name:     config.StickySession.CookieName,
 		Value:    machineID,
 		Path:     "/",
 		MaxAge:   maxAge,
-		HttpOnly: config.Server.StickySession.CookieHTTPOnly,
-		Secure:   config.Server.StickySession.CookieSecure,
+		HttpOnly: config.StickySession.CookieHTTPOnly,
+		Secure:   config.StickySession.CookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	}
 
-	if config.Server.StickySession.CookieSameSite != "" {
-		switch config.Server.StickySession.CookieSameSite {
+	if config.StickySession.CookieSameSite != "" {
+		switch config.StickySession.CookieSameSite {
 		case "strict":
 			cookie.SameSite = http.SameSiteStrictMode
 		case "none":

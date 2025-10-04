@@ -15,100 +15,25 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 	}{
 		{
 			name: "basic server config",
-			yamlConfig: YAMLConfig{
-				Server: struct {
-					Listen            interface{} `yaml:"listen"`
-					Hostname          string      `yaml:"hostname"`
-					PublicDir         string      `yaml:"public_dir"`
-					RootPath          string      `yaml:"root_path"`
-					NamedHosts        []string    `yaml:"named_hosts"`
-					Root              string      `yaml:"root"`
-					TryFiles          []string    `yaml:"try_files"`
-					AllowedExtensions []string    `yaml:"allowed_extensions"`
-					CacheControl      struct {
-						Default   string `yaml:"default"`
-						Overrides []struct {
-							Path   string `yaml:"path"`
-							MaxAge string `yaml:"max_age"`
-						} `yaml:"overrides"`
-					} `yaml:"cache_control"`
-					Authentication string   `yaml:"authentication"`
-					AuthExclude    []string `yaml:"auth_exclude"`
-					Rewrites       []struct {
-						Pattern     string   `yaml:"pattern"`
-						Replacement string   `yaml:"replacement"`
-						Flag        string   `yaml:"flag"`
-						Methods     []string `yaml:"methods"`
-					} `yaml:"rewrites"`
-					Idle struct {
-						Action  string `yaml:"action"`
-						Timeout string `yaml:"timeout"`
-					} `yaml:"idle"`
-					StickySession struct {
-						Enabled        bool     `yaml:"enabled"`
-						CookieName     string   `yaml:"cookie_name"`
-						CookieMaxAge   string   `yaml:"cookie_max_age"`
-						CookieSecure   bool     `yaml:"cookie_secure"`
-						CookieHTTPOnly bool     `yaml:"cookie_httponly"`
-						CookieSameSite string   `yaml:"cookie_samesite"`
-						CookiePath     string   `yaml:"cookie_path"`
-						Paths          []string `yaml:"paths"`
-					} `yaml:"sticky_sessions"`
-				}{
-					Listen:         3001,
-					PublicDir:      "/var/www/public",
-					Authentication: "/etc/htpasswd",
-				},
-			},
+			yamlConfig: func() YAMLConfig {
+				cfg := YAMLConfig{}
+				cfg.Server.Listen = 3001
+				cfg.Server.Static.PublicDir = "/var/www/public"
+				cfg.Auth.Enabled = true
+				cfg.Auth.HTPasswd = "/etc/htpasswd"
+				return cfg
+			}(),
 			wantListen: "3001",
 			wantPublic: "/var/www/public",
 			wantAuth:   "/etc/htpasswd",
 		},
 		{
 			name: "string listen port",
-			yamlConfig: YAMLConfig{
-				Server: struct {
-					Listen            interface{} `yaml:"listen"`
-					Hostname          string      `yaml:"hostname"`
-					PublicDir         string      `yaml:"public_dir"`
-					RootPath          string      `yaml:"root_path"`
-					NamedHosts        []string    `yaml:"named_hosts"`
-					Root              string      `yaml:"root"`
-					TryFiles          []string    `yaml:"try_files"`
-					AllowedExtensions []string    `yaml:"allowed_extensions"`
-					CacheControl      struct {
-						Default   string `yaml:"default"`
-						Overrides []struct {
-							Path   string `yaml:"path"`
-							MaxAge string `yaml:"max_age"`
-						} `yaml:"overrides"`
-					} `yaml:"cache_control"`
-					Authentication string   `yaml:"authentication"`
-					AuthExclude    []string `yaml:"auth_exclude"`
-					Rewrites       []struct {
-						Pattern     string   `yaml:"pattern"`
-						Replacement string   `yaml:"replacement"`
-						Flag        string   `yaml:"flag"`
-						Methods     []string `yaml:"methods"`
-					} `yaml:"rewrites"`
-					Idle struct {
-						Action  string `yaml:"action"`
-						Timeout string `yaml:"timeout"`
-					} `yaml:"idle"`
-					StickySession struct {
-						Enabled        bool     `yaml:"enabled"`
-						CookieName     string   `yaml:"cookie_name"`
-						CookieMaxAge   string   `yaml:"cookie_max_age"`
-						CookieSecure   bool     `yaml:"cookie_secure"`
-						CookieHTTPOnly bool     `yaml:"cookie_httponly"`
-						CookieSameSite string   `yaml:"cookie_samesite"`
-						CookiePath     string   `yaml:"cookie_path"`
-						Paths          []string `yaml:"paths"`
-					} `yaml:"sticky_sessions"`
-				}{
-					Listen: ":8080",
-				},
-			},
+			yamlConfig: func() YAMLConfig {
+				cfg := YAMLConfig{}
+				cfg.Server.Listen = ":8080"
+				return cfg
+			}(),
 			wantListen: ":8080",
 			wantPublic: "",
 			wantAuth:   "",
@@ -126,11 +51,11 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 			if config.Server.Listen != tt.wantListen {
 				t.Errorf("Listen = %v, want %v", config.Server.Listen, tt.wantListen)
 			}
-			if config.Server.PublicDir != tt.wantPublic {
-				t.Errorf("PublicDir = %v, want %v", config.Server.PublicDir, tt.wantPublic)
+			if config.Server.Static.PublicDir != tt.wantPublic {
+				t.Errorf("PublicDir = %v, want %v", config.Server.Static.PublicDir, tt.wantPublic)
 			}
-			if config.Server.Authentication != tt.wantAuth {
-				t.Errorf("Authentication = %v, want %v", config.Server.Authentication, tt.wantAuth)
+			if config.Auth.HTPasswd != tt.wantAuth {
+				t.Errorf("Authentication = %v, want %v", config.Auth.HTPasswd, tt.wantAuth)
 			}
 		})
 	}
@@ -174,22 +99,22 @@ applications:
 }
 
 func TestConfigParser_ParseRoutesConfig(t *testing.T) {
-	yamlConfig := YAMLConfig{
-		Routes: RoutesConfig{
-			Redirects: []struct {
-				From string `yaml:"from"`
-				To   string `yaml:"to"`
-			}{
-				{From: "^/old", To: "/new"},
-			},
-			Rewrites: []struct {
-				From string `yaml:"from"`
-				To   string `yaml:"to"`
-			}{
-				{From: "^/api/(.*)", To: "/v1/api/$1"},
-			},
-		},
-	}
+	yamlConfig := func() YAMLConfig {
+		cfg := YAMLConfig{}
+		cfg.Routes.Redirects = []struct {
+			From string `yaml:"from"`
+			To   string `yaml:"to"`
+		}{
+			{From: "^/old", To: "/new"},
+		}
+		cfg.Routes.Rewrites = []struct {
+			From string `yaml:"from"`
+			To   string `yaml:"to"`
+		}{
+			{From: "^/api/(.*)", To: "/v1/api/$1"},
+		}
+		return cfg
+	}()
 
 	parser := NewConfigParser(&yamlConfig)
 	config, err := parser.Parse()
@@ -284,39 +209,12 @@ func TestConfigParser_ParseLoggingConfig(t *testing.T) {
 }
 
 func TestConfigParser_ParseHooksConfig(t *testing.T) {
-	yamlConfig := YAMLConfig{
-		Hooks: struct {
-			Server struct {
-				Start  []HookConfig `yaml:"start"`
-				Ready  []HookConfig `yaml:"ready"`
-				Resume []HookConfig `yaml:"resume"`
-				Idle   []HookConfig `yaml:"idle"`
-			} `yaml:"server"`
-			Tenant struct {
-				Start []HookConfig `yaml:"start"`
-				Stop  []HookConfig `yaml:"stop"`
-			} `yaml:"tenant"`
-		}{
-			Server: struct {
-				Start  []HookConfig `yaml:"start"`
-				Ready  []HookConfig `yaml:"ready"`
-				Resume []HookConfig `yaml:"resume"`
-				Idle   []HookConfig `yaml:"idle"`
-			}{
-				Start: []HookConfig{
-					{Command: "/usr/local/bin/start.sh"},
-				},
-			},
-			Tenant: struct {
-				Start []HookConfig `yaml:"start"`
-				Stop  []HookConfig `yaml:"stop"`
-			}{
-				Start: []HookConfig{
-					{Command: "/usr/local/bin/tenant-start.sh"},
-				},
-			},
-		},
-	}
+	yamlConfig := func() YAMLConfig {
+		cfg := YAMLConfig{}
+		cfg.Hooks.Server.Start = []HookConfig{{Command: "/usr/local/bin/start.sh"}}
+		cfg.Hooks.Tenant.Start = []HookConfig{{Command: "/usr/local/bin/tenant-start.sh"}}
+		return cfg
+	}()
 
 	parser := NewConfigParser(&yamlConfig)
 	config, err := parser.Parse()
@@ -340,26 +238,14 @@ func TestConfigParser_ParseHooksConfig(t *testing.T) {
 }
 
 func TestConfigParser_ParseAuthConfig(t *testing.T) {
-	yamlConfig := YAMLConfig{
-		Auth: struct {
-			Enabled         bool     `yaml:"enabled"`
-			Realm           string   `yaml:"realm"`
-			HTPasswd        string   `yaml:"htpasswd"`
-			PublicPaths     []string `yaml:"public_paths"`
-			ExcludePatterns []struct {
-				Pattern     string `yaml:"pattern"`
-				Description string `yaml:"description"`
-			} `yaml:"exclude_patterns"`
-		}{
-			Enabled:  true,
-			Realm:    "Test Realm",
-			HTPasswd: "/etc/htpasswd",
-			PublicPaths: []string{
-				"/public",
-				"/health",
-			},
-		},
-	}
+	yamlConfig := func() YAMLConfig {
+		cfg := YAMLConfig{}
+		cfg.Auth.Enabled = true
+		cfg.Auth.Realm = "Test Realm"
+		cfg.Auth.HTPasswd = "/etc/htpasswd"
+		cfg.Auth.PublicPaths = []string{"/public", "/health"}
+		return cfg
+	}()
 
 	parser := NewConfigParser(&yamlConfig)
 	config, err := parser.Parse()
@@ -368,48 +254,48 @@ func TestConfigParser_ParseAuthConfig(t *testing.T) {
 	}
 
 	// Check that auth is enabled
-	if config.Server.Authentication != "/etc/htpasswd" {
-		t.Errorf("Expected htpasswd file '/etc/htpasswd', got %q", config.Server.Authentication)
+	if config.Auth.HTPasswd != "/etc/htpasswd" {
+		t.Errorf("Expected htpasswd file '/etc/htpasswd', got %q", config.Auth.HTPasswd)
 	}
 
-	// Check that public paths were added to AuthExclude
-	if len(config.Server.AuthExclude) < 2 {
-		t.Errorf("Expected at least 2 auth exclude patterns, got %d", len(config.Server.AuthExclude))
+	// Check that public paths were set in Auth.PublicPaths
+	if len(config.Auth.PublicPaths) < 2 {
+		t.Errorf("Expected at least 2 auth public paths, got %d", len(config.Auth.PublicPaths))
 	}
 
-	// Verify the public paths are in AuthExclude
+	// Verify the public paths are in Auth.PublicPaths
 	expectedPaths := []string{"/public", "/health"}
 	for _, expectedPath := range expectedPaths {
 		found := false
-		for _, excludePath := range config.Server.AuthExclude {
-			if excludePath == expectedPath {
+		for _, publicPath := range config.Auth.PublicPaths {
+			if publicPath == expectedPath {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Errorf("Expected to find %q in AuthExclude, but it was not found", expectedPath)
+			t.Errorf("Expected to find %q in Auth.PublicPaths, but it was not found", expectedPath)
 		}
 	}
 }
 
 func TestConfigParser_ParseFlyReplayRoutes(t *testing.T) {
-	yamlConfig := YAMLConfig{
-		Routes: RoutesConfig{
-			FlyReplay: []struct {
-				Path   string `yaml:"path"`
-				App    string `yaml:"app"`
-				Region string `yaml:"region"`
-				Status int    `yaml:"status"`
-			}{
-				{
-					Path:   "^/admin",
-					Region: "lax",
-					Status: 307,
-				},
+	yamlConfig := func() YAMLConfig {
+		cfg := YAMLConfig{}
+		cfg.Routes.FlyReplay = []struct {
+			Path   string `yaml:"path"`
+			App    string `yaml:"app"`
+			Region string `yaml:"region"`
+			Status int    `yaml:"status"`
+		}{
+			{
+				Path:   "^/admin",
+				Region: "lax",
+				Status: 307,
 			},
-		},
-	}
+		}
+		return cfg
+	}()
 
 	parser := NewConfigParser(&yamlConfig)
 	config, err := parser.Parse()
@@ -436,67 +322,18 @@ func TestConfigParser_ParseFlyReplayRoutes(t *testing.T) {
 }
 
 func TestConfigParser_ParseStickySessionConfig(t *testing.T) {
-	yamlConfig := YAMLConfig{
-		Server: struct {
-			Listen            interface{} `yaml:"listen"`
-			Hostname          string      `yaml:"hostname"`
-			PublicDir         string      `yaml:"public_dir"`
-			RootPath          string      `yaml:"root_path"`
-			NamedHosts        []string    `yaml:"named_hosts"`
-			Root              string      `yaml:"root"`
-			TryFiles          []string    `yaml:"try_files"`
-			AllowedExtensions []string    `yaml:"allowed_extensions"`
-			CacheControl      struct {
-				Default   string `yaml:"default"`
-				Overrides []struct {
-					Path   string `yaml:"path"`
-					MaxAge string `yaml:"max_age"`
-				} `yaml:"overrides"`
-			} `yaml:"cache_control"`
-			Authentication string   `yaml:"authentication"`
-			AuthExclude    []string `yaml:"auth_exclude"`
-			Rewrites       []struct {
-				Pattern     string   `yaml:"pattern"`
-				Replacement string   `yaml:"replacement"`
-				Flag        string   `yaml:"flag"`
-				Methods     []string `yaml:"methods"`
-			} `yaml:"rewrites"`
-			Idle struct {
-				Action  string `yaml:"action"`
-				Timeout string `yaml:"timeout"`
-			} `yaml:"idle"`
-			StickySession struct {
-				Enabled        bool     `yaml:"enabled"`
-				CookieName     string   `yaml:"cookie_name"`
-				CookieMaxAge   string   `yaml:"cookie_max_age"`
-				CookieSecure   bool     `yaml:"cookie_secure"`
-				CookieHTTPOnly bool     `yaml:"cookie_httponly"`
-				CookieSameSite string   `yaml:"cookie_samesite"`
-				CookiePath     string   `yaml:"cookie_path"`
-				Paths          []string `yaml:"paths"`
-			} `yaml:"sticky_sessions"`
-		}{
-			StickySession: struct {
-				Enabled        bool     `yaml:"enabled"`
-				CookieName     string   `yaml:"cookie_name"`
-				CookieMaxAge   string   `yaml:"cookie_max_age"`
-				CookieSecure   bool     `yaml:"cookie_secure"`
-				CookieHTTPOnly bool     `yaml:"cookie_httponly"`
-				CookieSameSite string   `yaml:"cookie_samesite"`
-				CookiePath     string   `yaml:"cookie_path"`
-				Paths          []string `yaml:"paths"`
-			}{
-				Enabled:        true,
-				CookieName:     "_nav_session",
-				CookieMaxAge:   "2h",
-				CookieSecure:   true,
-				CookieHTTPOnly: true,
-				CookieSameSite: "Lax",
-				CookiePath:     "/",
-				Paths:          []string{"/app/*"},
-			},
-		},
-	}
+	yamlConfig := func() YAMLConfig {
+		cfg := YAMLConfig{}
+		cfg.Routes.Fly.StickySession.Enabled = true
+		cfg.Routes.Fly.StickySession.CookieName = "_nav_session"
+		cfg.Routes.Fly.StickySession.CookieMaxAge = "2h"
+		cfg.Routes.Fly.StickySession.CookieSecure = true
+		cfg.Routes.Fly.StickySession.CookieHTTPOnly = true
+		cfg.Routes.Fly.StickySession.CookieSameSite = "Lax"
+		cfg.Routes.Fly.StickySession.CookiePath = "/"
+		cfg.Routes.Fly.StickySession.Paths = []string{"/app/*"}
+		return cfg
+	}()
 
 	parser := NewConfigParser(&yamlConfig)
 	config, err := parser.Parse()
@@ -504,7 +341,7 @@ func TestConfigParser_ParseStickySessionConfig(t *testing.T) {
 		t.Fatalf("Parse() error = %v", err)
 	}
 
-	ss := config.Server.StickySession
+	ss := config.StickySession
 	if !ss.Enabled {
 		t.Error("Expected sticky sessions to be enabled")
 	}
@@ -533,14 +370,11 @@ func TestConfigParser_ParseCompleteConfig(t *testing.T) {
 server:
   listen: 3000
   hostname: localhost
-  public_dir: /var/www/public
+  static:
+    public_dir: /var/www/public
   idle:
     action: suspend
     timeout: 20m
-  sticky_sessions:
-    enabled: true
-    cookie_name: "_navigator_session"
-    cookie_max_age: "1h"
 
 routes:
   redirects:
@@ -555,6 +389,11 @@ routes:
     - path: "^/admin"
       region: "lax"
       status: 307
+  fly:
+    sticky_sessions:
+      enabled: true
+      cookie_name: "_navigator_session"
+      cookie_max_age: "1h"
 
 applications:
   pools:

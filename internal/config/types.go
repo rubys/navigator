@@ -88,6 +88,19 @@ type TenantHooks struct {
 	Stop  []HookConfig `yaml:"stop"`
 }
 
+// StickySessionConfig represents sticky session configuration
+type StickySessionConfig struct {
+	Enabled        bool     `yaml:"enabled"`
+	CookieName     string   `yaml:"cookie_name"`
+	CookieMaxAge   string   `yaml:"cookie_max_age"` // Duration format: "1h", "30m", etc.
+	CookieSecure   bool     `yaml:"cookie_secure"`
+	CookieHTTPOnly bool     `yaml:"cookie_httponly"`
+	CookieSameSite string   `yaml:"cookie_samesite"`
+	CookiePath     string   `yaml:"cookie_path"`
+	Paths          []string `yaml:"paths"`
+	cookieMaxAge   time.Duration
+}
+
 // RoutesConfig represents routes configuration
 type RoutesConfig struct {
 	Redirects []struct {
@@ -105,6 +118,16 @@ type RoutesConfig struct {
 		Region string `yaml:"region"`
 		Status int    `yaml:"status"`
 	} `yaml:"fly_replay"`
+	// New nested structure for Fly.io features
+	Fly struct {
+		StickySession StickySessionConfig `yaml:"sticky_sessions"`
+		Replay        []struct {
+			Path   string `yaml:"path"`
+			App    string `yaml:"app"`
+			Region string `yaml:"region"`
+			Status int    `yaml:"status"`
+		} `yaml:"replay"`
+	} `yaml:"fly"`
 }
 
 // CacheControlOverride represents cache control configuration for specific paths
@@ -119,43 +142,51 @@ type CacheControl struct {
 	Overrides []CacheControlOverride `yaml:"overrides"` // Path-specific overrides
 }
 
+// AuthConfig represents authentication configuration
+type AuthConfig struct {
+	Enabled      bool     `yaml:"enabled"`
+	Realm        string   `yaml:"realm"`
+	HTPasswd     string   `yaml:"htpasswd"`
+	PublicPaths  []string `yaml:"public_paths"`
+	AuthPatterns []AuthPattern
+}
+
+// StaticConfig represents static file serving configuration
+type StaticConfig struct {
+	PublicDir         string   `yaml:"public_dir"`
+	AllowedExtensions []string `yaml:"allowed_extensions"`
+	TryFiles          []string `yaml:"try_files"`
+	CacheControl      CacheControl
+}
+
+// MaintenanceConfig represents maintenance page configuration
+type MaintenanceConfig struct {
+	Page string `yaml:"page"`
+}
+
 // Config represents the main configuration
 type Config struct {
 	Server struct {
-		Listen            string   `yaml:"listen"`
-		Hostname          string   `yaml:"hostname"`
-		PublicDir         string   `yaml:"public_dir"`
-		RootPath          string   `yaml:"root_path"`
-		NamedHosts        []string `yaml:"named_hosts"`
-		Root              string   `yaml:"root"`
-		TryFiles          []string `yaml:"try_files"`
-		AllowedExtensions []string `yaml:"allowed_extensions"`
-		CacheControl      CacheControl
-		Authentication    string   `yaml:"authentication"`
-		AuthExclude       []string `yaml:"auth_exclude"`
-		RewriteRules      []RewriteRule
-		AuthPatterns      []AuthPattern
-		Idle              struct {
+		Listen       string   `yaml:"listen"`
+		Hostname     string   `yaml:"hostname"`
+		RootPath     string   `yaml:"root_path"`
+		NamedHosts   []string `yaml:"named_hosts"`
+		Root         string   `yaml:"root"`
+		RewriteRules []RewriteRule
+		Static       StaticConfig
+		Idle         struct {
 			Action  string `yaml:"action"`  // "suspend" or "stop"
 			Timeout string `yaml:"timeout"` // Duration string like "30s", "5m"
 		} `yaml:"idle"`
-		StickySession struct {
-			Enabled        bool     `yaml:"enabled"`
-			CookieName     string   `yaml:"cookie_name"`
-			CookieMaxAge   string   `yaml:"cookie_max_age"` // Duration format: "1h", "30m", etc.
-			CookieSecure   bool     `yaml:"cookie_secure"`
-			CookieHTTPOnly bool     `yaml:"cookie_httponly"`
-			CookieSameSite string   `yaml:"cookie_samesite"`
-			CookiePath     string   `yaml:"cookie_path"`
-			Paths          []string `yaml:"paths"`
-			cookieMaxAge   time.Duration
-		} `yaml:"sticky_sessions"`
 	} `yaml:"server"`
+	Auth                AuthConfig
 	Routes              RoutesConfig           `yaml:"routes"`
+	StickySession       StickySessionConfig    // Moved from Server to top level for easier access
 	Applications        Applications           `yaml:"applications"`
 	ManagedProcesses    []ManagedProcessConfig `yaml:"managed_processes"`
 	Logging             LogConfig              `yaml:"logging"`
 	Hooks               ServerHooks            `yaml:"hooks"`
+	Maintenance         MaintenanceConfig      `yaml:"maintenance"`
 	LocationConfigMutex sync.RWMutex
 }
 
@@ -231,61 +262,83 @@ type Tenant struct {
 // YAMLConfig represents the raw YAML configuration structure
 type YAMLConfig struct {
 	Auth struct {
-		Enabled         bool     `yaml:"enabled"`
-		Realm           string   `yaml:"realm"`
-		HTPasswd        string   `yaml:"htpasswd"`
-		PublicPaths     []string `yaml:"public_paths"`
-		ExcludePatterns []struct {
-			Pattern     string `yaml:"pattern"`
-			Description string `yaml:"description"`
-		} `yaml:"exclude_patterns"`
+		Enabled     bool     `yaml:"enabled"`
+		Realm       string   `yaml:"realm"`
+		HTPasswd    string   `yaml:"htpasswd"`
+		PublicPaths []string `yaml:"public_paths"`
 	} `yaml:"auth"`
 	Server struct {
-		Listen            interface{} `yaml:"listen"`
-		Hostname          string      `yaml:"hostname"`
-		PublicDir         string      `yaml:"public_dir"`
-		RootPath          string      `yaml:"root_path"`
-		NamedHosts        []string    `yaml:"named_hosts"`
-		Root              string      `yaml:"root"`
-		TryFiles          []string    `yaml:"try_files"`
-		AllowedExtensions []string    `yaml:"allowed_extensions"`
-		CacheControl      struct {
-			Default   string `yaml:"default"`
-			Overrides []struct {
-				Path   string `yaml:"path"`
-				MaxAge string `yaml:"max_age"`
-			} `yaml:"overrides"`
-		} `yaml:"cache_control"`
-		Authentication string   `yaml:"authentication"`
-		AuthExclude    []string `yaml:"auth_exclude"`
-		Rewrites       []struct {
-			Pattern     string   `yaml:"pattern"`
-			Replacement string   `yaml:"replacement"`
-			Flag        string   `yaml:"flag"`
-			Methods     []string `yaml:"methods"`
-		} `yaml:"rewrites"`
+		Listen     interface{} `yaml:"listen"`
+		Hostname   string      `yaml:"hostname"`
+		RootPath   string      `yaml:"root_path"`
+		NamedHosts []string    `yaml:"named_hosts"`
+		Root       string      `yaml:"root"`
+		Static     struct {
+			PublicDir         string   `yaml:"public_dir"`
+			AllowedExtensions []string `yaml:"allowed_extensions"`
+			TryFiles          []string `yaml:"try_files"`
+			CacheControl      struct {
+				Default   string `yaml:"default"`
+				Overrides []struct {
+					Path   string `yaml:"path"`
+					MaxAge string `yaml:"max_age"`
+				} `yaml:"overrides"`
+			} `yaml:"cache_control"`
+		} `yaml:"static"`
 		Idle struct {
 			Action  string `yaml:"action"`  // "suspend" or "stop"
 			Timeout string `yaml:"timeout"` // Duration string like "30s", "5m"
 		} `yaml:"idle"`
-		StickySession struct {
-			Enabled        bool     `yaml:"enabled"`
-			CookieName     string   `yaml:"cookie_name"`
-			CookieMaxAge   string   `yaml:"cookie_max_age"`
-			CookieSecure   bool     `yaml:"cookie_secure"`
-			CookieHTTPOnly bool     `yaml:"cookie_httponly"`
-			CookieSameSite string   `yaml:"cookie_samesite"`
-			CookiePath     string   `yaml:"cookie_path"`
-			Paths          []string `yaml:"paths"`
-		} `yaml:"sticky_sessions"`
 	} `yaml:"server"`
-	Routes       RoutesConfig `yaml:"routes"`
+	Routes struct {
+		Redirects []struct {
+			From string `yaml:"from"`
+			To   string `yaml:"to"`
+		} `yaml:"redirects"`
+		Rewrites []struct {
+			From string `yaml:"from"`
+			To   string `yaml:"to"`
+		} `yaml:"rewrites"`
+		ReverseProxies []ProxyRoute `yaml:"reverse_proxies"`
+		// Support both old and new fly_replay formats
+		FlyReplay []struct {
+			Path   string `yaml:"path"`
+			App    string `yaml:"app"`
+			Region string `yaml:"region"`
+			Status int    `yaml:"status"`
+		} `yaml:"fly_replay"`
+		Fly struct {
+			StickySession struct {
+				Enabled        bool     `yaml:"enabled"`
+				CookieName     string   `yaml:"cookie_name"`
+				CookieMaxAge   string   `yaml:"cookie_max_age"`
+				CookieSecure   bool     `yaml:"cookie_secure"`
+				CookieHTTPOnly bool     `yaml:"cookie_httponly"`
+				CookieSameSite string   `yaml:"cookie_samesite"`
+				CookiePath     string   `yaml:"cookie_path"`
+				Paths          []string `yaml:"paths"`
+			} `yaml:"sticky_sessions"`
+			Replay []struct {
+				Path   string `yaml:"path"`
+				App    string `yaml:"app"`
+				Region string `yaml:"region"`
+				Status int    `yaml:"status"`
+			} `yaml:"replay"`
+		} `yaml:"fly"`
+	} `yaml:"routes"`
 	Applications struct {
 		Pools struct {
 			MaxSize   int    `yaml:"max_size"`
 			Timeout   string `yaml:"timeout"`
 			StartPort int    `yaml:"start_port"`
 		} `yaml:"pools"`
+		Framework struct {
+			Command      string   `yaml:"command"`
+			Args         []string `yaml:"args"`
+			AppDirectory string   `yaml:"app_directory"`
+			PortEnvVar   string   `yaml:"port_env_var"`
+			StartDelay   string   `yaml:"start_delay"`
+		} `yaml:"framework"`
 		Tenants []struct {
 			Path            string                 `yaml:"path"`
 			Root            string                 `yaml:"root"`
@@ -297,6 +350,7 @@ type YAMLConfig struct {
 			Args            []string               `yaml:"args"`
 			Var             map[string]interface{} `yaml:"var"`
 			HealthCheck     string                 `yaml:"health_check"`
+			StartupTimeout  string                 `yaml:"startup_timeout"`
 			TrackWebSockets *bool                  `yaml:"track_websockets"`
 			Hooks           struct {
 				Start []HookConfig `yaml:"start"`
@@ -308,6 +362,7 @@ type YAMLConfig struct {
 		Server          map[string]string   `yaml:"server"`
 		Args            map[string][]string `yaml:"args"`
 		HealthCheck     string              `yaml:"health_check"`
+		StartupTimeout  string              `yaml:"startup_timeout"`
 		TrackWebSockets bool                `yaml:"track_websockets"`
 		Hooks           struct {
 			Start []HookConfig `yaml:"start"`
@@ -322,10 +377,14 @@ type YAMLConfig struct {
 			Ready  []HookConfig `yaml:"ready"`
 			Resume []HookConfig `yaml:"resume"`
 			Idle   []HookConfig `yaml:"idle"`
+			Stop   []HookConfig `yaml:"stop"`
 		} `yaml:"server"`
 		Tenant struct {
 			Start []HookConfig `yaml:"start"`
 			Stop  []HookConfig `yaml:"stop"`
 		} `yaml:"tenant"`
 	} `yaml:"hooks"`
+	Maintenance struct {
+		Page string `yaml:"page"`
+	} `yaml:"maintenance"`
 }

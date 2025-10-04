@@ -5,6 +5,9 @@ Navigator provides built-in HTTP Basic Authentication using htpasswd files, supp
 ## Basic Setup
 
 ```yaml
+server:
+  listen: 3000
+
 auth:
   enabled: true
   realm: "My Application"

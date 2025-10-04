@@ -1,0 +1,2702 @@
+---
+server:
+  listen: 9999
+  hostname: rubix.intertwingly.net
+  root_path: "/showcase"
+
+  # Static file configuration
+  static:
+    public_dir: "/Users/rubys/git/showcase/public"
+    allowed_extensions:
+    - html
+    - htm
+    - txt
+    - xml
+    - json
+    - css
+    - js
+    - png
+    - jpg
+    - gif
+    - pdf
+    - xlsx
+    try_files:
+    - index.html
+    - ".html"
+    - ".htm"
+    - ".txt"
+    - ".xml"
+    - ".json"
+    cache_control:
+      overrides:
+      - path: /showcase/assets/
+        max_age: 24h
+      - path: /showcase/
+        max_age: 24h
+
+# Authentication configuration
+auth:
+  enabled: true
+  realm: "Navigator Showcase"
+  htpasswd: "/Users/rubys/git/showcase/db/htpasswd"
+  public_paths:
+  - "/showcase/assets/"
+  - "/showcase/cable"
+  - "/showcase/docs/"
+  - "/showcase/password/"
+  - "/showcase/regions/"
+  - "/showcase/studios/"
+  - "*.css"
+  - "*.js"
+  - "*.png"
+  - "*.jpg"
+  - "*.gif"
+applications:
+  framework:
+    command: bin/rails
+    args:
+    - server
+    - "-p"
+    - "${port}"
+    app_directory: "/rails"
+    port_env_var: PORT
+    start_delay: 2s
+  env:
+    RAILS_RELATIVE_URL_ROOT: "/showcase"
+    RAILS_APP_REDIS: showcase_production
+    RAILS_LOG_JSON: 'true'
+    RAILS_CABLE_PATH: "/showcase/cable"
+    RAILS_APP_DB: "${database}"
+    RAILS_STORAGE: "/Users/rubys/git/showcase/storage"
+    DATABASE_URL: sqlite3:///Users/rubys/git/showcase/db/${database}.sqlite3
+    PIDFILE: "/Users/rubys/git/showcase/tmp/pids/${database}.pid"
+  tenants:
+  - path: "/showcase/"
+    var:
+      database: index
+    env:
+      RAILS_APP_OWNER: Index
+      RAILS_SERVE_STATIC_FILES: 'true'
+  - path: "/showcase/2026/clearwater/cupid-comp/"
+    var:
+      database: 2026-clearwater-cupid-comp
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2026/clearwater/cupid-comp
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2026/clearwater/seattle-opener/"
+    var:
+      database: 2026-clearwater-seattle-opener
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2026/clearwater/seattle-opener
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2026/clearwater/gsg-opener/"
+    var:
+      database: 2026-clearwater-gsg-opener
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2026/clearwater/gsg-opener
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2026/clearwater/glass-slipper-gala/"
+    var:
+      database: 2026-clearwater-glass-slipper-gala
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2026/clearwater/glass-slipper-gala
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2026/clearwater/beach-ball/"
+    var:
+      database: 2026-clearwater-beach-ball
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2026/clearwater/beach-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2026/clearwater/flamingo-opener/"
+    var:
+      database: 2026-clearwater-flamingo-opener
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2026/clearwater/flamingo-opener
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2026/clearwater/flamingo-fright-fest/"
+    var:
+      database: 2026-clearwater-flamingo-fright-fest
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2026/clearwater/flamingo-fright-fest
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2026/clearwater/snowball/"
+    var:
+      database: 2026-clearwater-snowball
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2026/clearwater/snowball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2026/livermore/love-shack-medal-ball/"
+    var:
+      database: 2026-livermore-love-shack-medal-ball
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2026/livermore/love-shack-medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2026/livermore/district-showcase/"
+    var:
+      database: 2026-livermore-district-showcase
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2026/livermore/district-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2026/livermore/pep-rally/"
+    var:
+      database: 2026-livermore-pep-rally
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2026/livermore/pep-rally
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/abq/freestyle/"
+    var:
+      database: 2025-abq-freestyle
+    env:
+      RAILS_APP_OWNER: Albuquerque
+      RAILS_APP_SCOPE: 2025/abq/freestyle
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/abq/showcase/"
+    var:
+      database: 2025-abq-showcase
+    env:
+      RAILS_APP_OWNER: Albuquerque
+      RAILS_APP_SCOPE: 2025/abq/showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/abq/medal-ball/"
+    var:
+      database: 2025-abq-medal-ball
+    env:
+      RAILS_APP_OWNER: Albuquerque
+      RAILS_APP_SCOPE: 2025/abq/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/adelaide/adelaide-combined/"
+    var:
+      database: 2025-adelaide-adelaide-combined
+    env:
+      RAILS_APP_OWNER: Adelaide
+      RAILS_APP_SCOPE: 2025/adelaide/adelaide-combined
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2025/adelaide/adelaide-local/"
+    var:
+      database: 2025-adelaide-adelaide-local
+    env:
+      RAILS_APP_OWNER: Adelaide
+      RAILS_APP_SCOPE: 2025/adelaide/adelaide-local
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2025/adelaide/northside/"
+    var:
+      database: 2025-adelaide-northside
+    env:
+      RAILS_APP_OWNER: Adelaide
+      RAILS_APP_SCOPE: 2025/adelaide/northside
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2025/adelaide/inner-west/"
+    var:
+      database: 2025-adelaide-inner-west
+    env:
+      RAILS_APP_OWNER: Adelaide
+      RAILS_APP_SCOPE: 2025/adelaide/inner-west
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2025/adelaide/inner-west-special/"
+    var:
+      database: 2025-adelaide-inner-west-special
+    env:
+      RAILS_APP_OWNER: Adelaide
+      RAILS_APP_SCOPE: 2025/adelaide/inner-west-special
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2025/annapolis/medal-ball/"
+    var:
+      database: 2025-annapolis-medal-ball
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2025/annapolis/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/annapolis/chesapeake-classic/"
+    var:
+      database: 2025-annapolis-chesapeake-classic
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2025/annapolis/chesapeake-classic
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/annapolis/movie-madness/"
+    var:
+      database: 2025-annapolis-movie-madness
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2025/annapolis/movie-madness
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/annapolis/gratitude-gala/"
+    var:
+      database: 2025-annapolis-gratitude-gala
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2025/annapolis/gratitude-gala
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/barcelona/april/"
+    var:
+      database: 2025-barcelona-april
+    env:
+      RAILS_APP_OWNER: Barcelona
+      RAILS_APP_SCOPE: 2025/barcelona/april
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: es_ES
+  - path: "/showcase/2025/barcelona/may/"
+    var:
+      database: 2025-barcelona-may
+    env:
+      RAILS_APP_OWNER: Barcelona
+      RAILS_APP_SCOPE: 2025/barcelona/may
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: es_ES
+  - path: "/showcase/2025/barcelona/june/"
+    var:
+      database: 2025-barcelona-june
+    env:
+      RAILS_APP_OWNER: Barcelona
+      RAILS_APP_SCOPE: 2025/barcelona/june
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: es_ES
+  - path: "/showcase/2025/barcelona/july/"
+    var:
+      database: 2025-barcelona-july
+    env:
+      RAILS_APP_OWNER: Barcelona
+      RAILS_APP_SCOPE: 2025/barcelona/july
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: es_ES
+  - path: "/showcase/2025/barcelona/august/"
+    var:
+      database: 2025-barcelona-august
+    env:
+      RAILS_APP_OWNER: Barcelona
+      RAILS_APP_SCOPE: 2025/barcelona/august
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: es_ES
+  - path: "/showcase/2025/barcelona/september/"
+    var:
+      database: 2025-barcelona-september
+    env:
+      RAILS_APP_OWNER: Barcelona
+      RAILS_APP_SCOPE: 2025/barcelona/september
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: es_ES
+  - path: "/showcase/2025/barcelona/october/"
+    var:
+      database: 2025-barcelona-october
+    env:
+      RAILS_APP_OWNER: Barcelona
+      RAILS_APP_SCOPE: 2025/barcelona/october
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: es_ES
+  - path: "/showcase/2025/barcelona/november/"
+    var:
+      database: 2025-barcelona-november
+    env:
+      RAILS_APP_OWNER: Barcelona
+      RAILS_APP_SCOPE: 2025/barcelona/november
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: es_ES
+  - path: "/showcase/2025/barcelona/december/"
+    var:
+      database: 2025-barcelona-december
+    env:
+      RAILS_APP_OWNER: Barcelona
+      RAILS_APP_SCOPE: 2025/barcelona/december
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: es_ES
+  - path: "/showcase/2025/bellevue/hawaii/"
+    var:
+      database: 2025-bellevue-hawaii
+    env:
+      RAILS_APP_OWNER: Bellevue
+      RAILS_APP_SCOPE: 2025/bellevue/hawaii
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/bellevue/winter/"
+    var:
+      database: 2025-bellevue-winter
+    env:
+      RAILS_APP_OWNER: Bellevue
+      RAILS_APP_SCOPE: 2025/bellevue/winter
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/bellevue/summer-medal-ball/"
+    var:
+      database: 2025-bellevue-summer-medal-ball
+    env:
+      RAILS_APP_OWNER: Bellevue
+      RAILS_APP_SCOPE: 2025/bellevue/summer-medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/bellevue/summer-showcase/"
+    var:
+      database: 2025-bellevue-summer-showcase
+    env:
+      RAILS_APP_OWNER: Bellevue
+      RAILS_APP_SCOPE: 2025/bellevue/summer-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/bellevue/mini-comp/"
+    var:
+      database: 2025-bellevue-mini-comp
+    env:
+      RAILS_APP_OWNER: Bellevue
+      RAILS_APP_SCOPE: 2025/bellevue/mini-comp
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/bellevue/winter-medal-ball/"
+    var:
+      database: 2025-bellevue-winter-medal-ball
+    env:
+      RAILS_APP_OWNER: Bellevue
+      RAILS_APP_SCOPE: 2025/bellevue/winter-medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/boston/april/"
+    var:
+      database: 2025-boston-april
+    env:
+      RAILS_APP_OWNER: Boston
+      RAILS_APP_SCOPE: 2025/boston/april
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/boston/mini-comp/"
+    var:
+      database: 2025-boston-mini-comp
+    env:
+      RAILS_APP_OWNER: Boston
+      RAILS_APP_SCOPE: 2025/boston/mini-comp
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/boston/october/"
+    var:
+      database: 2025-boston-october
+    env:
+      RAILS_APP_OWNER: Boston
+      RAILS_APP_SCOPE: 2025/boston/october
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/carmel/paint-the-town-red/"
+    var:
+      database: 2025-carmel-paint-the-town-red
+    env:
+      RAILS_APP_OWNER: Carmel
+      RAILS_APP_SCOPE: 2025/carmel/paint-the-town-red
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/carmel/toys-to-life/"
+    var:
+      database: 2025-carmel-toys-to-life
+    env:
+      RAILS_APP_OWNER: Carmel
+      RAILS_APP_SCOPE: 2025/carmel/toys-to-life
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/charlotte/"
+    var:
+      database: 2025-charlotte
+    env:
+      RAILS_APP_OWNER: Charlotte
+      RAILS_APP_SCOPE: 2025/charlotte
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/chicago/"
+    var:
+      database: 2025-chicago
+    env:
+      RAILS_APP_OWNER: Chicago
+      RAILS_APP_SCOPE: 2025/chicago
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/clearwater/valentines-opener/"
+    var:
+      database: 2025-clearwater-valentines-opener
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2025/clearwater/valentines-opener
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/clearwater/portland-opener/"
+    var:
+      database: 2025-clearwater-portland-opener
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2025/clearwater/portland-opener
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/clearwater/beach-ball/"
+    var:
+      database: 2025-clearwater-beach-ball
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2025/clearwater/beach-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/clearwater/unique-opener/"
+    var:
+      database: 2025-clearwater-unique-opener
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2025/clearwater/unique-opener
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/clearwater/national-dance-day/"
+    var:
+      database: 2025-clearwater-national-dance-day
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2025/clearwater/national-dance-day
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/clearwater/glass-slipper-gala/"
+    var:
+      database: 2025-clearwater-glass-slipper-gala
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2025/clearwater/glass-slipper-gala
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/clearwater/flamingo-opener/"
+    var:
+      database: 2025-clearwater-flamingo-opener
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2025/clearwater/flamingo-opener
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/clearwater/fright-fest/"
+    var:
+      database: 2025-clearwater-fright-fest
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2025/clearwater/fright-fest
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/clearwater/snowball/"
+    var:
+      database: 2025-clearwater-snowball
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2025/clearwater/snowball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/columbia/showcase/"
+    var:
+      database: 2025-columbia-showcase
+    env:
+      RAILS_APP_OWNER: Columbia
+      RAILS_APP_SCOPE: 2025/columbia/showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/columbia/newsome-twosome/"
+    var:
+      database: 2025-columbia-newsome-twosome
+    env:
+      RAILS_APP_OWNER: Columbia
+      RAILS_APP_SCOPE: 2025/columbia/newsome-twosome
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/coquitlam/ballroom-blitz/"
+    var:
+      database: 2025-coquitlam-ballroom-blitz
+    env:
+      RAILS_APP_OWNER: Coquitlam
+      RAILS_APP_SCOPE: 2025/coquitlam/ballroom-blitz
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_CA
+  - path: "/showcase/2025/coquitlam/showcase/"
+    var:
+      database: 2025-coquitlam-showcase
+    env:
+      RAILS_APP_OWNER: Coquitlam
+      RAILS_APP_SCOPE: 2025/coquitlam/showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_CA
+  - path: "/showcase/2025/coquitlam/showcase-2/"
+    var:
+      database: 2025-coquitlam-showcase-2
+    env:
+      RAILS_APP_OWNER: Coquitlam
+      RAILS_APP_SCOPE: 2025/coquitlam/showcase-2
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_CA
+  - path: "/showcase/2025/coquitlam/spotlight-ball/"
+    var:
+      database: 2025-coquitlam-spotlight-ball
+    env:
+      RAILS_APP_OWNER: Coquitlam
+      RAILS_APP_SCOPE: 2025/coquitlam/spotlight-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_CA
+  - path: "/showcase/2025/coquitlam/medal-ball/"
+    var:
+      database: 2025-coquitlam-medal-ball
+    env:
+      RAILS_APP_OWNER: Coquitlam
+      RAILS_APP_SCOPE: 2025/coquitlam/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_CA
+  - path: "/showcase/2025/cranford/spring-freestyles/"
+    var:
+      database: 2025-cranford-spring-freestyles
+    env:
+      RAILS_APP_OWNER: Cranford
+      RAILS_APP_SCOPE: 2025/cranford/spring-freestyles
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/cranford/fall-freestyles/"
+    var:
+      database: 2025-cranford-fall-freestyles
+    env:
+      RAILS_APP_OWNER: Cranford
+      RAILS_APP_SCOPE: 2025/cranford/fall-freestyles
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/dallas/"
+    var:
+      database: 2025-dallas
+    env:
+      RAILS_APP_OWNER: Dallas
+      RAILS_APP_SCOPE: 2025/dallas
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/dayton/"
+    var:
+      database: 2025-dayton
+    env:
+      RAILS_APP_OWNER: Dayton
+      RAILS_APP_SCOPE: 2025/dayton
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/edmonton/"
+    var:
+      database: 2025-edmonton
+    env:
+      RAILS_APP_OWNER: Edmonton
+      RAILS_APP_SCOPE: 2025/edmonton
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/everett/"
+    var:
+      database: 2025-everett
+    env:
+      RAILS_APP_OWNER: Everett
+      RAILS_APP_SCOPE: 2025/everett
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/firenze/june/"
+    var:
+      database: 2025-firenze-june
+    env:
+      RAILS_APP_OWNER: Firenze
+      RAILS_APP_SCOPE: 2025/firenze/june
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/firenze/july/"
+    var:
+      database: 2025-firenze-july
+    env:
+      RAILS_APP_OWNER: Firenze
+      RAILS_APP_SCOPE: 2025/firenze/july
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/firenze/august/"
+    var:
+      database: 2025-firenze-august
+    env:
+      RAILS_APP_OWNER: Firenze
+      RAILS_APP_SCOPE: 2025/firenze/august
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/firenze/september/"
+    var:
+      database: 2025-firenze-september
+    env:
+      RAILS_APP_OWNER: Firenze
+      RAILS_APP_SCOPE: 2025/firenze/september
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/firenze/october/"
+    var:
+      database: 2025-firenze-october
+    env:
+      RAILS_APP_OWNER: Firenze
+      RAILS_APP_SCOPE: 2025/firenze/october
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/firenze/november/"
+    var:
+      database: 2025-firenze-november
+    env:
+      RAILS_APP_OWNER: Firenze
+      RAILS_APP_SCOPE: 2025/firenze/november
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/firenze/december/"
+    var:
+      database: 2025-firenze-december
+    env:
+      RAILS_APP_OWNER: Firenze
+      RAILS_APP_SCOPE: 2025/firenze/december
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/folsom/"
+    var:
+      database: 2025-folsom
+    env:
+      RAILS_APP_OWNER: Folsom
+      RAILS_APP_SCOPE: 2025/folsom
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/fortworth/heart-of-texas/"
+    var:
+      database: 2025-fortworth-heart-of-texas
+    env:
+      RAILS_APP_OWNER: Fort Worth
+      RAILS_APP_SCOPE: 2025/fortworth/heart-of-texas
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/fremont/fall-medal-ball/"
+    var:
+      database: 2025-fremont-fall-medal-ball
+    env:
+      RAILS_APP_OWNER: Fremont
+      RAILS_APP_SCOPE: 2025/fremont/fall-medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/glenview/"
+    var:
+      database: 2025-glenview
+    env:
+      RAILS_APP_OWNER: Glenview
+      RAILS_APP_SCOPE: 2025/glenview
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/greenhills/spring/"
+    var:
+      database: 2025-greenhills-spring
+    env:
+      RAILS_APP_OWNER: Nashville-Green Hills
+      RAILS_APP_SCOPE: 2025/greenhills/spring
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/greenhills/newsome-twosome/"
+    var:
+      database: 2025-greenhills-newsome-twosome
+    env:
+      RAILS_APP_OWNER: Nashville-Green Hills
+      RAILS_APP_SCOPE: 2025/greenhills/newsome-twosome
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/greenhills/music-city/"
+    var:
+      database: 2025-greenhills-music-city
+    env:
+      RAILS_APP_OWNER: Nashville-Green Hills
+      RAILS_APP_SCOPE: 2025/greenhills/music-city
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/harrisburg/"
+    var:
+      database: 2025-harrisburg
+    env:
+      RAILS_APP_OWNER: Harrisburg
+      RAILS_APP_SCOPE: 2025/harrisburg
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/honolulu/"
+    var:
+      database: 2025-honolulu
+    env:
+      RAILS_APP_OWNER: Honolulu
+      RAILS_APP_SCOPE: 2025/honolulu
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/hornsby/disney-showcase/"
+    var:
+      database: 2025-hornsby-disney-showcase
+    env:
+      RAILS_APP_OWNER: Hornsby
+      RAILS_APP_SCOPE: 2025/hornsby/disney-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2025/kennesaw/"
+    var:
+      database: 2025-kennesaw
+    env:
+      RAILS_APP_OWNER: Kennesaw
+      RAILS_APP_SCOPE: 2025/kennesaw
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/kobe/medal-ball/"
+    var:
+      database: 2025-kobe-medal-ball
+    env:
+      RAILS_APP_OWNER: Kobe
+      RAILS_APP_SCOPE: 2025/kobe/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: ja_JP
+  - path: "/showcase/2025/kobe/yokohama-showcase/"
+    var:
+      database: 2025-kobe-yokohama-showcase
+    env:
+      RAILS_APP_OWNER: Kobe
+      RAILS_APP_SCOPE: 2025/kobe/yokohama-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: ja_JP
+  - path: "/showcase/2025/kobe/summer-spotlight/"
+    var:
+      database: 2025-kobe-summer-spotlight
+    env:
+      RAILS_APP_OWNER: Kobe
+      RAILS_APP_SCOPE: 2025/kobe/summer-spotlight
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: ja_JP
+  - path: "/showcase/2025/kobe/fall-showcase/"
+    var:
+      database: 2025-kobe-fall-showcase
+    env:
+      RAILS_APP_OWNER: Kobe
+      RAILS_APP_SCOPE: 2025/kobe/fall-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: ja_JP
+  - path: "/showcase/2025/kobe/yokohama-medal-ball/"
+    var:
+      database: 2025-kobe-yokohama-medal-ball
+    env:
+      RAILS_APP_OWNER: Kobe
+      RAILS_APP_SCOPE: 2025/kobe/yokohama-medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: ja_JP
+  - path: "/showcase/2025/kyiv/"
+    var:
+      database: 2025-kyiv
+    env:
+      RAILS_APP_OWNER: Kyiv
+      RAILS_APP_SCOPE: 2025/kyiv
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: uk_UA
+  - path: "/showcase/2025/lakeview/medal-ball-graduation-night-may/"
+    var:
+      database: 2025-lakeview-medal-ball-graduation-night-may
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2025/lakeview/medal-ball-graduation-night-may
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/lakeview/summer-showcase-rounds/"
+    var:
+      database: 2025-lakeview-summer-showcase-rounds
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2025/lakeview/summer-showcase-rounds
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/lakeview/summer-showcase/"
+    var:
+      database: 2025-lakeview-summer-showcase
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2025/lakeview/summer-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/lakeview/showcase-rounds/"
+    var:
+      database: 2025-lakeview-showcase-rounds
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2025/lakeview/showcase-rounds
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/lakeview/medal-ball-graduation-night-nov/"
+    var:
+      database: 2025-lakeview-medal-ball-graduation-night-nov
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2025/lakeview/medal-ball-graduation-night-nov
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/laval/"
+    var:
+      database: 2025-laval
+    env:
+      RAILS_APP_OWNER: Laval
+      RAILS_APP_SCOPE: 2025/laval
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: fr_CA
+  - path: "/showcase/2025/livermore/pep-rally/"
+    var:
+      database: 2025-livermore-pep-rally
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2025/livermore/pep-rally
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/livermore/the-music-of-prince/"
+    var:
+      database: 2025-livermore-the-music-of-prince
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2025/livermore/the-music-of-prince
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/livermore/james-bond/"
+    var:
+      database: 2025-livermore-james-bond
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2025/livermore/james-bond
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/livermore/extravaganza/"
+    var:
+      database: 2025-livermore-extravaganza
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2025/livermore/extravaganza
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/livermore/bbq-pep-rally/"
+    var:
+      database: 2025-livermore-bbq-pep-rally
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2025/livermore/bbq-pep-rally
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/livermore/la-la-land/"
+    var:
+      database: 2025-livermore-la-la-land
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2025/livermore/la-la-land
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/livermore/district-showcase/"
+    var:
+      database: 2025-livermore-district-showcase
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2025/livermore/district-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/livermore/theatre-extravaganza/"
+    var:
+      database: 2025-livermore-theatre-extravaganza
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2025/livermore/theatre-extravaganza
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/marlton/freestyle/"
+    var:
+      database: 2025-marlton-freestyle
+    env:
+      RAILS_APP_OWNER: Marlton
+      RAILS_APP_SCOPE: 2025/marlton/freestyle
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/marlton/medal-ball/"
+    var:
+      database: 2025-marlton-medal-ball
+    env:
+      RAILS_APP_OWNER: Marlton
+      RAILS_APP_SCOPE: 2025/marlton/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/mdballroom/"
+    var:
+      database: 2025-mdballroom
+    env:
+      RAILS_APP_OWNER: Memorial DanceSport Ballroom
+      RAILS_APP_SCOPE: 2025/mdballroom
+      SHOWCASE_LOGO: mdballroom.webp
+  - path: "/showcase/2025/merrillville/team-match/"
+    var:
+      database: 2025-merrillville-team-match
+    env:
+      RAILS_APP_OWNER: Merrillville
+      RAILS_APP_SCOPE: 2025/merrillville/team-match
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/merrillville/arthur-murray-prom/"
+    var:
+      database: 2025-merrillville-arthur-murray-prom
+    env:
+      RAILS_APP_OWNER: Merrillville
+      RAILS_APP_SCOPE: 2025/merrillville/arthur-murray-prom
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/merrillville/graduation-night/"
+    var:
+      database: 2025-merrillville-graduation-night
+    env:
+      RAILS_APP_OWNER: Merrillville
+      RAILS_APP_SCOPE: 2025/merrillville/graduation-night
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/merrillville/club-arthur-murray/"
+    var:
+      database: 2025-merrillville-club-arthur-murray
+    env:
+      RAILS_APP_OWNER: Merrillville
+      RAILS_APP_SCOPE: 2025/merrillville/club-arthur-murray
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/merrillville/harvest-moon/"
+    var:
+      database: 2025-merrillville-harvest-moon
+    env:
+      RAILS_APP_OWNER: Merrillville
+      RAILS_APP_SCOPE: 2025/merrillville/harvest-moon
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/merrillville/winter-wonderland/"
+    var:
+      database: 2025-merrillville-winter-wonderland
+    env:
+      RAILS_APP_OWNER: Merrillville
+      RAILS_APP_SCOPE: 2025/merrillville/winter-wonderland
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/miami/april/"
+    var:
+      database: 2025-miami-april
+    env:
+      RAILS_APP_OWNER: Miami
+      RAILS_APP_SCOPE: 2025/miami/april
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/miami/may/"
+    var:
+      database: 2025-miami-may
+    env:
+      RAILS_APP_OWNER: Miami
+      RAILS_APP_SCOPE: 2025/miami/may
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/miami/june/"
+    var:
+      database: 2025-miami-june
+    env:
+      RAILS_APP_OWNER: Miami
+      RAILS_APP_SCOPE: 2025/miami/june
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/miami/july/"
+    var:
+      database: 2025-miami-july
+    env:
+      RAILS_APP_OWNER: Miami
+      RAILS_APP_SCOPE: 2025/miami/july
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/miami/august/"
+    var:
+      database: 2025-miami-august
+    env:
+      RAILS_APP_OWNER: Miami
+      RAILS_APP_SCOPE: 2025/miami/august
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/miami/september/"
+    var:
+      database: 2025-miami-september
+    env:
+      RAILS_APP_OWNER: Miami
+      RAILS_APP_SCOPE: 2025/miami/september
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/miami/october/"
+    var:
+      database: 2025-miami-october
+    env:
+      RAILS_APP_OWNER: Miami
+      RAILS_APP_SCOPE: 2025/miami/october
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/miami/november/"
+    var:
+      database: 2025-miami-november
+    env:
+      RAILS_APP_OWNER: Miami
+      RAILS_APP_SCOPE: 2025/miami/november
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/miami/december/"
+    var:
+      database: 2025-miami-december
+    env:
+      RAILS_APP_OWNER: Miami
+      RAILS_APP_SCOPE: 2025/miami/december
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/milano/april/"
+    var:
+      database: 2025-milano-april
+    env:
+      RAILS_APP_OWNER: Milano
+      RAILS_APP_SCOPE: 2025/milano/april
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/milano/may/"
+    var:
+      database: 2025-milano-may
+    env:
+      RAILS_APP_OWNER: Milano
+      RAILS_APP_SCOPE: 2025/milano/may
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/milano/june/"
+    var:
+      database: 2025-milano-june
+    env:
+      RAILS_APP_OWNER: Milano
+      RAILS_APP_SCOPE: 2025/milano/june
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/milano/july/"
+    var:
+      database: 2025-milano-july
+    env:
+      RAILS_APP_OWNER: Milano
+      RAILS_APP_SCOPE: 2025/milano/july
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/milano/august/"
+    var:
+      database: 2025-milano-august
+    env:
+      RAILS_APP_OWNER: Milano
+      RAILS_APP_SCOPE: 2025/milano/august
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/milano/september/"
+    var:
+      database: 2025-milano-september
+    env:
+      RAILS_APP_OWNER: Milano
+      RAILS_APP_SCOPE: 2025/milano/september
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/milano/october/"
+    var:
+      database: 2025-milano-october
+    env:
+      RAILS_APP_OWNER: Milano
+      RAILS_APP_SCOPE: 2025/milano/october
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/milano/november/"
+    var:
+      database: 2025-milano-november
+    env:
+      RAILS_APP_OWNER: Milano
+      RAILS_APP_SCOPE: 2025/milano/november
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/milano/december/"
+    var:
+      database: 2025-milano-december
+    env:
+      RAILS_APP_OWNER: Milano
+      RAILS_APP_SCOPE: 2025/milano/december
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/millbrae/showcase/"
+    var:
+      database: 2025-millbrae-showcase
+    env:
+      RAILS_APP_OWNER: Millbrae
+      RAILS_APP_SCOPE: 2025/millbrae/showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/millbrae/halloween-haunt/"
+    var:
+      database: 2025-millbrae-halloween-haunt
+    env:
+      RAILS_APP_OWNER: Millbrae
+      RAILS_APP_SCOPE: 2025/millbrae/halloween-haunt
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/montclair/bye-bye-summer/"
+    var:
+      database: 2025-montclair-bye-bye-summer
+    env:
+      RAILS_APP_OWNER: Montclair
+      RAILS_APP_SCOPE: 2025/montclair/bye-bye-summer
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/montgomery/cddc/"
+    var:
+      database: 2025-montgomery-cddc
+    env:
+      RAILS_APP_OWNER: Montgomery
+      RAILS_APP_SCOPE: 2025/montgomery/cddc
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/montgomery/grand-rapids/"
+    var:
+      database: 2025-montgomery-grand-rapids
+    env:
+      RAILS_APP_OWNER: Montgomery
+      RAILS_APP_SCOPE: 2025/montgomery/grand-rapids
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/montgomery/fall-cddc/"
+    var:
+      database: 2025-montgomery-fall-cddc
+    env:
+      RAILS_APP_OWNER: Montgomery
+      RAILS_APP_SCOPE: 2025/montgomery/fall-cddc
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/montgomery/swing-sway/"
+    var:
+      database: 2025-montgomery-swing-sway
+    env:
+      RAILS_APP_OWNER: Montgomery
+      RAILS_APP_SCOPE: 2025/montgomery/swing-sway
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/montgomery/royal-oak/"
+    var:
+      database: 2025-montgomery-royal-oak
+    env:
+      RAILS_APP_OWNER: Montgomery
+      RAILS_APP_SCOPE: 2025/montgomery/royal-oak
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/montgomery/lincolnshire/"
+    var:
+      database: 2025-montgomery-lincolnshire
+    env:
+      RAILS_APP_OWNER: Montgomery
+      RAILS_APP_SCOPE: 2025/montgomery/lincolnshire
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/montgomery/fort-wayne-showcase/"
+    var:
+      database: 2025-montgomery-fort-wayne-showcase
+    env:
+      RAILS_APP_OWNER: Montgomery
+      RAILS_APP_SCOPE: 2025/montgomery/fort-wayne-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/montreal/certification-exams/"
+    var:
+      database: 2025-montreal-certification-exams
+    env:
+      RAILS_APP_OWNER: Montreal
+      RAILS_APP_SCOPE: 2025/montreal/certification-exams
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: fr_CA
+  - path: "/showcase/2025/montreal/graduation-ball/"
+    var:
+      database: 2025-montreal-graduation-ball
+    env:
+      RAILS_APP_OWNER: Montreal
+      RAILS_APP_SCOPE: 2025/montreal/graduation-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: fr_CA
+  - path: "/showcase/2025/monza/april/"
+    var:
+      database: 2025-monza-april
+    env:
+      RAILS_APP_OWNER: Monza
+      RAILS_APP_SCOPE: 2025/monza/april
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/monza/may/"
+    var:
+      database: 2025-monza-may
+    env:
+      RAILS_APP_OWNER: Monza
+      RAILS_APP_SCOPE: 2025/monza/may
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/monza/june/"
+    var:
+      database: 2025-monza-june
+    env:
+      RAILS_APP_OWNER: Monza
+      RAILS_APP_SCOPE: 2025/monza/june
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/monza/july/"
+    var:
+      database: 2025-monza-july
+    env:
+      RAILS_APP_OWNER: Monza
+      RAILS_APP_SCOPE: 2025/monza/july
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/monza/august/"
+    var:
+      database: 2025-monza-august
+    env:
+      RAILS_APP_OWNER: Monza
+      RAILS_APP_SCOPE: 2025/monza/august
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/monza/september/"
+    var:
+      database: 2025-monza-september
+    env:
+      RAILS_APP_OWNER: Monza
+      RAILS_APP_SCOPE: 2025/monza/september
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/monza/october/"
+    var:
+      database: 2025-monza-october
+    env:
+      RAILS_APP_OWNER: Monza
+      RAILS_APP_SCOPE: 2025/monza/october
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/monza/november/"
+    var:
+      database: 2025-monza-november
+    env:
+      RAILS_APP_OWNER: Monza
+      RAILS_APP_SCOPE: 2025/monza/november
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/monza/december/"
+    var:
+      database: 2025-monza-december
+    env:
+      RAILS_APP_OWNER: Monza
+      RAILS_APP_SCOPE: 2025/monza/december
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/ottawa/"
+    var:
+      database: 2025-ottawa
+    env:
+      RAILS_APP_OWNER: Ottawa
+      RAILS_APP_SCOPE: 2025/ottawa
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_CA
+  - path: "/showcase/2025/perth/disco-showcase/"
+    var:
+      database: 2025-perth-disco-showcase
+    env:
+      RAILS_APP_OWNER: Perth
+      RAILS_APP_SCOPE: 2025/perth/disco-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2025/pinehurst/"
+    var:
+      database: 2025-pinehurst
+    env:
+      RAILS_APP_OWNER: Pinehurst
+      RAILS_APP_SCOPE: 2025/pinehurst
+      SHOWCASE_LOGO: intertwingly.png
+  - path: "/showcase/2025/princeton/"
+    var:
+      database: 2025-princeton
+    env:
+      RAILS_APP_OWNER: Princeton
+      RAILS_APP_SCOPE: 2025/princeton
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/raleigh/disney/"
+    var:
+      database: 2025-raleigh-disney
+    env:
+      RAILS_APP_OWNER: Raleigh
+      RAILS_APP_SCOPE: 2025/raleigh/disney
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/raleigh/team-match/"
+    var:
+      database: 2025-raleigh-team-match
+    env:
+      RAILS_APP_OWNER: Raleigh
+      RAILS_APP_SCOPE: 2025/raleigh/team-match
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/raleigh/shimmer-shine/"
+    var:
+      database: 2025-raleigh-shimmer-shine
+    env:
+      RAILS_APP_OWNER: Raleigh
+      RAILS_APP_SCOPE: 2025/raleigh/shimmer-shine
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/reno/"
+    var:
+      database: 2025-reno
+    env:
+      RAILS_APP_OWNER: Reno
+      RAILS_APP_SCOPE: 2025/reno
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/richmond/medal-ball/"
+    var:
+      database: 2025-richmond-medal-ball
+    env:
+      RAILS_APP_OWNER: Richmond
+      RAILS_APP_SCOPE: 2025/richmond/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/richmond/team-match/"
+    var:
+      database: 2025-richmond-team-match
+    env:
+      RAILS_APP_OWNER: Richmond
+      RAILS_APP_SCOPE: 2025/richmond/team-match
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/richmond/nouveau-duo/"
+    var:
+      database: 2025-richmond-nouveau-duo
+    env:
+      RAILS_APP_OWNER: Richmond
+      RAILS_APP_SCOPE: 2025/richmond/nouveau-duo
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/roanoke/rodeo-showcase/"
+    var:
+      database: 2025-roanoke-rodeo-showcase
+    env:
+      RAILS_APP_OWNER: Roanoke
+      RAILS_APP_SCOPE: 2025/roanoke/rodeo-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/rogers/"
+    var:
+      database: 2025-rogers
+    env:
+      RAILS_APP_OWNER: Rogers
+      RAILS_APP_SCOPE: 2025/rogers
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/salem/spring/"
+    var:
+      database: 2025-salem-spring
+    env:
+      RAILS_APP_OWNER: Salem
+      RAILS_APP_SCOPE: 2025/salem/spring
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/salem/fall/"
+    var:
+      database: 2025-salem-fall
+    env:
+      RAILS_APP_OWNER: Salem
+      RAILS_APP_SCOPE: 2025/salem/fall
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/sanjose/march/"
+    var:
+      database: 2025-sanjose-march
+    env:
+      RAILS_APP_OWNER: San Jose
+      RAILS_APP_SCOPE: 2025/sanjose/march
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/sanjose/september/"
+    var:
+      database: 2025-sanjose-september
+    env:
+      RAILS_APP_OWNER: San Jose
+      RAILS_APP_SCOPE: 2025/sanjose/september
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/slc/winter-wonderland/"
+    var:
+      database: 2025-slc-winter-wonderland
+    env:
+      RAILS_APP_OWNER: Salt Lake City
+      RAILS_APP_SCOPE: 2025/slc/winter-wonderland
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/slc/medal-ball/"
+    var:
+      database: 2025-slc-medal-ball
+    env:
+      RAILS_APP_OWNER: Salt Lake City
+      RAILS_APP_SCOPE: 2025/slc/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/slc/extravaganza/"
+    var:
+      database: 2025-slc-extravaganza
+    env:
+      RAILS_APP_OWNER: Salt Lake City
+      RAILS_APP_SCOPE: 2025/slc/extravaganza
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/slc/medal-ball-august/"
+    var:
+      database: 2025-slc-medal-ball-august
+    env:
+      RAILS_APP_OWNER: Salt Lake City
+      RAILS_APP_SCOPE: 2025/slc/medal-ball-august
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/stockton/mdna-medal-ball/"
+    var:
+      database: 2025-stockton-mdna-medal-ball
+    env:
+      RAILS_APP_OWNER: Stockton
+      RAILS_APP_SCOPE: 2025/stockton/mdna-medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/stockton/beach-ball/"
+    var:
+      database: 2025-stockton-beach-ball
+    env:
+      RAILS_APP_OWNER: Stockton
+      RAILS_APP_SCOPE: 2025/stockton/beach-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/stockton/extravaganza/"
+    var:
+      database: 2025-stockton-extravaganza
+    env:
+      RAILS_APP_OWNER: Stockton
+      RAILS_APP_SCOPE: 2025/stockton/extravaganza
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/stockton/medal-ball/"
+    var:
+      database: 2025-stockton-medal-ball
+    env:
+      RAILS_APP_OWNER: Stockton
+      RAILS_APP_SCOPE: 2025/stockton/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/sugarland/jingle-ball/"
+    var:
+      database: 2025-sugarland-jingle-ball
+    env:
+      RAILS_APP_OWNER: Sugar Land
+      RAILS_APP_SCOPE: 2025/sugarland/jingle-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/sugarland/summer/"
+    var:
+      database: 2025-sugarland-summer
+    env:
+      RAILS_APP_OWNER: Sugar Land
+      RAILS_APP_SCOPE: 2025/sugarland/summer
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/sydney/rhythm/"
+    var:
+      database: 2025-sydney-rhythm
+    env:
+      RAILS_APP_OWNER: Sydney
+      RAILS_APP_SCOPE: 2025/sydney/rhythm
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2025/sydney/winter/"
+    var:
+      database: 2025-sydney-winter
+    env:
+      RAILS_APP_OWNER: Sydney
+      RAILS_APP_SCOPE: 2025/sydney/winter
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2025/torino/april/"
+    var:
+      database: 2025-torino-april
+    env:
+      RAILS_APP_OWNER: Torino
+      RAILS_APP_SCOPE: 2025/torino/april
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/torino/may/"
+    var:
+      database: 2025-torino-may
+    env:
+      RAILS_APP_OWNER: Torino
+      RAILS_APP_SCOPE: 2025/torino/may
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/torino/june/"
+    var:
+      database: 2025-torino-june
+    env:
+      RAILS_APP_OWNER: Torino
+      RAILS_APP_SCOPE: 2025/torino/june
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/torino/july/"
+    var:
+      database: 2025-torino-july
+    env:
+      RAILS_APP_OWNER: Torino
+      RAILS_APP_SCOPE: 2025/torino/july
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/torino/august/"
+    var:
+      database: 2025-torino-august
+    env:
+      RAILS_APP_OWNER: Torino
+      RAILS_APP_SCOPE: 2025/torino/august
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/torino/september/"
+    var:
+      database: 2025-torino-september
+    env:
+      RAILS_APP_OWNER: Torino
+      RAILS_APP_SCOPE: 2025/torino/september
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/torino/october/"
+    var:
+      database: 2025-torino-october
+    env:
+      RAILS_APP_OWNER: Torino
+      RAILS_APP_SCOPE: 2025/torino/october
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/torino/november/"
+    var:
+      database: 2025-torino-november
+    env:
+      RAILS_APP_OWNER: Torino
+      RAILS_APP_SCOPE: 2025/torino/november
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/torino/december/"
+    var:
+      database: 2025-torino-december
+    env:
+      RAILS_APP_OWNER: Torino
+      RAILS_APP_SCOPE: 2025/torino/december
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/vabeach/medal-ball/"
+    var:
+      database: 2025-vabeach-medal-ball
+    env:
+      RAILS_APP_OWNER: Virginia Beach
+      RAILS_APP_SCOPE: 2025/vabeach/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/vabeach/beach-bash/"
+    var:
+      database: 2025-vabeach-beach-bash
+    env:
+      RAILS_APP_OWNER: Virginia Beach
+      RAILS_APP_SCOPE: 2025/vabeach/beach-bash
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/vabeach/freestyles/"
+    var:
+      database: 2025-vabeach-freestyles
+    env:
+      RAILS_APP_OWNER: Virginia Beach
+      RAILS_APP_SCOPE: 2025/vabeach/freestyles
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/vegas/"
+    var:
+      database: 2025-vegas
+    env:
+      RAILS_APP_OWNER: Las Vegas
+      RAILS_APP_SCOPE: 2025/vegas
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2025/vicenza/april/"
+    var:
+      database: 2025-vicenza-april
+    env:
+      RAILS_APP_OWNER: Vicenza
+      RAILS_APP_SCOPE: 2025/vicenza/april
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/vicenza/may/"
+    var:
+      database: 2025-vicenza-may
+    env:
+      RAILS_APP_OWNER: Vicenza
+      RAILS_APP_SCOPE: 2025/vicenza/may
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/vicenza/june/"
+    var:
+      database: 2025-vicenza-june
+    env:
+      RAILS_APP_OWNER: Vicenza
+      RAILS_APP_SCOPE: 2025/vicenza/june
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/vicenza/july/"
+    var:
+      database: 2025-vicenza-july
+    env:
+      RAILS_APP_OWNER: Vicenza
+      RAILS_APP_SCOPE: 2025/vicenza/july
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/vicenza/august/"
+    var:
+      database: 2025-vicenza-august
+    env:
+      RAILS_APP_OWNER: Vicenza
+      RAILS_APP_SCOPE: 2025/vicenza/august
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/vicenza/september/"
+    var:
+      database: 2025-vicenza-september
+    env:
+      RAILS_APP_OWNER: Vicenza
+      RAILS_APP_SCOPE: 2025/vicenza/september
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/vicenza/october/"
+    var:
+      database: 2025-vicenza-october
+    env:
+      RAILS_APP_OWNER: Vicenza
+      RAILS_APP_SCOPE: 2025/vicenza/october
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/vicenza/november/"
+    var:
+      database: 2025-vicenza-november
+    env:
+      RAILS_APP_OWNER: Vicenza
+      RAILS_APP_SCOPE: 2025/vicenza/november
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/vicenza/december/"
+    var:
+      database: 2025-vicenza-december
+    env:
+      RAILS_APP_OWNER: Vicenza
+      RAILS_APP_SCOPE: 2025/vicenza/december
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2025/warsaw/wroclaw/"
+    var:
+      database: 2025-warsaw-wroclaw
+    env:
+      RAILS_APP_OWNER: Warsaw
+      RAILS_APP_SCOPE: 2025/warsaw/wroclaw
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: pl_PL
+  - path: "/showcase/2025/warsaw/warsaw/"
+    var:
+      database: 2025-warsaw-warsaw
+    env:
+      RAILS_APP_OWNER: Warsaw
+      RAILS_APP_SCOPE: 2025/warsaw/warsaw
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: pl_PL
+  - path: "/showcase/2025/woodlands/"
+    var:
+      database: 2025-woodlands
+    env:
+      RAILS_APP_OWNER: Woodlands
+      RAILS_APP_SCOPE: 2025/woodlands
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/adelaide/starry-night/"
+    var:
+      database: 2024-adelaide-starry-night
+    env:
+      RAILS_APP_OWNER: Adelaide
+      RAILS_APP_SCOPE: 2024/adelaide/starry-night
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2024/adelaide/rewind/"
+    var:
+      database: 2024-adelaide-rewind
+    env:
+      RAILS_APP_OWNER: Adelaide
+      RAILS_APP_SCOPE: 2024/adelaide/rewind
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2024/adelaide/northside/"
+    var:
+      database: 2024-adelaide-northside
+    env:
+      RAILS_APP_OWNER: Adelaide
+      RAILS_APP_SCOPE: 2024/adelaide/northside
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2024/adelaide/adalaide/"
+    var:
+      database: 2024-adelaide-adalaide
+    env:
+      RAILS_APP_OWNER: Adelaide
+      RAILS_APP_SCOPE: 2024/adelaide/adalaide
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2024/alexandria/"
+    var:
+      database: 2024-alexandria
+    env:
+      RAILS_APP_OWNER: Alexandria
+      RAILS_APP_SCOPE: 2024/alexandria
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/annapolis/medalball/"
+    var:
+      database: 2024-annapolis-medalball
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2024/annapolis/medalball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/annapolis/chesapeakeclassic/"
+    var:
+      database: 2024-annapolis-chesapeakeclassic
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2024/annapolis/chesapeakeclassic
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/annapolis/gratitudegala/"
+    var:
+      database: 2024-annapolis-gratitudegala
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2024/annapolis/gratitudegala
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/austin/"
+    var:
+      database: 2024-austin
+    env:
+      RAILS_APP_OWNER: Austin
+      RAILS_APP_SCOPE: 2024/austin
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/bellevue/june-medal-ball/"
+    var:
+      database: 2024-bellevue-june-medal-ball
+    env:
+      RAILS_APP_OWNER: Bellevue
+      RAILS_APP_SCOPE: 2024/bellevue/june-medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/bellevue/august-showcase/"
+    var:
+      database: 2024-bellevue-august-showcase
+    env:
+      RAILS_APP_OWNER: Bellevue
+      RAILS_APP_SCOPE: 2024/bellevue/august-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/bellevue/october-mini-comp/"
+    var:
+      database: 2024-bellevue-october-mini-comp
+    env:
+      RAILS_APP_OWNER: Bellevue
+      RAILS_APP_SCOPE: 2024/bellevue/october-mini-comp
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/bellevue/spotlight-ball/"
+    var:
+      database: 2024-bellevue-spotlight-ball
+    env:
+      RAILS_APP_OWNER: Bellevue
+      RAILS_APP_SCOPE: 2024/bellevue/spotlight-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/bellevue/december-medal-ball/"
+    var:
+      database: 2024-bellevue-december-medal-ball
+    env:
+      RAILS_APP_OWNER: Bellevue
+      RAILS_APP_SCOPE: 2024/bellevue/december-medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/boston/"
+    var:
+      database: 2024-boston
+    env:
+      RAILS_APP_OWNER: Boston
+      RAILS_APP_SCOPE: 2024/boston
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/carmel/spring-showcase/"
+    var:
+      database: 2024-carmel-spring-showcase
+    env:
+      RAILS_APP_OWNER: Carmel
+      RAILS_APP_SCOPE: 2024/carmel/spring-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/carmel/back-to-the-80s/"
+    var:
+      database: 2024-carmel-back-to-the-80s
+    env:
+      RAILS_APP_OWNER: Carmel
+      RAILS_APP_SCOPE: 2024/carmel/back-to-the-80s
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/cary/"
+    var:
+      database: 2024-cary
+    env:
+      RAILS_APP_OWNER: Cary
+      RAILS_APP_SCOPE: 2024/cary
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/charlotte/"
+    var:
+      database: 2024-charlotte
+    env:
+      RAILS_APP_OWNER: Charlotte
+      RAILS_APP_SCOPE: 2024/charlotte
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/chicago/"
+    var:
+      database: 2024-chicago
+    env:
+      RAILS_APP_OWNER: Chicago
+      RAILS_APP_SCOPE: 2024/chicago
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/clearwater/texas-opener/"
+    var:
+      database: 2024-clearwater-texas-opener
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2024/clearwater/texas-opener
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/clearwater/birthday-bash/"
+    var:
+      database: 2024-clearwater-birthday-bash
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2024/clearwater/birthday-bash
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/clearwater/glass-slipper/"
+    var:
+      database: 2024-clearwater-glass-slipper
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2024/clearwater/glass-slipper
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/clearwater/northstar-opener/"
+    var:
+      database: 2024-clearwater-northstar-opener
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2024/clearwater/northstar-opener
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/clearwater/flamingo-opener/"
+    var:
+      database: 2024-clearwater-flamingo-opener
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2024/clearwater/flamingo-opener
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/clearwater/fright-fest/"
+    var:
+      database: 2024-clearwater-fright-fest
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2024/clearwater/fright-fest
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/clearwater/snowball/"
+    var:
+      database: 2024-clearwater-snowball
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2024/clearwater/snowball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/cranford/spring-freestyles/"
+    var:
+      database: 2024-cranford-spring-freestyles
+    env:
+      RAILS_APP_OWNER: Cranford
+      RAILS_APP_SCOPE: 2024/cranford/spring-freestyles
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/cranford/fall-freestyles/"
+    var:
+      database: 2024-cranford-fall-freestyles
+    env:
+      RAILS_APP_OWNER: Cranford
+      RAILS_APP_SCOPE: 2024/cranford/fall-freestyles
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/dayton/"
+    var:
+      database: 2024-dayton
+    env:
+      RAILS_APP_OWNER: Dayton
+      RAILS_APP_SCOPE: 2024/dayton
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/durham/"
+    var:
+      database: 2024-durham
+    env:
+      RAILS_APP_OWNER: Durham
+      RAILS_APP_SCOPE: 2024/durham
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/everett/"
+    var:
+      database: 2024-everett
+    env:
+      RAILS_APP_OWNER: Everett
+      RAILS_APP_SCOPE: 2024/everett
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/glenview/chicagoland-feb/"
+    var:
+      database: 2024-glenview-chicagoland-feb
+    env:
+      RAILS_APP_OWNER: Glenview
+      RAILS_APP_SCOPE: 2024/glenview/chicagoland-feb
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/glenview/chicagoland-sept/"
+    var:
+      database: 2024-glenview-chicagoland-sept
+    env:
+      RAILS_APP_OWNER: Glenview
+      RAILS_APP_SCOPE: 2024/glenview/chicagoland-sept
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/greenhills/spring/"
+    var:
+      database: 2024-greenhills-spring
+    env:
+      RAILS_APP_OWNER: Nashville-Green Hills
+      RAILS_APP_SCOPE: 2024/greenhills/spring
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/greenhills/revival/"
+    var:
+      database: 2024-greenhills-revival
+    env:
+      RAILS_APP_OWNER: Nashville-Green Hills
+      RAILS_APP_SCOPE: 2024/greenhills/revival
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/harrisburg/"
+    var:
+      database: 2024-harrisburg
+    env:
+      RAILS_APP_OWNER: Harrisburg
+      RAILS_APP_SCOPE: 2024/harrisburg
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/kennesaw/"
+    var:
+      database: 2024-kennesaw
+    env:
+      RAILS_APP_OWNER: Kennesaw
+      RAILS_APP_SCOPE: 2024/kennesaw
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/kyiv/july/"
+    var:
+      database: 2024-kyiv-july
+    env:
+      RAILS_APP_OWNER: Kyiv
+      RAILS_APP_SCOPE: 2024/kyiv/july
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: uk_UA
+  - path: "/showcase/2024/kyiv/freestyle-showcase/"
+    var:
+      database: 2024-kyiv-freestyle-showcase
+    env:
+      RAILS_APP_OWNER: Kyiv
+      RAILS_APP_SCOPE: 2024/kyiv/freestyle-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: uk_UA
+  - path: "/showcase/2024/lakeview/showcase-rounds/"
+    var:
+      database: 2024-lakeview-showcase-rounds
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2024/lakeview/showcase-rounds
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/lakeview/graduation-nights/"
+    var:
+      database: 2024-lakeview-graduation-nights
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2024/lakeview/graduation-nights
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/lakeview/in-studio/"
+    var:
+      database: 2024-lakeview-in-studio
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2024/lakeview/in-studio
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/lakeview/showcase-rounds-september/"
+    var:
+      database: 2024-lakeview-showcase-rounds-september
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2024/lakeview/showcase-rounds-september
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/lakeview/graduation-nights-2/"
+    var:
+      database: 2024-lakeview-graduation-nights-2
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2024/lakeview/graduation-nights-2
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/laval/"
+    var:
+      database: 2024-laval
+    env:
+      RAILS_APP_OWNER: Laval
+      RAILS_APP_SCOPE: 2024/laval
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: fr_CA
+  - path: "/showcase/2024/lincolnshire/"
+    var:
+      database: 2024-lincolnshire
+    env:
+      RAILS_APP_OWNER: Lincolnshire
+      RAILS_APP_SCOPE: 2024/lincolnshire
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/livermore/pep-rally/"
+    var:
+      database: 2024-livermore-pep-rally
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2024/livermore/pep-rally
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/livermore/district-showcase/"
+    var:
+      database: 2024-livermore-district-showcase
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2024/livermore/district-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/livermore/barbecue-pep-rally/"
+    var:
+      database: 2024-livermore-barbecue-pep-rally
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2024/livermore/barbecue-pep-rally
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/livermore/live-medal-ball/"
+    var:
+      database: 2024-livermore-live-medal-ball
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2024/livermore/live-medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/livermore/willie-wonkas-magical-night/"
+    var:
+      database: 2024-livermore-willie-wonkas-magical-night
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2024/livermore/willie-wonkas-magical-night
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/livermore/extravaganza/"
+    var:
+      database: 2024-livermore-extravaganza
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2024/livermore/extravaganza
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/lwr/"
+    var:
+      database: 2024-lwr
+    env:
+      RAILS_APP_OWNER: Lakewood Ranch
+      RAILS_APP_SCOPE: 2024/lwr
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/manchester/"
+    var:
+      database: 2024-manchester
+    env:
+      RAILS_APP_OWNER: Manchester
+      RAILS_APP_SCOPE: 2024/manchester
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/mdballroom/february-team-match/"
+    var:
+      database: 2024-mdballroom-february-team-match
+    env:
+      RAILS_APP_OWNER: Memorial DanceSport Ballroom
+      RAILS_APP_SCOPE: 2024/mdballroom/february-team-match
+      SHOWCASE_LOGO: mdballroom.webp
+  - path: "/showcase/2024/mdballroom/june-team-match/"
+    var:
+      database: 2024-mdballroom-june-team-match
+    env:
+      RAILS_APP_OWNER: Memorial DanceSport Ballroom
+      RAILS_APP_SCOPE: 2024/mdballroom/june-team-match
+      SHOWCASE_LOGO: mdballroom.webp
+  - path: "/showcase/2024/merrillville/medal-ball/"
+    var:
+      database: 2024-merrillville-medal-ball
+    env:
+      RAILS_APP_OWNER: Merrillville
+      RAILS_APP_SCOPE: 2024/merrillville/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/merrillville/team-match/"
+    var:
+      database: 2024-merrillville-team-match
+    env:
+      RAILS_APP_OWNER: Merrillville
+      RAILS_APP_SCOPE: 2024/merrillville/team-match
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/merrillville/graduation-night/"
+    var:
+      database: 2024-merrillville-graduation-night
+    env:
+      RAILS_APP_OWNER: Merrillville
+      RAILS_APP_SCOPE: 2024/merrillville/graduation-night
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/merrillville/newsome-twosome/"
+    var:
+      database: 2024-merrillville-newsome-twosome
+    env:
+      RAILS_APP_OWNER: Merrillville
+      RAILS_APP_SCOPE: 2024/merrillville/newsome-twosome
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/merrillville/snowball-spotlight/"
+    var:
+      database: 2024-merrillville-snowball-spotlight
+    env:
+      RAILS_APP_OWNER: Merrillville
+      RAILS_APP_SCOPE: 2024/merrillville/snowball-spotlight
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/monterey/"
+    var:
+      database: 2024-monterey
+    env:
+      RAILS_APP_OWNER: Monterey
+      RAILS_APP_SCOPE: 2024/monterey
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/montgomery/dreamland/"
+    var:
+      database: 2024-montgomery-dreamland
+    env:
+      RAILS_APP_OWNER: Montgomery
+      RAILS_APP_SCOPE: 2024/montgomery/dreamland
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/montgomery/fort-wayne/"
+    var:
+      database: 2024-montgomery-fort-wayne
+    env:
+      RAILS_APP_OWNER: Montgomery
+      RAILS_APP_SCOPE: 2024/montgomery/fort-wayne
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/montgomery/cddc/"
+    var:
+      database: 2024-montgomery-cddc
+    env:
+      RAILS_APP_OWNER: Montgomery
+      RAILS_APP_SCOPE: 2024/montgomery/cddc
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/montgomery/swing-sway/"
+    var:
+      database: 2024-montgomery-swing-sway
+    env:
+      RAILS_APP_OWNER: Montgomery
+      RAILS_APP_SCOPE: 2024/montgomery/swing-sway
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/montreal/june/"
+    var:
+      database: 2024-montreal-june
+    env:
+      RAILS_APP_OWNER: Montreal
+      RAILS_APP_SCOPE: 2024/montreal/june
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: fr_CA
+  - path: "/showcase/2024/montreal/november/"
+    var:
+      database: 2024-montreal-november
+    env:
+      RAILS_APP_OWNER: Montreal
+      RAILS_APP_SCOPE: 2024/montreal/november
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: fr_CA
+  - path: "/showcase/2024/montreal/december/"
+    var:
+      database: 2024-montreal-december
+    env:
+      RAILS_APP_OWNER: Montreal
+      RAILS_APP_SCOPE: 2024/montreal/december
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: fr_CA
+  - path: "/showcase/2024/perth/karaoke/"
+    var:
+      database: 2024-perth-karaoke
+    env:
+      RAILS_APP_OWNER: Perth
+      RAILS_APP_SCOPE: 2024/perth/karaoke
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2024/perth/country/"
+    var:
+      database: 2024-perth-country
+    env:
+      RAILS_APP_OWNER: Perth
+      RAILS_APP_SCOPE: 2024/perth/country
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2024/perth/pin-up-50s/"
+    var:
+      database: 2024-perth-pin-up-50s
+    env:
+      RAILS_APP_OWNER: Perth
+      RAILS_APP_SCOPE: 2024/perth/pin-up-50s
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2024/perth/hawaiian/"
+    var:
+      database: 2024-perth-hawaiian
+    env:
+      RAILS_APP_OWNER: Perth
+      RAILS_APP_SCOPE: 2024/perth/hawaiian
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2024/perth/christmas/"
+    var:
+      database: 2024-perth-christmas
+    env:
+      RAILS_APP_OWNER: Perth
+      RAILS_APP_SCOPE: 2024/perth/christmas
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2024/petaluma/"
+    var:
+      database: 2024-petaluma
+    env:
+      RAILS_APP_OWNER: Petaluma
+      RAILS_APP_SCOPE: 2024/petaluma
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/raleigh/casino-royale/"
+    var:
+      database: 2024-raleigh-casino-royale
+    env:
+      RAILS_APP_OWNER: Raleigh
+      RAILS_APP_SCOPE: 2024/raleigh/casino-royale
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/raleigh/in-house/"
+    var:
+      database: 2024-raleigh-in-house
+    env:
+      RAILS_APP_OWNER: Raleigh
+      RAILS_APP_SCOPE: 2024/raleigh/in-house
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/richmond/medal-ball/"
+    var:
+      database: 2024-richmond-medal-ball
+    env:
+      RAILS_APP_OWNER: Richmond
+      RAILS_APP_SCOPE: 2024/richmond/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/richmond/team-match/"
+    var:
+      database: 2024-richmond-team-match
+    env:
+      RAILS_APP_OWNER: Richmond
+      RAILS_APP_SCOPE: 2024/richmond/team-match
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/richmond/nouveau-duo/"
+    var:
+      database: 2024-richmond-nouveau-duo
+    env:
+      RAILS_APP_OWNER: Richmond
+      RAILS_APP_SCOPE: 2024/richmond/nouveau-duo
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/ridgewood/"
+    var:
+      database: 2024-ridgewood
+    env:
+      RAILS_APP_OWNER: Ridgewood
+      RAILS_APP_SCOPE: 2024/ridgewood
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/roanoke/team-match/"
+    var:
+      database: 2024-roanoke-team-match
+    env:
+      RAILS_APP_OWNER: Roanoke
+      RAILS_APP_SCOPE: 2024/roanoke/team-match
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/roanoke/spring-showcase/"
+    var:
+      database: 2024-roanoke-spring-showcase
+    env:
+      RAILS_APP_OWNER: Roanoke
+      RAILS_APP_SCOPE: 2024/roanoke/spring-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/roanoke/medal-ball/"
+    var:
+      database: 2024-roanoke-medal-ball
+    env:
+      RAILS_APP_OWNER: Roanoke
+      RAILS_APP_SCOPE: 2024/roanoke/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/roanoke/fall-showcase/"
+    var:
+      database: 2024-roanoke-fall-showcase
+    env:
+      RAILS_APP_OWNER: Roanoke
+      RAILS_APP_SCOPE: 2024/roanoke/fall-showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/salem/spring/"
+    var:
+      database: 2024-salem-spring
+    env:
+      RAILS_APP_OWNER: Salem
+      RAILS_APP_SCOPE: 2024/salem/spring
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/salem/fall/"
+    var:
+      database: 2024-salem-fall
+    env:
+      RAILS_APP_OWNER: Salem
+      RAILS_APP_SCOPE: 2024/salem/fall
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/sanjose/march/"
+    var:
+      database: 2024-sanjose-march
+    env:
+      RAILS_APP_OWNER: San Jose
+      RAILS_APP_SCOPE: 2024/sanjose/march
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/sanjose/september/"
+    var:
+      database: 2024-sanjose-september
+    env:
+      RAILS_APP_OWNER: San Jose
+      RAILS_APP_SCOPE: 2024/sanjose/september
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/sarasota/"
+    var:
+      database: 2024-sarasota
+    env:
+      RAILS_APP_OWNER: Sarasota
+      RAILS_APP_SCOPE: 2024/sarasota
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/schaumburg/"
+    var:
+      database: 2024-schaumburg
+    env:
+      RAILS_APP_OWNER: Schaumburg
+      RAILS_APP_SCOPE: 2024/schaumburg
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/slc/june/"
+    var:
+      database: 2024-slc-june
+    env:
+      RAILS_APP_OWNER: Salt Lake City
+      RAILS_APP_SCOPE: 2024/slc/june
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/slc/medal-ball/"
+    var:
+      database: 2024-slc-medal-ball
+    env:
+      RAILS_APP_OWNER: Salt Lake City
+      RAILS_APP_SCOPE: 2024/slc/medal-ball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/stockton/walk-this-way/"
+    var:
+      database: 2024-stockton-walk-this-way
+    env:
+      RAILS_APP_OWNER: Stockton
+      RAILS_APP_SCOPE: 2024/stockton/walk-this-way
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/stockton/dance-down-memory-lane/"
+    var:
+      database: 2024-stockton-dance-down-memory-lane
+    env:
+      RAILS_APP_OWNER: Stockton
+      RAILS_APP_SCOPE: 2024/stockton/dance-down-memory-lane
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/sugarland/"
+    var:
+      database: 2024-sugarland
+    env:
+      RAILS_APP_OWNER: Sugar Land
+      RAILS_APP_SCOPE: 2024/sugarland
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/sydney/gatsby/"
+    var:
+      database: 2024-sydney-gatsby
+    env:
+      RAILS_APP_OWNER: Sydney
+      RAILS_APP_SCOPE: 2024/sydney/gatsby
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2024/sydney/dancing-with-the-stars/"
+    var:
+      database: 2024-sydney-dancing-with-the-stars
+    env:
+      RAILS_APP_OWNER: Sydney
+      RAILS_APP_SCOPE: 2024/sydney/dancing-with-the-stars
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2024/vabeach/newsome-twosome/"
+    var:
+      database: 2024-vabeach-newsome-twosome
+    env:
+      RAILS_APP_OWNER: Virginia Beach
+      RAILS_APP_SCOPE: 2024/vabeach/newsome-twosome
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/vabeach/summer-beach-bash/"
+    var:
+      database: 2024-vabeach-summer-beach-bash
+    env:
+      RAILS_APP_OWNER: Virginia Beach
+      RAILS_APP_SCOPE: 2024/vabeach/summer-beach-bash
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/vabeach/freestyles/"
+    var:
+      database: 2024-vabeach-freestyles
+    env:
+      RAILS_APP_OWNER: Virginia Beach
+      RAILS_APP_SCOPE: 2024/vabeach/freestyles
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/vicenza/"
+    var:
+      database: 2024-vicenza
+    env:
+      RAILS_APP_OWNER: Vicenza
+      RAILS_APP_SCOPE: 2024/vicenza
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: it_IT
+  - path: "/showcase/2024/warsaw/june-warsaw-freestyle/"
+    var:
+      database: 2024-warsaw-june-warsaw-freestyle
+    env:
+      RAILS_APP_OWNER: Warsaw
+      RAILS_APP_SCOPE: 2024/warsaw/june-warsaw-freestyle
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: pl_PL
+  - path: "/showcase/2024/warsaw/freestyle-showcase-warsaw-2024/"
+    var:
+      database: 2024-warsaw-freestyle-showcase-warsaw-2024
+    env:
+      RAILS_APP_OWNER: Warsaw
+      RAILS_APP_SCOPE: 2024/warsaw/freestyle-showcase-warsaw-2024
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: pl_PL
+  - path: "/showcase/2024/westchester/"
+    var:
+      database: 2024-westchester
+    env:
+      RAILS_APP_OWNER: West Chester
+      RAILS_APP_SCOPE: 2024/westchester
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2024/woodlands/"
+    var:
+      database: 2024-woodlands
+    env:
+      RAILS_APP_OWNER: Woodlands
+      RAILS_APP_SCOPE: 2024/woodlands
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/annapolis/medalball/"
+    var:
+      database: 2023-annapolis-medalball
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2023/annapolis/medalball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/annapolis/chesapeakeclassic/"
+    var:
+      database: 2023-annapolis-chesapeakeclassic
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2023/annapolis/chesapeakeclassic
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/annapolis/gratitudegala/"
+    var:
+      database: 2023-annapolis-gratitudegala
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2023/annapolis/gratitudegala
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/carmel/"
+    var:
+      database: 2023-carmel
+    env:
+      RAILS_APP_OWNER: Carmel
+      RAILS_APP_SCOPE: 2023/carmel
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/charlotte/"
+    var:
+      database: 2023-charlotte
+    env:
+      RAILS_APP_OWNER: Charlotte
+      RAILS_APP_SCOPE: 2023/charlotte
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/chicago/"
+    var:
+      database: 2023-chicago
+    env:
+      RAILS_APP_OWNER: Chicago
+      RAILS_APP_SCOPE: 2023/chicago
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/clearwater/glassslipper/"
+    var:
+      database: 2023-clearwater-glassslipper
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2023/clearwater/glassslipper
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/clearwater/nationaldance/"
+    var:
+      database: 2023-clearwater-nationaldance
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2023/clearwater/nationaldance
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/clearwater/flamingoopener/"
+    var:
+      database: 2023-clearwater-flamingoopener
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2023/clearwater/flamingoopener
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/clearwater/flamingo-fright/"
+    var:
+      database: 2023-clearwater-flamingo-fright
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2023/clearwater/flamingo-fright
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/clearwater/snowball/"
+    var:
+      database: 2023-clearwater-snowball
+    env:
+      RAILS_APP_OWNER: Clearwater
+      RAILS_APP_SCOPE: 2023/clearwater/snowball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/durham/"
+    var:
+      database: 2023-durham
+    env:
+      RAILS_APP_OWNER: Durham
+      RAILS_APP_SCOPE: 2023/durham
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/greenhills/"
+    var:
+      database: 2023-greenhills
+    env:
+      RAILS_APP_OWNER: Nashville-Green Hills
+      RAILS_APP_SCOPE: 2023/greenhills
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/harrisburg/"
+    var:
+      database: 2023-harrisburg
+    env:
+      RAILS_APP_OWNER: Harrisburg
+      RAILS_APP_SCOPE: 2023/harrisburg
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/kennesaw/"
+    var:
+      database: 2023-kennesaw
+    env:
+      RAILS_APP_OWNER: Kennesaw
+      RAILS_APP_SCOPE: 2023/kennesaw
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/lakeview/showcase/"
+    var:
+      database: 2023-lakeview-showcase
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2023/lakeview/showcase
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/lakeview/showcase-rounds/"
+    var:
+      database: 2023-lakeview-showcase-rounds
+    env:
+      RAILS_APP_OWNER: Lakeview
+      RAILS_APP_SCOPE: 2023/lakeview/showcase-rounds
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/livermore/"
+    var:
+      database: 2023-livermore
+    env:
+      RAILS_APP_OWNER: Livermore
+      RAILS_APP_SCOPE: 2023/livermore
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/montreal/"
+    var:
+      database: 2023-montreal
+    env:
+      RAILS_APP_OWNER: Montreal
+      RAILS_APP_SCOPE: 2023/montreal
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: fr_CA
+  - path: "/showcase/2023/raleigh/night-in-paris/"
+    var:
+      database: 2023-raleigh-night-in-paris
+    env:
+      RAILS_APP_OWNER: Raleigh
+      RAILS_APP_SCOPE: 2023/raleigh/night-in-paris
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/raleigh/team-match/"
+    var:
+      database: 2023-raleigh-team-match
+    env:
+      RAILS_APP_OWNER: Raleigh
+      RAILS_APP_SCOPE: 2023/raleigh/team-match
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/richmond/medalball/"
+    var:
+      database: 2023-richmond-medalball
+    env:
+      RAILS_APP_OWNER: Richmond
+      RAILS_APP_SCOPE: 2023/richmond/medalball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/richmond/teammatch/"
+    var:
+      database: 2023-richmond-teammatch
+    env:
+      RAILS_APP_OWNER: Richmond
+      RAILS_APP_SCOPE: 2023/richmond/teammatch
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/richmond/nouveau-duo/"
+    var:
+      database: 2023-richmond-nouveau-duo
+    env:
+      RAILS_APP_OWNER: Richmond
+      RAILS_APP_SCOPE: 2023/richmond/nouveau-duo
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/salem/"
+    var:
+      database: 2023-salem
+    env:
+      RAILS_APP_OWNER: Salem
+      RAILS_APP_SCOPE: 2023/salem
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/sarasota/"
+    var:
+      database: 2023-sarasota
+    env:
+      RAILS_APP_OWNER: Sarasota
+      RAILS_APP_SCOPE: 2023/sarasota
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/sugarland/"
+    var:
+      database: 2023-sugarland
+    env:
+      RAILS_APP_OWNER: Sugar Land
+      RAILS_APP_SCOPE: 2023/sugarland
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/sydney/"
+    var:
+      database: 2023-sydney
+    env:
+      RAILS_APP_OWNER: Sydney
+      RAILS_APP_SCOPE: 2023/sydney
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+      RAILS_LOCALE: en_AU
+  - path: "/showcase/2023/vabeach/"
+    var:
+      database: 2023-vabeach
+    env:
+      RAILS_APP_OWNER: Virginia Beach
+      RAILS_APP_SCOPE: 2023/vabeach
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2023/woodlands/"
+    var:
+      database: 2023-woodlands
+    env:
+      RAILS_APP_OWNER: Woodlands
+      RAILS_APP_SCOPE: 2023/woodlands
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2022/annapolis/medalball/"
+    var:
+      database: 2022-annapolis-medalball
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2022/annapolis/medalball
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2022/annapolis/chesapeakeclassic/"
+    var:
+      database: 2022-annapolis-chesapeakeclassic
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2022/annapolis/chesapeakeclassic
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2022/annapolis/gratitudegala/"
+    var:
+      database: 2022-annapolis-gratitudegala
+    env:
+      RAILS_APP_OWNER: Annapolis
+      RAILS_APP_SCOPE: 2022/annapolis/gratitudegala
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2022/cary/"
+    var:
+      database: 2022-cary
+    env:
+      RAILS_APP_OWNER: Cary
+      RAILS_APP_SCOPE: 2022/cary
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2022/charlotte/"
+    var:
+      database: 2022-charlotte
+    env:
+      RAILS_APP_OWNER: Charlotte
+      RAILS_APP_SCOPE: 2022/charlotte
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2022/harrisburg/"
+    var:
+      database: 2022-harrisburg
+    env:
+      RAILS_APP_OWNER: Harrisburg
+      RAILS_APP_SCOPE: 2022/harrisburg
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2022/kennesaw/"
+    var:
+      database: 2022-kennesaw
+    env:
+      RAILS_APP_OWNER: Kennesaw
+      RAILS_APP_SCOPE: 2022/kennesaw
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  - path: "/showcase/2022/vabeach/"
+    var:
+      database: 2022-vabeach
+    env:
+      RAILS_APP_OWNER: Virginia Beach
+      RAILS_APP_SCOPE: 2022/vabeach
+      SHOWCASE_LOGO: arthur-murray-logo.gif
+  pools:
+    max_size: 22
+    timeout: 5m
+    start_port: 4000
+managed_processes:
+- name: action-cable
+  command: bundle
+  args:
+  - exec
+  - puma
+  - "-p"
+  - '28080'
+  - cable/config.ru
+  working_dir: "/Users/rubys/git/showcase"
+  env:
+    RAILS_ENV: production
+    RAILS_APP_REDIS: showcase_production
+    RAILS_APP_DB: action-cable
+  auto_restart: true
+  start_delay: 1s
+routes:
+  redirects:
+  - from: "^/(showcase)?$"
+    to: "/showcase/studios/"
+  rewrites:
+  - from: "^/assets/(.*)"
+    to: "/showcase/assets/$1"
+  - from: "^/([^/]+\\.(gif|png|jpg|jpeg|ico|pdf|svg|webp|txt))$"
+    to: "/showcase/$1"
+  reverse_proxies:
+  - path: "^/showcase/cable"
+    target: http://localhost:28080/cable
+    websocket: true
+    headers:
+      X-Forwarded-For: "$remote_addr"
+      X-Forwarded-Proto: "$scheme"
+      X-Forwarded-Host: "$host"
+  - path: "^/showease/password"
+    target: https://rubix.intertwingly.net/showcase/password
+    headers:
+      X-Forwarded-Host: "$host"
+  - path: "^/showcase/studios/([a-z]*)/request$"
+    target: https://rubix.intertwingly.net/showcase/studios/$1/request
+    headers:
+      X-Forwarded-Host: "$host"
+  fly_replay: []
+hooks:
+  server:
+    start: []
+    stop: []
+    idle: []
+    resume: []
+  tenant:
+    start: []
+    stop: []
+logging:
+  format: json
+maintenance:
+  page: "/503.html"

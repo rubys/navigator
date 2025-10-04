@@ -83,12 +83,16 @@ sudo cp bin/navigator /usr/local/bin/
 server:
   listen: 3000
   hostname: myapp.com
-  public_dir: /var/www/app/public
 
-pools:
-  max_size: 20           # Scale based on server capacity
-  idle_timeout: 600      # 10 minutes for production
-  start_port: 4000
+  static:
+    public_dir: /var/www/app/public
+    allowed_extensions: [css, js, png, jpg, gif, ico, svg, woff, woff2]
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 1y  # 1 year for fingerprinted assets
+        - path: /images/
+          max_age: 1d  # 1 day for images
 
 # Authentication for admin areas
 auth:
@@ -102,18 +106,12 @@ auth:
     - "*.css"
     - "*.js"
 
-# Optimized static file serving
-static:
-  directories:
-    - path: /assets/
-      root: /var/www/app/public/assets/
-      cache: 31536000      # 1 year for fingerprinted assets
-    - path: /images/
-      root: /var/www/app/public/images/
-      cache: 86400         # 1 day for images
-  extensions: [css, js, png, jpg, gif, ico, svg, woff, woff2]
-
 applications:
+  pools:
+    max_size: 20      # Scale based on server capacity
+    idle_timeout: 10m # 10 minutes for production
+    start_port: 4000
+
   global_env:
     RAILS_ENV: production
     RAILS_SERVE_STATIC_FILES: "false"
@@ -121,7 +119,7 @@ applications:
     SECRET_KEY_BASE: "${SECRET_KEY_BASE}"
     DATABASE_URL: "${DATABASE_URL}"
     REDIS_URL: "${REDIS_URL}"
-    
+
   tenants:
     - name: production
       path: /
@@ -133,7 +131,7 @@ managed_processes:
     command: redis-server
     args: [/etc/redis/redis.conf]
     auto_restart: true
-    
+
   - name: sidekiq
     command: bundle
     args: [exec, sidekiq]
@@ -141,7 +139,7 @@ managed_processes:
     env:
       RAILS_ENV: production
     auto_restart: true
-    start_delay: 2
+    start_delay: 2s
 ```
 
 ### Environment Variables
@@ -417,17 +415,20 @@ echo "navigator_requests_total $(grep -c 'GET\|POST' /var/log/navigator/access.l
 
 ```yaml
 # Optimize for server capacity
-pools:
-  max_size: 20          # 2GB RAM = ~10 processes, 4GB = ~20
-  idle_timeout: 600     # Keep processes alive longer
-  start_port: 4000
+applications:
+  pools:
+    max_size: 20      # 2GB RAM = ~10 processes, 4GB = ~20
+    idle_timeout: 10m # Keep processes alive longer
+    start_port: 4000
 
 # Efficient static file serving
-static:
-  directories:
-    - path: /assets/
-      root: /var/www/app/public/assets/
-      cache: 31536000    # Long cache for assets
+server:
+  static:
+    public_dir: /var/www/app/public
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 1y  # Long cache for assets
 ```
 
 ### Database Optimization

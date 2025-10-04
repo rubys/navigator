@@ -5,89 +5,81 @@ Navigator can serve static files directly from the filesystem, bypassing Rails f
 ## Basic Configuration
 
 ```yaml
-static:
-  directories:
-    - path: /assets/
-      root: public/assets/
-      cache: 86400
-  extensions: [css, js, png, jpg, gif, ico]
+server:
+  listen: 3000
+  static:
+    public_dir: "./public"
+    allowed_extensions: [css, js, png, jpg, gif, ico]
+    try_files: [index.html, .html, .htm]
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 24h
 ```
 
-## Directory Mappings
+## Public Directory
 
-Map URL paths to filesystem directories:
+Navigator serves static files from a configured public directory:
 
 ```yaml
-static:
-  directories:
-    # Rails assets (precompiled)
-    - path: /assets/
-      root: public/assets/
-      cache: 31536000  # 1 year (fingerprinted files)
-    
-    # Webpack/Vite assets
-    - path: /packs/
-      root: public/packs/
-      cache: 31536000
-    
-    # User uploads
-    - path: /uploads/
-      root: storage/uploads/
-      cache: 3600  # 1 hour
-      
-    # Documentation
-    - path: /docs/
-      root: public/docs/
-      cache: 86400  # 1 day
+server:
+  static:
+    public_dir: "./public"  # Directory containing static files
 ```
 
-### Directory Configuration
+All static files are served from this single directory. Navigator maps URL paths directly to files within this directory.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `path` | string | ✓ | URL path (must start and end with /) |
-| `root` | string | ✓ | Filesystem directory path |
-| `cache` | integer | | Cache-Control max-age in seconds |
+### Public Directory Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `public_dir` | string | `"./public"` | Directory path for static files |
+
+**Examples:**
+- URL `/assets/app.css` → File `public/assets/app.css`
+- URL `/images/logo.png` → File `public/images/logo.png`
+- URL `/favicon.ico` → File `public/favicon.ico`
 
 ## File Extensions
 
-Serve files with specific extensions directly:
+Optionally restrict which file extensions Navigator will serve:
 
 ```yaml
-static:
-  extensions: [
-    # Web assets
-    css, js, map,
-    
-    # Images
-    png, jpg, jpeg, gif, ico, svg, webp,
-    
-    # Fonts
-    woff, woff2, ttf, eot, otf,
-    
-    # Documents
-    pdf, txt, xml, json,
-    
-    # Audio/Video
-    mp3, mp4, webm, ogg
-  ]
+server:
+  static:
+    allowed_extensions: [
+      # Web assets
+      css, js, map,
+
+      # Images
+      png, jpg, jpeg, gif, ico, svg, webp,
+
+      # Fonts
+      woff, woff2, ttf, eot, otf,
+
+      # Documents
+      pdf, txt, xml, json,
+
+      # Audio/Video
+      mp3, mp4, webm, ogg
+    ]
 ```
 
-Files matching these extensions are served directly regardless of path.
+When `allowed_extensions` is specified, only files with these extensions will be served. If omitted, all file types are allowed.
 
 ## Try Files Behavior
 
 Enable nginx-style try_files for better static site support:
 
 ```yaml
-static:
-  try_files:
-    enabled: true
-    suffixes: [".html", "index.html", ".htm", ".txt", ".xml", ".json"]
-    fallback: rails
+server:
+  static:
+    try_files: [".html", "index.html", ".htm"]
 ```
 
 ### How Try Files Works
+
+When `try_files` is configured, Navigator attempts to find files with different extensions:
 
 1. Request comes in: `/about`
 2. Navigator tries in order:
@@ -95,56 +87,54 @@ static:
    - `/about.html`
    - `/about/index.html`
    - `/about.htm`
-   - `/about.txt`
-   - `/about.xml`
-   - `/about.json`
-3. If no file found, falls back to Rails
+3. If no file found, falls back to the Rails application
 
 ### Try Files Configuration
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Enable try_files behavior |
-| `suffixes` | array | `[]` | File suffixes to try |
-| `fallback` | string | `"rails"` | What to do when no file found |
+| `try_files` | array | `[]` | File suffixes to try (empty = disabled) |
+
+**Examples:**
+- `try_files: [".html"]` - Try `.html` extension
+- `try_files: ["index.html", ".html"]` - Try index.html first, then .html
+- `try_files: []` - Disabled (exact path match only)
 
 ## Cache Control
 
-Set appropriate cache headers for different content types:
+Set appropriate cache headers for different paths:
 
 ```yaml
-static:
-  directories:
-    # Long cache for fingerprinted assets
-    - path: /assets/
-      root: public/assets/
-      cache: 31536000  # 1 year
-      
-    # Medium cache for images
-    - path: /images/
-      root: public/images/
-      cache: 86400     # 1 day
-      
-    # Short cache for dynamic content
-    - path: /api/docs/
-      root: public/api-docs/
-      cache: 300       # 5 minutes
-      
-    # No cache for development
-    - path: /dev/
-      root: public/dev/
-      cache: 0         # Always revalidate
+server:
+  static:
+    cache_control:
+      overrides:
+        # Long cache for fingerprinted assets
+        - path: /assets/
+          max_age: 8760h  # 1 year (365 days)
+
+        # Medium cache for images
+        - path: /images/
+          max_age: 24h    # 1 day
+
+        # Short cache for dynamic content
+        - path: /docs/
+          max_age: 5m     # 5 minutes
+
+        # No cache for development
+        - path: /dev/
+          max_age: 0s     # Always revalidate
 ```
 
 ### Cache Duration Guidelines
 
-| Content Type | Duration | Seconds | Use Case |
-|--------------|----------|---------|----------|
-| **Immutable assets** | 1 year | 31536000 | Fingerprinted files |
-| **Semi-static** | 1 week | 604800 | Images, fonts |
-| **Dynamic** | 1 hour | 3600 | Generated content |
-| **Real-time** | 5 minutes | 300 | API docs |
-| **Development** | No cache | 0 | Local development |
+| Content Type | Duration | Format | Use Case |
+|--------------|----------|--------|----------|
+| **Immutable assets** | 1 year | `8760h` | Fingerprinted files |
+| **Semi-static** | 1 week | `168h` | Images, fonts |
+| **Dynamic** | 1 hour | `1h` | Generated content |
+| **Real-time** | 5 minutes | `5m` | API docs |
+| **Development** | No cache | `0s` | Local development |
 
 ## MIME Types
 
@@ -172,12 +162,14 @@ Navigator automatically detects MIME types based on file extensions:
 
 ```yaml
 # Instead of letting Rails serve assets
-static:
-  directories:
-    - path: /assets/
-      root: public/assets/
-      cache: 31536000
-  extensions: [css, js, png, jpg, gif]
+server:
+  static:
+    public_dir: "./public"
+    allowed_extensions: [css, js, png, jpg, gif]
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 8760h  # 1 year
 
 applications:
   global_env:
@@ -219,25 +211,18 @@ Navigator will serve pre-compressed files when available.
 ### Rails Application with Assets
 
 ```yaml
-static:
-  directories:
-    # Precompiled Rails assets
-    - path: /assets/
-      root: public/assets/
-      cache: 31536000
-      
-    # Webpack packs (if using Webpacker)
-    - path: /packs/
-      root: public/packs/
-      cache: 31536000
-      
-  extensions: [css, js, png, jpg, gif, ico, woff, woff2]
-  
-  # Enable try_files for public pages
-  try_files:
-    enabled: true
-    suffixes: ["index.html", ".html"]
-    fallback: rails
+server:
+  listen: 3000
+  static:
+    public_dir: "./public"
+    allowed_extensions: [css, js, png, jpg, gif, ico, woff, woff2]
+    try_files: ["index.html", ".html"]
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 8760h  # 1 year
+        - path: /packs/
+          max_age: 8760h  # 1 year
 
 applications:
   global_env:
@@ -247,22 +232,16 @@ applications:
 ### Static Site with Rails API
 
 ```yaml
-static:
-  directories:
-    # Static site files
-    - path: /
-      root: public/dist/
-      cache: 3600
-      
-    # Assets with long cache
-    - path: /assets/
-      root: public/dist/assets/
-      cache: 31536000
-      
-  try_files:
-    enabled: true
-    suffixes: ["index.html", "/index.html"]
-    fallback: rails
+server:
+  static:
+    public_dir: "./public/dist"
+    try_files: ["index.html", "/index.html"]
+    cache_control:
+      overrides:
+        - path: /
+          max_age: 1h
+        - path: /assets/
+          max_age: 8760h  # 1 year
 
 applications:
   tenants:
@@ -274,21 +253,21 @@ applications:
 ### Multi-Tenant with Shared Assets
 
 ```yaml
-static:
-  directories:
-    # Shared assets for all tenants
-    - path: /shared/
-      root: public/shared/
-      cache: 86400
-      
-    # Tenant-specific assets
-    - path: /tenant1/assets/
-      root: storage/tenants/tenant1/assets/
-      cache: 3600
-      
-    - path: /tenant2/assets/
-      root: storage/tenants/tenant2/assets/
-      cache: 3600
+server:
+  static:
+    public_dir: "./public"
+    cache_control:
+      overrides:
+        # Shared assets for all tenants
+        - path: /shared/
+          max_age: 24h
+
+        # Tenant-specific assets
+        - path: /tenant1/assets/
+          max_age: 1h
+
+        - path: /tenant2/assets/
+          max_age: 1h
 ```
 
 ### Development vs Production
@@ -296,26 +275,29 @@ static:
 === "Development"
 
     ```yaml
-    static:
-      directories:
-        - path: /assets/
-          root: public/assets/
-          cache: 0  # No cache for development
-      extensions: [css, js, png, jpg]
+    server:
+      static:
+        public_dir: "./public"
+        allowed_extensions: [css, js, png, jpg]
+        cache_control:
+          overrides:
+            - path: /assets/
+              max_age: 0s  # No cache for development
     ```
 
 === "Production"
 
     ```yaml
-    static:
-      directories:
-        - path: /assets/
-          root: public/assets/
-          cache: 31536000  # Long cache
-        - path: /packs/
-          root: public/packs/
-          cache: 31536000
-      extensions: [css, js, map, png, jpg, gif, ico, svg, woff, woff2, ttf, eot]
+    server:
+      static:
+        public_dir: "./public"
+        allowed_extensions: [css, js, map, png, jpg, gif, ico, svg, woff, woff2, ttf, eot]
+        cache_control:
+          overrides:
+            - path: /assets/
+              max_age: 8760h  # 1 year
+            - path: /packs/
+              max_age: 8760h  # 1 year
     ```
 
 ## Security Considerations
@@ -326,42 +308,42 @@ Navigator automatically prevents `..` path traversal attacks, but ensure your di
 
 ```yaml
 # Safe
-static:
-  directories:
-    - path: /public/
-      root: public/files/  # Contained directory
+server:
+  static:
+    public_dir: public/  # Contained directory
 
 # Potentially unsafe
-static:
-  directories:
-    - path: /files/
-      root: /  # Root filesystem access
+server:
+  static:
+    public_dir: /  # Root filesystem access (avoid!)
 ```
 
 ### 2. Serve Only Intended Files
 
 ```yaml
 # Use specific extensions
-static:
-  extensions: [css, js, png, jpg]  # Only these types
+server:
+  static:
+    allowed_extensions: [css, js, png, jpg]  # Only these types
 
-# Avoid serving all files
-# extensions: ["*"]  # Don't do this
+# Or omit to allow all files (use with caution)
+server:
+  static:
+    # allowed_extensions not specified = all files allowed
 ```
 
 ### 3. Exclude Sensitive Directories
 
 ```yaml
-static:
-  directories:
-    - path: /assets/
-      root: public/assets/  # OK - public assets
-    
-# Avoid
-# - path: /config/
-#   root: config/         # Contains secrets
-# - path: /logs/
-#   root: log/           # Contains sensitive data
+# Safe - only serve from public directory
+server:
+  static:
+    public_dir: public/  # Only files in public/ are accessible
+
+# Ensure sensitive files are outside public_dir:
+# - config/ (contains secrets)
+# - log/ (contains sensitive data)
+# - db/ (database files)
 ```
 
 ## Troubleshooting
@@ -373,12 +355,11 @@ static:
    ls -la public/assets/application.css
    ```
 
-2. **Verify path mapping**:
+2. **Verify public directory**:
    ```yaml
-   static:
-     directories:
-       - path: /assets/        # URL path
-         root: public/assets/  # File system path
+   server:
+     static:
+       public_dir: public/  # Must contain the file
    ```
 
 3. **Test directly**:
@@ -472,13 +453,14 @@ Becomes:
 
 ```yaml
 # Navigator
-static:
-  directories:
-    - path: /assets/
-      root: /var/www/app/public/assets/
-      cache: 31536000  # 1 year
-  extensions: [css, js, png, jpg]
-  # 1 week cache applied to all extensions
+server:
+  static:
+    public_dir: /var/www/app/public
+    allowed_extensions: [css, js, png, jpg]
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 8760h  # 1 year
 ```
 
 ## See Also

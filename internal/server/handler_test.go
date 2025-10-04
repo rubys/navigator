@@ -207,7 +207,7 @@ func TestServeStaticFileWithRootPath(t *testing.T) {
 			// Create config
 			cfg := &config.Config{}
 			cfg.Server.RootPath = tt.rootPath
-			cfg.Server.PublicDir = tt.publicDir
+			cfg.Server.Static.PublicDir = tt.publicDir
 
 			// Create handler
 			handler := &Handler{config: cfg, staticHandler: NewStaticFileHandler(cfg)}
@@ -386,7 +386,8 @@ func TestHandler_ServeHTTP_RequestID(t *testing.T) {
 
 func TestHandler_ServeHTTP_Authentication(t *testing.T) {
 	cfg := &config.Config{}
-	cfg.Server.AuthExclude = []string{"/public/*", "/assets/*"}
+	cfg.Auth.Enabled = true
+	cfg.Auth.PublicPaths = []string{"/public/*", "/assets/*"}
 
 	// Create a basic auth instance
 	basicAuth := &auth.BasicAuth{}
@@ -497,8 +498,8 @@ func TestHandler_handleStickySession(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config.Config{}
-			cfg.Server.StickySession.Enabled = tt.stickyEnabled
-			cfg.Server.StickySession.Paths = tt.paths
+			cfg.StickySession.Enabled = tt.stickyEnabled
+			cfg.StickySession.Paths = tt.paths
 
 			handler := &Handler{config: cfg, staticHandler: NewStaticFileHandler(cfg)}
 
@@ -540,7 +541,7 @@ func TestMaintenanceModeHandler(t *testing.T) {
 			Tenants: []config.Tenant{}, // Empty tenants for maintenance mode
 		},
 	}
-	cfg.Server.PublicDir = tempDir
+	cfg.Server.Static.PublicDir = tempDir
 
 	// Use rewrite rules to redirect all traffic to 503.html (proper maintenance mode)
 	pattern := regexp.MustCompile("^.*$")
@@ -738,9 +739,9 @@ func TestAssetServingIntegration(t *testing.T) {
 			cfg := &config.Config{
 				LocationConfigMutex: sync.RWMutex{},
 			}
-			cfg.Server.PublicDir = tempDir
+			cfg.Server.Static.PublicDir = tempDir
 			cfg.Server.RootPath = tc.rootPath
-			cfg.Server.AuthPatterns = []config.AuthPattern{}
+			cfg.Auth.AuthPatterns = []config.AuthPattern{}
 			cfg.Server.RewriteRules = []config.RewriteRule{}
 
 			// Create handler with all required components
@@ -830,9 +831,9 @@ func TestAssetServingIntegrationErrorCases(t *testing.T) {
 	cfg := &config.Config{
 		LocationConfigMutex: sync.RWMutex{},
 	}
-	cfg.Server.PublicDir = tempDir
+	cfg.Server.Static.PublicDir = tempDir
 	cfg.Server.RootPath = "/showcase"
-	cfg.Server.AuthPatterns = []config.AuthPattern{}
+	cfg.Auth.AuthPatterns = []config.AuthPattern{}
 	cfg.Server.RewriteRules = []config.RewriteRule{}
 
 	handler := &Handler{
@@ -917,9 +918,9 @@ func TestAssetServingRootPathVariations(t *testing.T) {
 			cfg := &config.Config{
 				LocationConfigMutex: sync.RWMutex{},
 			}
-			cfg.Server.PublicDir = tempDir
+			cfg.Server.Static.PublicDir = tempDir
 			cfg.Server.RootPath = tc.rootPath
-			cfg.Server.AuthPatterns = []config.AuthPattern{}
+			cfg.Auth.AuthPatterns = []config.AuthPattern{}
 			cfg.Server.RewriteRules = []config.RewriteRule{}
 
 			handler := &Handler{
@@ -956,7 +957,7 @@ func TestJSONAccessLogging(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Listen = "3000"
 	cfg.Server.Hostname = "localhost"
-	cfg.Server.PublicDir = "public"
+	cfg.Server.Static.PublicDir = "public"
 
 	// Create handler
 	handler := CreateHandler(cfg, nil, nil, nil)

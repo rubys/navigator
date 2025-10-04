@@ -15,13 +15,21 @@ Configure Navigator to manage both your Rails application and Redis server for c
 ```yaml title="navigator.yml"
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
+
+    # Cache configuration
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 24h
+    allowed_extensions: [css, js, png, jpg, gif]
 
 # Redis process managed by Navigator
 managed_processes:
   - name: redis
     command: redis-server
-    args: 
+    args:
       - --port 6379
       - --appendonly yes
       - --save 900 1
@@ -33,14 +41,6 @@ managed_processes:
     auto_restart: true
     start_delay: 0
 
-# Static files
-static:
-  directories:
-    - path: /assets/
-      root: public/assets/
-      cache: 86400
-  extensions: [css, js, png, jpg, gif]
-
 # Rails application with Redis configuration
 applications:
   global_env:
@@ -48,7 +48,7 @@ applications:
     REDIS_URL: redis://localhost:6379/0
     CACHE_REDIS_URL: redis://localhost:6379/1
     SESSION_REDIS_URL: redis://localhost:6379/2
-    
+
   tenants:
     - name: myapp
       path: /

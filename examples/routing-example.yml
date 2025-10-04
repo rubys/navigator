@@ -5,52 +5,59 @@
 server:
   listen: 3000
   hostname: localhost
-  public_dir: public
 
-# Rewrite rules for intelligent routing
-rewrite_rules:
-  # Route admin panel to primary region
-  - pattern: ^/admin(/.*)?$
-    replacement: $1
-    fly_replay: region=iad     # Route to IAD (Virginia) region
-    flag: last
+  # Static file configuration
+  static:
+    public_dir: public
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 0
 
-  # Route specific tenants to their home regions
-  - pattern: ^/tenant/europe(/.*)?$
-    replacement: $1
-    fly_replay: region=ams     # Route to Amsterdam region
-    flag: last
+# Maintenance page configuration
+maintenance:
+  page: /503.html
 
-  - pattern: ^/tenant/asia(/.*)?$
-    replacement: $1
-    fly_replay: region=nrt     # Route to Tokyo region
-    flag: last
+# Intelligent routing with Fly-Replay
+routes:
+  fly:
+    replay:
+      # Route admin panel to primary region
+      - pattern: ^/admin(/.*)?$
+        replacement: $1
+        region: iad     # Route to IAD (Virginia) region
+        flag: last
 
-  # Route to specific machine for debugging
-  - pattern: ^/debug/machine/(.+?)/(.*)$
-    replacement: $2
-    fly_replay: instance=$1    # Route to specific machine ID
-    flag: last
+      # Route specific tenants to their home regions
+      - pattern: ^/tenant/europe(/.*)?$
+        replacement: $1
+        region: ams     # Route to Amsterdam region
+        flag: last
 
-  # Route to any instance of a specific app
-  - pattern: ^/app/(.+?)/(.*)$
-    replacement: $2
-    fly_replay: app=$1        # Route to any instance of the app
-    flag: last
+      - pattern: ^/tenant/asia(/.*)?$
+        replacement: $1
+        region: nrt     # Route to Tokyo region
+        flag: last
 
-  # Maintenance mode for specific paths
-  - pattern: ^/maintenance(/.*)?$
-    replacement: /503.html
-    status: 503               # Return 503 Service Unavailable
-    flag: last
+      # Route to specific machine for debugging
+      - pattern: ^/debug/machine/(.+?)/(.*)$
+        replacement: $2
+        instance: $1    # Route to specific machine ID
+        flag: last
 
-# Static maintenance page
-static_files:
-  paths:
-    - /503.html
-    - /assets/*
-  headers:
-    cache_control: "no-cache, no-store, must-revalidate"
+      # Route to any instance of a specific app
+      - pattern: ^/app/(.+?)/(.*)$
+        replacement: $2
+        app: $1        # Route to any instance of the app
+        flag: last
+
+  # Rewrite rules for other routing
+  rewrite_rules:
+    # Maintenance mode for specific paths
+    - pattern: ^/maintenance(/.*)?$
+      replacement: /503.html
+      status: 503               # Return 503 Service Unavailable
+      flag: last
 
 # Multi-tenant application configuration
 applications:

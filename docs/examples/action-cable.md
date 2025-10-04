@@ -16,7 +16,15 @@ Configure Navigator to support Rails Action Cable for real-time WebSocket connec
 ```yaml title="navigator.yml"
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
+
+    # Cache configuration
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 24h
+    allowed_extensions: [css, js, png, jpg, gif]
 
 # Redis for Action Cable
 managed_processes:
@@ -25,27 +33,19 @@ managed_processes:
     args: [--port, "6379"]
     auto_restart: true
 
-# Static files
-static:
-  directories:
-    - path: /assets/
-      root: public/assets/
-      cache: 86400
-  extensions: [css, js, png, jpg, gif]
-
 # Applications
 applications:
   global_env:
     RAILS_ENV: production
     REDIS_URL: redis://localhost:6379/0
     CABLE_REDIS_URL: redis://localhost:6379/5  # Separate DB for Cable
-    
+
   tenants:
     # Main Rails application
     - name: main
       path: /
       working_dir: /var/www/app
-      
+
     # Action Cable server (WebSocket connections)
     - name: cable
       path: /cable

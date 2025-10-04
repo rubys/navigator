@@ -18,26 +18,31 @@ A complete Navigator configuration has these main sections:
 server:
   listen: 3000
   hostname: localhost
-  public_dir: ./public
 
-# Process pool management
-pools:
-  max_size: 10
-  idle_timeout: 300
-  start_port: 4000
+  # Static file serving
+  static:
+    public_dir: ./public
+    directories: []
+    extensions: []
+
+  # Machine idle management (Fly.io)
+  idle:
+    action: suspend  # or "stop"
+    timeout: 10m
 
 # Authentication
 auth:
   enabled: true
   htpasswd: ./htpasswd
 
-# Static file serving
-static:
-  directories: []
-  extensions: []
-
 # Applications
 applications:
+  # Process pool management
+  pools:
+    max_size: 10
+    idle_timeout: 5m
+    start_port: 4000
+
   global_env: {}
   env: {}
   tenants: []
@@ -48,12 +53,14 @@ managed_processes: []
 # Routing rules
 routes:
   rewrites: []
-  fly_replay: []
+  fly:
+    replay: []
+    sticky_sessions: {}
 
-# Machine suspension (Fly.io)
-suspend:
+# Maintenance page
+maintenance:
   enabled: false
-  idle_timeout: 600
+  page: public/503.html
 ```
 
 ## Quick Examples
@@ -63,6 +70,8 @@ suspend:
 ```yaml
 server:
   listen: 3000
+  static:
+    public_dir: public
 
 applications:
   tenants:
@@ -77,45 +86,43 @@ applications:
 server:
   listen: 3000
   hostname: example.com
-  public_dir: /var/www/app/public
+
+  static:
+    public_dir: /var/www/app/public
+    directories:
+      - path: /assets/
+        root: /var/www/app/public/assets/
+        cache: 86400
 
 auth:
   enabled: true
   htpasswd: /etc/navigator/htpasswd
 
-static:
-  directories:
-    - path: /assets/
-      root: /var/www/app/public/assets/
-      cache: 86400
-
 applications:
+  pools:
+    max_size: 20
+    idle_timeout: 10m
+
   global_env:
     RAILS_ENV: production
     SECRET_KEY_BASE: "${SECRET_KEY_BASE}"
-    
+
   tenants:
     - name: production
       path: /
       working_dir: /var/www/app
-
-pools:
-  max_size: 20
-  idle_timeout: 600
 ```
 
 ## Configuration Sections
 
 | Section | Purpose | Required | Details |
 |---------|---------|----------|---------|
-| [server](server.md) | HTTP server settings | ✓ | Port, hostname, paths |
-| pools | Process pool management | | Resource limits |
+| [server](server.md) | HTTP server settings | ✓ | Port, hostname, static files, idle |
 | [auth](authentication.md) | Authentication setup | | htpasswd support |
-| [static](static-files.md) | Static file serving | | Direct filesystem serving |
-| [applications](applications.md) | Rails applications | ✓ | Tenants and environment |
+| [applications](applications.md) | Rails applications | ✓ | Tenants, pools, environment |
 | [managed_processes](processes.md) | External processes | | Redis, Sidekiq, etc. |
-| [routes](routing.md) | URL routing rules | | Rewrites, redirects |
-| [suspend](suspend.md) | Machine suspension | | Fly.io auto-suspend |
+| [routes](routing.md) | URL routing rules | | Rewrites, Fly-Replay, sticky sessions |
+| [maintenance](maintenance.md) | Maintenance pages | | Custom 503 pages |
 
 ## Environment Variables
 
@@ -178,11 +185,11 @@ Navigator validates configuration on startup:
 ### 1. Use Absolute Paths
 
 ```yaml
-# Good
+# Good - Absolute paths
 working_dir: /var/www/app
 htpasswd: /etc/navigator/htpasswd
 
-# Avoid
+# Avoid - Relative paths
 working_dir: ./app
 htpasswd: ../htpasswd
 ```
@@ -216,17 +223,18 @@ config/*.yml
 ### 4. Optimize Static Serving
 
 ```yaml
-static:
-  # Fingerprinted assets (far-future cache)
-  directories:
-    - path: /assets/
-      root: public/assets/
-      cache: 31536000  # 1 year
-    
-    # Regular images (shorter cache)
-    - path: /images/
-      root: public/images/
-      cache: 3600  # 1 hour
+server:
+  static:
+    # Fingerprinted assets (far-future cache)
+    directories:
+      - path: /assets/
+        root: public/assets/
+        cache: 31536000  # 1 year
+
+      # Regular images (shorter cache)
+      - path: /images/
+        root: public/images/
+        cache: 3600  # 1 hour
 ```
 
 ## Migration from nginx

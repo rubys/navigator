@@ -32,7 +32,7 @@ func TestHandler_getPublicDir(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config.Config{}
-			cfg.Server.PublicDir = tt.publicDir
+			cfg.Server.Static.PublicDir = tt.publicDir
 
 			staticHandler := NewStaticFileHandler(cfg)
 

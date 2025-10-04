@@ -43,12 +43,8 @@ All examples follow this structure:
 # Server configuration
 server:
   listen: 3000
-  public_dir: ./public
-
-# Static file serving (optional)
-static:
-  directories: []
-  extensions: []
+  static:
+    public_dir: ./public
 
 # Authentication (optional)
 auth:
@@ -64,7 +60,8 @@ managed_processes: []
 # Routing rules (optional)
 routes:
   rewrites: []
-  fly_replay: []
+  fly:
+    replay: []
 ```
 
 ## Tips for Using Examples

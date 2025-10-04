@@ -5,61 +5,64 @@
 server:
   listen: 3000
   hostname: localhost
-  public_dir: public  # All static files served from this directory
 
-  # Cache control configuration (optional)
-  # Customize cache headers for specific URL paths
-  cache_control:
-    overrides:
-      # Long cache for versioned assets
-      - path: /assets/
-        max_age: 24h
+  # Static file configuration
+  static:
+    public_dir: public  # All static files served from this directory
 
-      # Medium cache for images
-      - path: /images/
-        max_age: 12h
+    # Cache control configuration (optional)
+    # Customize cache headers for specific URL paths
+    cache_control:
+      overrides:
+        # Long cache for versioned assets
+        - path: /assets/
+          max_age: 24h
 
-      # Long cache for fonts
-      - path: /fonts/
-        max_age: 30d
+        # Medium cache for images
+        - path: /images/
+          max_age: 12h
 
-      # Short cache for root-level files
-      - path: /
-        max_age: 1h
+        # Long cache for fonts
+        - path: /fonts/
+          max_age: 30d
 
-  # File extensions allowed for static serving (optional)
-  # If omitted, ALL files in public_dir are allowed
-  # Specify this to restrict which file types can be served
-  allowed_extensions:
-    - html
-    - htm
-    - css
-    - js
-    - png
-    - jpg
-    - jpeg
-    - gif
-    - svg
-    - ico
-    - pdf
-    - txt
-    - xml
-    - json
-    - woff
-    - woff2
-    - ttf
-    - eot
+        # Short cache for root-level files
+        - path: /
+          max_age: 1h
 
-  # Try files configuration (optional)
-  # If present, enables try_files feature for SPA-like behavior
-  # If absent, feature is disabled
-  try_files:
-    - index.html  # Try index.html first
-    - .html       # Then try adding .html extension
-    - .htm        # Then try adding .htm extension
-    - .txt        # Then try adding .txt extension
-    - .xml        # Then try adding .xml extension
-    - .json       # Then try adding .json extension
+    # File extensions allowed for static serving (optional)
+    # If omitted, ALL files in public_dir are allowed
+    # Specify this to restrict which file types can be served
+    allowed_extensions:
+      - html
+      - htm
+      - css
+      - js
+      - png
+      - jpg
+      - jpeg
+      - gif
+      - svg
+      - ico
+      - pdf
+      - txt
+      - xml
+      - json
+      - woff
+      - woff2
+      - ttf
+      - eot
+
+    # Try files configuration (optional)
+    # If present, enables try_files feature for SPA-like behavior
+    # If absent, feature is disabled
+    try_files:
+      - index.html  # Try index.html first
+      - .html       # Then try adding .html extension
+      - .htm        # Then try adding .htm extension
+      - .txt        # Then try adding .txt extension
+      - .xml        # Then try adding .xml extension
+      - .json       # Then try adding .json extension
 
 # Example URL mappings this configuration creates:
 #

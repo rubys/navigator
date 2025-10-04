@@ -124,7 +124,7 @@ func TestShouldExcludeFromAuth(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			// Create a minimal config with auth exclusions
 			cfg := &config.Config{}
-			cfg.Server.AuthExclude = tt.authExclude
+			cfg.Auth.PublicPaths = tt.authExclude
 
 			result := ShouldExcludeFromAuth(tt.path, cfg)
 			if result != tt.expected {
@@ -195,7 +195,7 @@ func BenchmarkCheckAuth(b *testing.B) {
 
 func BenchmarkShouldExcludeFromAuth(b *testing.B) {
 	cfg := &config.Config{}
-	cfg.Server.AuthExclude = []string{"*.css", "*.js", "*.png", "/up", "/health"}
+	cfg.Auth.PublicPaths = []string{"*.css", "*.js", "*.png", "/up", "/health"}
 
 	path := "/styles.css"
 
@@ -349,7 +349,7 @@ func TestShouldExcludeFromAuthAdvanced(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config.Config{}
-			cfg.Server.AuthExclude = tt.authExclude
+			cfg.Auth.PublicPaths = tt.authExclude
 
 			result := ShouldExcludeFromAuth(tt.path, cfg)
 			if result != tt.expected {

@@ -65,11 +65,15 @@ func main() {
 
 	// Load authentication if configured
 	var basicAuth *auth.BasicAuth
-	if cfg.Server.Authentication != "" {
+	if cfg.Auth.Enabled && cfg.Auth.HTPasswd != "" {
+		realm := cfg.Auth.Realm
+		if realm == "" {
+			realm = "Restricted" // Default realm
+		}
 		basicAuth, err = auth.LoadAuthFile(
-			cfg.Server.Authentication,
-			"Restricted", // Default realm
-			cfg.Server.AuthExclude,
+			cfg.Auth.HTPasswd,
+			realm,
+			cfg.Auth.PublicPaths,
 		)
 		if err != nil {
 			slog.Error("Failed to load auth file", "error", err)
@@ -260,17 +264,21 @@ func (l *ServerLifecycle) handleReload() {
 	l.idleManager.UpdateConfig(newConfig)
 
 	// Reload auth if configured
-	if newConfig.Server.Authentication != "" {
+	if newConfig.Auth.Enabled && newConfig.Auth.HTPasswd != "" {
+		realm := newConfig.Auth.Realm
+		if realm == "" {
+			realm = "Restricted"
+		}
 		newAuth, err := auth.LoadAuthFile(
-			newConfig.Server.Authentication,
-			"Restricted",
-			newConfig.Server.AuthExclude,
+			newConfig.Auth.HTPasswd,
+			realm,
+			newConfig.Auth.PublicPaths,
 		)
 		if err != nil {
-			slog.Warn("Failed to reload auth file", "file", newConfig.Server.Authentication, "error", err)
+			slog.Warn("Failed to reload auth file", "file", newConfig.Auth.HTPasswd, "error", err)
 		} else {
 			l.basicAuth = newAuth
-			slog.Info("Reloaded authentication", "file", newConfig.Server.Authentication)
+			slog.Info("Reloaded authentication", "file", newConfig.Auth.HTPasswd)
 		}
 	} else {
 		l.basicAuth = nil

@@ -101,7 +101,8 @@ docs/
 # Simplest possible setup
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
 applications:
   tenants:
@@ -115,14 +116,13 @@ applications:
 # Serve assets directly, bypass Rails
 server:
   listen: 3000
-  public_dir: ./public
-
-static:
-  directories:
-    - path: /assets/
-      root: public/assets/
-      cache: 86400
-  extensions: [css, js, png, jpg]
+  static:
+    public_dir: ./public
+    directories:
+      - path: /assets/
+        root: public/assets/
+        cache: 86400
+    extensions: [css, js, png, jpg]
 
 applications:
   tenants:
@@ -197,10 +197,11 @@ applications:
 ```yaml
 # Route by region
 routes:
-  fly_replay:
-    - path: "^/sydney/"
-      region: syd
-      status: 307
+  fly:
+    replay:
+      - path: "^/sydney/"
+        region: syd
+        status: 307
 ```
 
 ### 8. Development with Hot Reload
@@ -384,14 +385,15 @@ You have a Rails application that needs to process background jobs using Sidekiq
 # config/navigator.yml
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
 managed_processes:
   - name: redis
     command: redis-server
     auto_restart: true
     start_delay: 0
-    
+
   - name: sidekiq
     command: bundle
     args: [exec, sidekiq]
@@ -406,7 +408,7 @@ applications:
   global_env:
     RAILS_ENV: production
     REDIS_URL: redis://localhost:6379
-    
+
   tenants:
     - name: myapp
       path: /

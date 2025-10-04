@@ -57,7 +57,8 @@ end
 ```yaml
 server:
   listen: 3000
-  public_dir: /var/www/app/public
+  static:
+    public_dir: /var/www/app/public
 
 pools:
   max_size: 10
@@ -240,8 +241,7 @@ applications:
 # Reverse proxy to standalone Action Cable server
 routes:
   reverse_proxies:
-    - name: action-cable
-      path: "^/cable"
+    - path: "^/cable"
       target: "http://localhost:28080"
       websocket: true  # Enable WebSocket support for proxy
 ```
@@ -299,7 +299,8 @@ applications:
 ```yaml
 server:
   listen: 3000
-  public_dir: /var/www/app/public
+  static:
+    public_dir: /var/www/app/public
 
 pools:
   max_size: 30             # More processes for high connection count
@@ -395,26 +396,19 @@ end
 ### Multi-Instance WebSocket Setup
 
 ```yaml
-# Instance 1 - Primary WebSocket server
 server:
-  listen: 3001
+  listen: 3000
+  static:
+    public_dir: /var/www/app/public
 
-applications:
-  tenants:
-    - name: websocket-primary
-      path: /cable
-      force_max_concurrent_requests: 0
+pools:
+  max_size: 30             # More processes for high connection count
+  idle_timeout: 3600       # 1 hour - keep connections alive
+  start_port: 4000
 
-# Instance 2 - Secondary WebSocket server  
-server:
-  listen: 3002
-  
-applications:
-  tenants:
-    - name: websocket-secondary
-      path: /cable
-      force_max_concurrent_requests: 0
-```
+# Disable suspension for WebSocket servers
+suspend:
+  enabled: false           # WebSockets prevent proper suspension
 
 ### Load Balancer Configuration
 

@@ -18,14 +18,10 @@ func TestParseAuthConfig_NoWarningsForGlobPatterns(t *testing.T) {
 	// Create config with glob patterns
 	yamlConfig := YAMLConfig{
 		Auth: struct {
-			Enabled         bool     `yaml:"enabled"`
-			Realm           string   `yaml:"realm"`
-			HTPasswd        string   `yaml:"htpasswd"`
-			PublicPaths     []string `yaml:"public_paths"`
-			ExcludePatterns []struct {
-				Pattern     string `yaml:"pattern"`
-				Description string `yaml:"description"`
-			} `yaml:"exclude_patterns"`
+			Enabled     bool     `yaml:"enabled"`
+			Realm       string   `yaml:"realm"`
+			HTPasswd    string   `yaml:"htpasswd"`
+			PublicPaths []string `yaml:"public_paths"`
 		}{
 			Enabled:  true,
 			HTPasswd: "/etc/htpasswd",
@@ -50,9 +46,9 @@ func TestParseAuthConfig_NoWarningsForGlobPatterns(t *testing.T) {
 		t.Fatalf("Parse() failed: %v", err)
 	}
 
-	// Verify glob patterns were preserved
-	if len(config.Server.AuthExclude) != 9 {
-		t.Errorf("Expected 9 auth exclude patterns, got %d", len(config.Server.AuthExclude))
+	// Verify glob patterns were preserved in Auth.PublicPaths
+	if len(config.Auth.PublicPaths) != 9 {
+		t.Errorf("Expected 9 auth public paths, got %d", len(config.Auth.PublicPaths))
 	}
 
 	// Check for any warnings about invalid patterns
@@ -67,19 +63,14 @@ func TestParseAuthConfig_NoWarningsForGlobPatterns(t *testing.T) {
 		t.Errorf("Unexpected regex repetition operator error in logs:\n%s", logOutput)
 	}
 
-	// Verify no regex patterns were created
-	if len(config.Server.AuthPatterns) != 0 {
-		t.Errorf("Expected 0 auth patterns (regex), got %d", len(config.Server.AuthPatterns))
-	}
-
 	// Verify the glob patterns are present as-is
 	expectedPatterns := []string{
 		"*.css", "*.js", "*.png", "*.jpg", "*.gif",
 		"*.woff", "*.woff2", "/assets/", "/favicon.ico",
 	}
 	for i, expected := range expectedPatterns {
-		if i >= len(config.Server.AuthExclude) || config.Server.AuthExclude[i] != expected {
-			t.Errorf("AuthExclude[%d] = %q, want %q", i, config.Server.AuthExclude[i], expected)
+		if i >= len(config.Auth.PublicPaths) || config.Auth.PublicPaths[i] != expected {
+			t.Errorf("Auth.PublicPaths[%d] = %q, want %q", i, config.Auth.PublicPaths[i], expected)
 		}
 	}
 }

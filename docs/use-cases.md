@@ -42,7 +42,8 @@ CMD ["navigator", "config/navigator.yml"]
 ```yaml
 server:
   listen: 3000
-  public_dir: public
+  static:
+    public_dir: public
 
 applications:
   env:
@@ -114,10 +115,10 @@ hooks:
   server:
     idle:
       - command: /usr/local/bin/backup-to-s3.sh
-        timeout: 30
+        timeout: 30s
     resume:
       - command: /usr/local/bin/restore-from-s3.sh
-        timeout: 30
+        timeout: 30s
 
 applications:
   tenants:
@@ -156,7 +157,15 @@ Navigator combines both without modifying your Rails configuration.
 ```yaml
 server:
   listen: 3000
-  public_dir: public
+  static:
+    public_dir: public
+
+  # Reverse proxy WebSocket requests to standalone Action Cable server
+  reverse_proxies:
+    - name: action-cable
+      path: "^/cable"
+      target: "http://localhost:28080"
+      websocket: true
 
 applications:
   # Disable WebSocket tracking for main app (proxies WebSockets elsewhere)
@@ -167,14 +176,6 @@ applications:
       path: /
       working_dir: /app
       track_websockets: false  # Override: this app proxies WebSockets to standalone server
-
-# Reverse proxy WebSocket requests to standalone Action Cable server
-routes:
-  reverse_proxies:
-    - name: action-cable
-      path: "^/cable"
-      target: "http://localhost:28080"
-      websocket: true
 ```
 
 ### WebSocket Connection Tracking
@@ -208,15 +209,17 @@ See [websockets-example.yml](https://github.com/rubys/navigator/blob/main/exampl
 ### Configuration Example
 
 ```yaml
-sticky_sessions:
-  enabled: true
-  cookie_name: "_navigator_machine"
-  cookie_max_age: "2h"
-  cookie_secure: true
-  cookie_httponly: true
-  paths:
-    - "/app/*"
-    - "/dashboard/*"
+routes:
+  fly:
+    sticky_sessions:
+      enabled: true
+      cookie_name: "_navigator_machine"
+      cookie_max_age: "2h"
+      cookie_secure: true
+      cookie_httponly: true
+      paths:
+        - "/app/*"
+        - "/dashboard/*"
 
 applications:
   tenants:

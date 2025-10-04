@@ -653,8 +653,9 @@ func TestAuthenticationBypass(t *testing.T) {
 	// This test would be more comprehensive with actual auth setup
 	// For now, test basic auth header handling
 	cfg := &config.Config{}
-	cfg.Server.Authentication = "/tmp/nonexistent.htpasswd" // Simulate auth requirement
-	cfg.Server.AuthExclude = []string{"/public/*"}
+	cfg.Auth.Enabled = true
+	cfg.Auth.HTPasswd = "/tmp/nonexistent.htpasswd" // Simulate auth requirement
+	cfg.Auth.PublicPaths = []string{"/public/*"}
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}

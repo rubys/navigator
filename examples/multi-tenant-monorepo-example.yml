@@ -6,16 +6,16 @@
 server:
   listen: 3000
   hostname: localhost
-  public_dir: public
 
-# Static file serving shared across all tenants
-static_files:
-  paths:
-    - /assets/*
-    - /favicon.ico
-    - /robots.txt
-  headers:
-    cache_control: "public, max-age=3600"
+  # Static file serving shared across all tenants
+  static:
+    public_dir: public
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 1h
+        - path: /
+          max_age: 1h
 
 # Rewrite rules to route to different services
 rewrite_rules:

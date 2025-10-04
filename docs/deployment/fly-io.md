@@ -147,25 +147,26 @@ primary_region = "ord"
 ```yaml title="config/navigator-fly.yml"
 server:
   listen: 3000
-  public_dir: /app/public
 
-pools:
-  max_size: 10
-  idle_timeout: 300
-  start_port: 4000
+  idle:
+    action: suspend
+    timeout: 10m
 
-# Machine suspension
-suspend:
-  enabled: true
-  idle_timeout: 600        # 10 minutes
+  static:
+    public_dir: /app/public
 
 applications:
+  pools:
+    max_size: 10
+    idle_timeout: 5m
+    start_port: 4000
+
   global_env:
     RAILS_ENV: production
     RAILS_SERVE_STATIC_FILES: "false"
     DATABASE_URL: "${DATABASE_URL}"
     SECRET_KEY_BASE: "${SECRET_KEY_BASE}"
-    
+
   tenants:
     - name: production
       path: /
@@ -177,43 +178,45 @@ applications:
 ```yaml title="config/navigator-fly.yml"
 server:
   listen: 3000
-  public_dir: /app/public
 
-pools:
-  max_size: 15
-  idle_timeout: 600        # Longer timeout for production
+  # Aggressive suspension for cost optimization
+  idle:
+    action: suspend
+    timeout: 15m
 
-# Aggressive suspension for cost optimization
-suspend:
-  enabled: true
-  idle_timeout: 900        # 15 minutes
-  check_interval: 60
+  static:
+    public_dir: /app/public
 
-# Fly-Replay routing for optimal performance
 routes:
-  fly_replay:
-    # Route PDF generation to specific region
-    - path: "^/api/pdf/"
-      region: ord
-      status: 307
-      
-    # Route European users to Frankfurt
-    - path: "^/eu/"
-      region: fra
-      status: 307
-      
-    # Route Asian users to Tokyo  
-    - path: "^/asia/"
-      region: nrt
-      status: 307
+  # Fly-Replay routing for optimal performance
+  fly:
+    replay:
+      # Route PDF generation to specific region
+      - path: "^/api/pdf/"
+        region: ord
+        status: 307
+
+      # Route European users to Frankfurt
+      - path: "^/eu/"
+        region: fra
+        status: 307
+
+      # Route Asian users to Tokyo
+      - path: "^/asia/"
+        region: nrt
+        status: 307
 
 applications:
+  pools:
+    max_size: 15
+    idle_timeout: 10m  # Longer timeout for production
+
   global_env:
     RAILS_ENV: production
     DATABASE_URL: "${DATABASE_URL}"
     SECRET_KEY_BASE: "${SECRET_KEY_BASE}"
     REDIS_URL: "${REDIS_URL}"
-    
+
   tenants:
     - name: production
       path: /
@@ -321,11 +324,12 @@ Navigator integrates seamlessly with Fly.io's machine suspension:
 
 ```yaml
 # Enable in Navigator config
-suspend:
-  enabled: true
-  idle_timeout: 600
+server:
+  idle:
+    action: suspend
+    timeout: 10m
 
-# Allow in Fly.io config  
+# Allow in Fly.io config
 [machines]
   auto_stop = true
   min_machines_running = 0
@@ -352,21 +356,22 @@ flyctl scale count 2      # Multiple machines for redundancy
 
 ```yaml title="Navigator configuration"
 routes:
-  fly_replay:
-    # North America -> Chicago
-    - path: "^/na/"
-      region: ord
-      status: 307
-      
-    # Europe -> Frankfurt  
-    - path: "^/eu/"
-      region: fra
-      status: 307
-      
-    # Asia Pacific -> Tokyo
-    - path: "^/apac/"
-      region: nrt
-      status: 307
+  fly:
+    replay:
+      # North America -> Chicago
+      - path: "^/na/"
+        region: ord
+        status: 307
+
+      # Europe -> Frankfurt
+      - path: "^/eu/"
+        region: fra
+        status: 307
+
+      # Asia Pacific -> Tokyo
+      - path: "^/apac/"
+        region: nrt
+        status: 307
 ```
 
 ### Regional Deployment
@@ -442,12 +447,13 @@ flyctl ssh console -C "ps aux | grep rails"
 ### Process Pool Tuning
 
 ```yaml
-# Adjust for machine size
-pools:
-  max_size: 8      # 512MB machine
-  # max_size: 15   # 1GB machine  
-  # max_size: 25   # 2GB machine
-  idle_timeout: 600
+applications:
+  pools:
+    # Adjust for machine size
+    max_size: 8      # 512MB machine
+    # max_size: 15   # 1GB machine
+    # max_size: 25   # 2GB machine
+    idle_timeout: 10m
 ```
 
 ## Cost Optimization
@@ -456,19 +462,22 @@ pools:
 
 ```yaml
 # Aggressive suspension (development)
-suspend:
-  enabled: true
-  idle_timeout: 180     # 3 minutes
+server:
+  idle:
+    action: suspend
+    timeout: 3m
 
-# Balanced suspension (staging)  
-suspend:
-  enabled: true
-  idle_timeout: 600     # 10 minutes
+# Balanced suspension (staging)
+server:
+  idle:
+    action: suspend
+    timeout: 10m
 
 # Conservative suspension (production)
-suspend:
-  enabled: true
-  idle_timeout: 1800    # 30 minutes
+server:
+  idle:
+    action: suspend
+    timeout: 30m
 ```
 
 ### Regional Cost Management
@@ -531,7 +540,7 @@ journalctl -u navigator -f
 
 ```bash
 # Check suspension configuration
-flyctl ssh console -C "cat /app/navigator.yml | grep -A5 suspend"
+flyctl ssh console -C "cat /app/navigator.yml | grep -A5 idle"
 
 # Monitor suspension activity
 flyctl logs | grep -E "(suspend|idle|activity)"
@@ -628,9 +637,10 @@ flyctl deploy --app myapp-staging
 ### 1. Use Machine Suspension
 
 ```yaml
-suspend:
-  enabled: true
-  idle_timeout: 600    # Adjust based on traffic patterns
+server:
+  idle:
+    action: suspend
+    timeout: 10m  # Adjust based on traffic patterns
 ```
 
 ### 2. Optimize for Regions

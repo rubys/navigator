@@ -27,14 +27,15 @@ defaults:
 
 server:
   listen: 3000
-  public_dir: /app/public
-
-pools:
-  max_size: 20
-  idle_timeout: 600
-  start_port: 4000
+  static:
+    public_dir: /app/public
 
 applications:
+  pools:
+    max_size: 20
+    idle_timeout: 10m
+    start_port: 4000
+
   # Application-level defaults (override global defaults)
   framework: rails  # Default framework for all tenants
   env:

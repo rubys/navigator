@@ -5,7 +5,8 @@
 # This configuration still works exactly as before
 server:
   listen: 3000
-  public_dir: /app/public
+  static:
+    public_dir: /app/public
 
 applications:
   env:
@@ -29,7 +30,8 @@ applications:
 
 server:
   listen: 3000
-  public_dir: /app/public
+  static:
+    public_dir: /app/public
 
 applications:
   framework: rails  # Explicitly specify Rails (optional, this is the default)

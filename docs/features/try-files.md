@@ -17,13 +17,14 @@ Try files are configured directly in the `server` section:
 
 ```yaml
 server:
-  public_dir: public  # Base directory for static files
+  static:
+    public_dir: public  # Base directory for static files
 
-  # Try files configuration - if present, feature is enabled
-  try_files: [index.html, .html, .htm, .txt, .xml, .json]
+    # Try files configuration - if present, feature is enabled
+    try_files: [index.html, .html, .htm, .txt, .xml, .json]
 
-  # Optional: restrict allowed file extensions
-  allowed_extensions: [html, htm, txt, xml, json, css, js]
+    # Optional: restrict allowed file extensions
+    allowed_extensions: [html, htm, txt, xml, json, css, js]
 ```
 
 **Key points:**
@@ -40,13 +41,14 @@ Perfect for serving documentation, marketing pages, or static content:
 
 ```yaml
 server:
-  public_dir: public
+  static:
+    public_dir: public
 
-  # Enable try files for docs
-  try_files: [index.html, .html, .htm]
+    # Enable try files for docs
+    try_files: [index.html, .html, .htm]
 
-  # Optional: restrict to documentation file types
-  allowed_extensions: [html, htm, json, txt]
+    # Optional: restrict to documentation file types
+    allowed_extensions: [html, htm, json, txt]
 ```
 
 **Example requests**:
@@ -60,12 +62,13 @@ Serve the same content in multiple formats:
 
 ```yaml
 server:
-  public_dir: public
+  static:
+    public_dir: public
 
-  # Try multiple format suffixes
-  try_files: [.html, .xml, .json, .txt]
+    # Try multiple format suffixes
+    try_files: [.html, .xml, .json, .txt]
 
-  allowed_extensions: [html, xml, json, txt]
+    allowed_extensions: [html, xml, json, txt]
 ```
 
 **Example**:
@@ -79,13 +82,14 @@ Support Single Page Applications with catch-all routing:
 
 ```yaml
 server:
-  public_dir: public/spa
+  static:
+    public_dir: public/spa
 
-  # Try index.html for SPA routing
-  try_files: [index.html]
+    # Try index.html for SPA routing
+    try_files: [index.html]
 
-  # Allow all SPA assets
-  allowed_extensions: [html, js, css, png, jpg, svg, woff, woff2]
+    # Allow all SPA assets
+    allowed_extensions: [html, js, css, png, jpg, svg, woff, woff2]
 ```
 
 **Behavior**:
@@ -109,23 +113,24 @@ Navigator serves the showcase application with try files enabled:
 
 ```yaml
 server:
-  public_dir: public
+  static:
+    public_dir: public
 
-  # Try files in order
-  try_files: [index.html, .html, .htm]
+    # Try files in order
+    try_files: [index.html, .html, .htm]
 
-  # Allow static content types
-  allowed_extensions: [html, htm, css, js, png, jpg, svg]
+    # Allow static content types
+    allowed_extensions: [html, htm, css, js, png, jpg, svg]
 
-  # Cache static content
-  cache_control:
-    overrides:
-      - path: /studios/
-        max_age: 1h
-      - path: /regions/
-        max_age: 1h
-      - path: /docs/
-        max_age: 24h
+    # Cache static content
+    cache_control:
+      overrides:
+        - path: /studios/
+          max_age: 1h
+        - path: /regions/
+          max_age: 1h
+        - path: /docs/
+          max_age: 24h
 ```
 
 **File structure**:
@@ -163,14 +168,16 @@ public/
 
 **Example values**:
 ```yaml
-# Enable with multiple suffixes
-try_files: [index.html, .html, .htm, .txt]
+server:
+  static:
+    # Enable with multiple suffixes
+    try_files: [index.html, .html, .htm, .txt]
 
-# Enable with single suffix
-try_files: [.html]
+    # Enable with single suffix
+    try_files: [.html]
 
-# Disable (omit entirely)
-# try_files: ...
+    # Disable (omit entirely)
+    # try_files: ...
 ```
 
 **Order matters**: Suffixes are tried in the order specified. Put most specific first.
@@ -180,48 +187,53 @@ try_files: [.html]
 ### 1. Order Suffixes by Priority
 ```yaml
 server:
-  try_files: [index.html, .html, .htm, .txt]
-  # Most specific first, most general last
+  static:
+    try_files: [index.html, .html, .htm, .txt]
+    # Most specific first, most general last
 ```
 
 ### 2. Combine with Caching
 ```yaml
 server:
-  public_dir: public
-  try_files: [.html]
+  static:
+    public_dir: public
+    try_files: [.html]
 
-  # Add cache headers for static content
-  cache_control:
-    overrides:
-      - path: /docs/
-        max_age: 1h
+    # Add cache headers for static content
+    cache_control:
+      overrides:
+        - path: /docs/
+          max_age: 1h
 ```
 
 ### 3. Restrict File Types for Security
 ```yaml
 server:
-  try_files: [.html, .htm]
+  static:
+    try_files: [.html, .htm]
 
-  # Only serve safe file types
-  allowed_extensions: [html, htm, css, js, png, jpg]
+    # Only serve safe file types
+    allowed_extensions: [html, htm, css, js, png, jpg]
 ```
 
 ### 4. Use Different Settings for Different Environments
 ```yaml
 # Production: strict and cached
 server:
-  try_files: [.html]
-  allowed_extensions: [html, css, js, png, jpg]
-  cache_control:
-    overrides:
-      - path: /
-        max_age: 24h
+  static:
+    try_files: [.html]
+    allowed_extensions: [html, css, js, png, jpg]
+    cache_control:
+      overrides:
+        - path: /
+          max_age: 24h
 
 # Development: permissive and uncached
 server:
-  try_files: [.html, .htm, .txt]
-  # No allowed_extensions = all files allowed
-  # No cache_control = no caching
+  static:
+    try_files: [.html, .htm, .txt]
+    # No allowed_extensions = all files allowed
+    # No cache_control = no caching
 ```
 
 ## Debugging Try Files
@@ -286,14 +298,15 @@ installation      # → text/plain (generic)
 
 ```yaml
 server:
-  public_dir: public
-  try_files: [.html]
+  static:
+    public_dir: public
+    try_files: [.html]
 
-  # Add caching for performance
-  cache_control:
-    overrides:
-      - path: /docs/
-        max_age: 24h
+    # Add caching for performance
+    cache_control:
+      overrides:
+        - path: /docs/
+          max_age: 24h
 ```
 
 ## See Also

@@ -26,8 +26,8 @@ func NewStaticFileHandler(cfg *config.Config) *StaticFileHandler {
 
 // getPublicDir returns the configured public directory or the default
 func (s *StaticFileHandler) getPublicDir() string {
-	if s.config.Server.PublicDir != "" {
-		return s.config.Server.PublicDir
+	if s.config.Server.Static.PublicDir != "" {
+		return s.config.Server.Static.PublicDir
 	}
 	return config.DefaultPublicDir
 }
@@ -50,7 +50,7 @@ func (s *StaticFileHandler) ServeStatic(w http.ResponseWriter, r *http.Request) 
 
 	slog.Debug("Checking static file",
 		"path", path,
-		"publicDir", s.config.Server.PublicDir,
+		"publicDir", s.config.Server.Static.PublicDir,
 		"rootPath", s.config.Server.RootPath)
 
 	// Strip the root path if configured (e.g., "/showcase" prefix)
@@ -100,8 +100,8 @@ func (s *StaticFileHandler) hasStaticExtension(path string) bool {
 	}
 
 	// Use configured allowed extensions
-	if len(s.config.Server.AllowedExtensions) > 0 {
-		for _, allowedExt := range s.config.Server.AllowedExtensions {
+	if len(s.config.Server.Static.AllowedExtensions) > 0 {
+		for _, allowedExt := range s.config.Server.Static.AllowedExtensions {
 			if ext == allowedExt {
 				return true
 			}
@@ -147,7 +147,7 @@ func (s *StaticFileHandler) TryFiles(w http.ResponseWriter, r *http.Request) boo
 
 // getTryFileExtensions returns the configured try_files extensions
 func (s *StaticFileHandler) getTryFileExtensions() []string {
-	return s.config.Server.TryFiles
+	return s.config.Server.Static.TryFiles
 }
 
 // tryPublicDirFiles attempts to serve files from the public directory
@@ -195,7 +195,7 @@ func (s *StaticFileHandler) setCacheControl(w http.ResponseWriter, path string) 
 	var maxAge string
 	bestMatchLen := 0
 
-	for _, override := range s.config.Server.CacheControl.Overrides {
+	for _, override := range s.config.Server.Static.CacheControl.Overrides {
 		if strings.HasPrefix(path, override.Path) && len(override.Path) > bestMatchLen {
 			maxAge = override.MaxAge
 			bestMatchLen = len(override.Path)
@@ -204,7 +204,7 @@ func (s *StaticFileHandler) setCacheControl(w http.ResponseWriter, path string) 
 
 	// Use default if no override matched
 	if maxAge == "" {
-		maxAge = s.config.Server.CacheControl.Default
+		maxAge = s.config.Server.Static.CacheControl.Default
 	}
 
 	// Set Cache-Control header if configured

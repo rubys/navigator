@@ -48,7 +48,8 @@ Create a `navigator.yml` file:
 ```yaml
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
 applications:
   tenants:

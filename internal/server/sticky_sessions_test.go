@@ -123,10 +123,10 @@ func TestHandleStickySession(t *testing.T) {
 
 			// Setup config
 			cfg := &config.Config{}
-			cfg.Server.StickySession.Enabled = tt.stickyEnabled
-			cfg.Server.StickySession.Paths = tt.paths
-			cfg.Server.StickySession.CookieName = "_navigator_machine"
-			cfg.Server.StickySession.CookieMaxAge = "1h"
+			cfg.StickySession.Enabled = tt.stickyEnabled
+			cfg.StickySession.Paths = tt.paths
+			cfg.StickySession.CookieName = "_navigator_machine"
+			cfg.StickySession.CookieMaxAge = "1h"
 
 			// Create request
 			req := httptest.NewRequest("GET", tt.requestPath, nil)
@@ -260,11 +260,11 @@ func TestSetStickySessionCookie(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config.Config{}
-			cfg.Server.StickySession.CookieName = tt.cookieName
-			cfg.Server.StickySession.CookieMaxAge = tt.maxAge
-			cfg.Server.StickySession.CookieSecure = tt.secure
-			cfg.Server.StickySession.CookieHTTPOnly = tt.httpOnly
-			cfg.Server.StickySession.CookieSameSite = tt.sameSite
+			cfg.StickySession.CookieName = tt.cookieName
+			cfg.StickySession.CookieMaxAge = tt.maxAge
+			cfg.StickySession.CookieSecure = tt.secure
+			cfg.StickySession.CookieHTTPOnly = tt.httpOnly
+			cfg.StickySession.CookieSameSite = tt.sameSite
 
 			recorder := httptest.NewRecorder()
 
@@ -372,9 +372,9 @@ func TestHandleStickySession_PathMatching(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config.Config{}
-			cfg.Server.StickySession.Enabled = true
-			cfg.Server.StickySession.Paths = tt.patterns
-			cfg.Server.StickySession.CookieName = "_nav_machine"
+			cfg.StickySession.Enabled = true
+			cfg.StickySession.Paths = tt.patterns
+			cfg.StickySession.CookieName = "_nav_machine"
 
 			req := httptest.NewRequest("GET", tt.requestPath, nil)
 			recorder := httptest.NewRecorder()
@@ -398,8 +398,8 @@ func BenchmarkHandleStickySession(b *testing.B) {
 	}()
 
 	cfg := &config.Config{}
-	cfg.Server.StickySession.Enabled = true
-	cfg.Server.StickySession.CookieName = "_nav_machine"
+	cfg.StickySession.Enabled = true
+	cfg.StickySession.CookieName = "_nav_machine"
 
 	req := httptest.NewRequest("GET", "/app/dashboard", nil)
 
@@ -412,8 +412,8 @@ func BenchmarkHandleStickySession(b *testing.B) {
 
 func BenchmarkSetStickySessionCookie(b *testing.B) {
 	cfg := &config.Config{}
-	cfg.Server.StickySession.CookieName = "_nav_machine"
-	cfg.Server.StickySession.CookieMaxAge = "1h"
+	cfg.StickySession.CookieName = "_nav_machine"
+	cfg.StickySession.CookieMaxAge = "1h"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

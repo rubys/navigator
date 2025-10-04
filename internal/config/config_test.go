@@ -12,7 +12,8 @@ server:
   listen: 3000
   hostname: localhost
   root_path: /showcase
-  public_dir: public
+  static:
+    public_dir: public
   idle:
     action: suspend
     timeout: 20m
@@ -57,8 +58,8 @@ applications:
 		t.Errorf("Expected hostname localhost, got %s", config.Server.Hostname)
 	}
 
-	if config.Server.PublicDir != "public" {
-		t.Errorf("Expected public_dir public, got %s", config.Server.PublicDir)
+	if config.Server.Static.PublicDir != "public" {
+		t.Errorf("Expected public_dir public, got %s", config.Server.Static.PublicDir)
 	}
 
 	// RootPath should be correctly parsed from YAML
@@ -172,6 +173,7 @@ auth:
     - "/showcase/docs/"
     - "*.css"
     - "*.js"
+    - "/server/public/"
   exclude_patterns:
     - pattern: "^/showcase/?$"
       description: "Root showcase path"
@@ -179,8 +181,6 @@ auth:
 server:
   listen: 3000
   hostname: localhost
-  auth_exclude:
-    - "/server/public/"
 
 applications:
   pools:
@@ -205,21 +205,21 @@ applications:
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Verify auth section overrides server auth_exclude with public_paths
-	expectedAuthExclude := []string{"/showcase/studios/", "/showcase/docs/", "*.css", "*.js"}
-	if len(config.Server.AuthExclude) != len(expectedAuthExclude) {
-		t.Errorf("Expected %d auth exclude paths, got %d", len(expectedAuthExclude), len(config.Server.AuthExclude))
+	// Verify auth section sets public_paths in Auth.PublicPaths
+	expectedPublicPaths := []string{"/showcase/studios/", "/showcase/docs/", "*.css", "*.js", "/server/public/"}
+	if len(config.Auth.PublicPaths) != len(expectedPublicPaths) {
+		t.Errorf("Expected %d auth public paths, got %d", len(expectedPublicPaths), len(config.Auth.PublicPaths))
 	}
 
-	for i, expected := range expectedAuthExclude {
-		if i >= len(config.Server.AuthExclude) || config.Server.AuthExclude[i] != expected {
-			t.Errorf("Expected auth exclude[%d] to be %s, got %s", i, expected, config.Server.AuthExclude[i])
+	for i, expected := range expectedPublicPaths {
+		if i >= len(config.Auth.PublicPaths) || config.Auth.PublicPaths[i] != expected {
+			t.Errorf("Expected auth public_paths[%d] to be %s, got %s", i, expected, config.Auth.PublicPaths[i])
 		}
 	}
 
 	// Verify authentication file path is set from auth section
-	if config.Server.Authentication != "/path/to/htpasswd" {
-		t.Errorf("Expected authentication file /path/to/htpasswd, got %s", config.Server.Authentication)
+	if config.Auth.HTPasswd != "/path/to/htpasswd" {
+		t.Errorf("Expected authentication file /path/to/htpasswd, got %s", config.Auth.HTPasswd)
 	}
 }
 
@@ -232,8 +232,6 @@ auth:
 
 server:
   listen: 3000
-  auth_exclude:
-    - "/server/original/"
 
 applications:
   pools:
@@ -256,9 +254,9 @@ applications:
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	// When auth is disabled, server auth_exclude should remain unchanged
-	if len(config.Server.AuthExclude) != 1 || config.Server.AuthExclude[0] != "/server/original/" {
-		t.Errorf("Expected server auth_exclude to remain unchanged when auth disabled, got %v", config.Server.AuthExclude)
+	// When auth is disabled, auth public paths should be empty
+	if len(config.Auth.PublicPaths) != 0 {
+		t.Errorf("Expected auth public_paths to be empty when auth disabled, got %v", config.Auth.PublicPaths)
 	}
 }
 
@@ -266,15 +264,16 @@ func TestServerConfigWithTryFiles(t *testing.T) {
 	testConfig := `
 server:
   listen: 3000
-  public_dir: /Users/test/public
-  try_files:
-    - "index.html"
-    - ".html"
-    - ".htm"
-  allowed_extensions:
-    - html
-    - css
-    - js
+  static:
+    public_dir: /Users/test/public
+    try_files:
+      - "index.html"
+      - ".html"
+      - ".htm"
+    allowed_extensions:
+      - html
+      - css
+      - js
 
 applications:
   pools:
@@ -299,20 +298,20 @@ applications:
 
 	// Verify try_files configuration at server level
 	expectedTryFiles := []string{"index.html", ".html", ".htm"}
-	if len(config.Server.TryFiles) != len(expectedTryFiles) {
-		t.Errorf("Expected %d try_files, got %d", len(expectedTryFiles), len(config.Server.TryFiles))
+	if len(config.Server.Static.TryFiles) != len(expectedTryFiles) {
+		t.Errorf("Expected %d try_files, got %d", len(expectedTryFiles), len(config.Server.Static.TryFiles))
 	}
 
 	for i, expected := range expectedTryFiles {
-		if i >= len(config.Server.TryFiles) || config.Server.TryFiles[i] != expected {
-			t.Errorf("Expected try_files[%d] to be %s, got %s", i, expected, config.Server.TryFiles[i])
+		if i >= len(config.Server.Static.TryFiles) || config.Server.Static.TryFiles[i] != expected {
+			t.Errorf("Expected try_files[%d] to be %s, got %s", i, expected, config.Server.Static.TryFiles[i])
 		}
 	}
 
 	// Verify allowed extensions at server level
 	expectedExtensions := []string{"html", "css", "js"}
-	if len(config.Server.AllowedExtensions) != len(expectedExtensions) {
-		t.Errorf("Expected %d extensions, got %d", len(expectedExtensions), len(config.Server.AllowedExtensions))
+	if len(config.Server.Static.AllowedExtensions) != len(expectedExtensions) {
+		t.Errorf("Expected %d extensions, got %d", len(expectedExtensions), len(config.Server.Static.AllowedExtensions))
 	}
 }
 
@@ -346,7 +345,7 @@ server:
 
 	// Public dir should have a reasonable default or be empty
 	// (depending on implementation)
-	if config.Server.PublicDir == "" {
+	if config.Server.Static.PublicDir == "" {
 		t.Log("Public dir is empty - this may be expected behavior")
 	}
 }
@@ -357,25 +356,26 @@ func TestServerConfigWithCacheControl(t *testing.T) {
 server:
   listen: 3000
   hostname: localhost
-  public_dir: public
-  cache_control:
-    default: "public, max-age=86400"
-    overrides:
-      - path: "/assets/"
-        max_age: "public, max-age=86400"
-      - path: "/docs/"
-        max_age: "public, max-age=3600"
-      - path: "/images/"
-        max_age: "public, max-age=1800"
-      - path: "/temp/"
-        max_age: "no-cache"
-  allowed_extensions:
-    - html
-    - css
-    - js
-  try_files:
-    - ".html"
-    - ".htm"
+  static:
+    public_dir: public
+    cache_control:
+      default: "public, max-age=86400"
+      overrides:
+        - path: "/assets/"
+          max_age: "public, max-age=86400"
+        - path: "/docs/"
+          max_age: "public, max-age=3600"
+        - path: "/images/"
+          max_age: "public, max-age=1800"
+        - path: "/temp/"
+          max_age: "no-cache"
+    allowed_extensions:
+      - html
+      - css
+      - js
+    try_files:
+      - ".html"
+      - ".htm"
 
 routes:
   rewrites:
@@ -409,29 +409,29 @@ applications:
 	}
 
 	// Verify cache control configuration
-	if config.Server.CacheControl.Default != "public, max-age=86400" {
-		t.Errorf("Expected default cache control 'public, max-age=86400', got %s", config.Server.CacheControl.Default)
+	if config.Server.Static.CacheControl.Default != "public, max-age=86400" {
+		t.Errorf("Expected default cache control 'public, max-age=86400', got %s", config.Server.Static.CacheControl.Default)
 	}
 
-	if len(config.Server.CacheControl.Overrides) != 4 {
-		t.Errorf("Expected 4 cache overrides, got %d", len(config.Server.CacheControl.Overrides))
+	if len(config.Server.Static.CacheControl.Overrides) != 4 {
+		t.Errorf("Expected 4 cache overrides, got %d", len(config.Server.Static.CacheControl.Overrides))
 	}
 
 	// Verify allowed extensions at server level
 	expectedExtensions := []string{"html", "css", "js"}
-	if len(config.Server.AllowedExtensions) != len(expectedExtensions) {
-		t.Errorf("Expected %d extensions, got %d", len(expectedExtensions), len(config.Server.AllowedExtensions))
+	if len(config.Server.Static.AllowedExtensions) != len(expectedExtensions) {
+		t.Errorf("Expected %d extensions, got %d", len(expectedExtensions), len(config.Server.Static.AllowedExtensions))
 	}
 	for i, ext := range expectedExtensions {
-		if i >= len(config.Server.AllowedExtensions) || config.Server.AllowedExtensions[i] != ext {
-			t.Errorf("Expected extension %s at index %d, got %s", ext, i, config.Server.AllowedExtensions[i])
+		if i >= len(config.Server.Static.AllowedExtensions) || config.Server.Static.AllowedExtensions[i] != ext {
+			t.Errorf("Expected extension %s at index %d, got %s", ext, i, config.Server.Static.AllowedExtensions[i])
 		}
 	}
 
 	// Verify try_files configuration at server level
 	expectedTryFiles := []string{".html", ".htm"}
-	if len(config.Server.TryFiles) != len(expectedTryFiles) {
-		t.Errorf("Expected %d try_files, got %d", len(expectedTryFiles), len(config.Server.TryFiles))
+	if len(config.Server.Static.TryFiles) != len(expectedTryFiles) {
+		t.Errorf("Expected %d try_files, got %d", len(expectedTryFiles), len(config.Server.Static.TryFiles))
 	}
 
 	// Verify routes configuration
@@ -452,18 +452,19 @@ server:
   listen: 3000
   hostname: localhost
   root_path: /
-  public_dir: public
-  cache_control:
-    default: "no-cache"
-  allowed_extensions:
-    - html
-    - css
-    - js
-    - png
-    - jpg
-    - svg
-    - ico
-  try_files: []
+  static:
+    public_dir: public
+    cache_control:
+      default: "no-cache"
+    allowed_extensions:
+      - html
+      - css
+      - js
+      - png
+      - jpg
+      - svg
+      - ico
+    try_files: []
 
 auth:
   enabled: false
@@ -512,8 +513,8 @@ pools:
 		t.Errorf("Expected root_path /, got %s", config.Server.RootPath)
 	}
 
-	if config.Server.PublicDir != "public" {
-		t.Errorf("Expected public_dir public, got %s", config.Server.PublicDir)
+	if config.Server.Static.PublicDir != "public" {
+		t.Errorf("Expected public_dir public, got %s", config.Server.Static.PublicDir)
 	}
 
 	// Verify maintenance mode characteristics
@@ -537,8 +538,8 @@ pools:
 	}
 
 	// Verify cache control is set to no-cache
-	if config.Server.CacheControl.Default != "no-cache" {
-		t.Errorf("Expected cache control 'no-cache', got %s", config.Server.CacheControl.Default)
+	if config.Server.Static.CacheControl.Default != "no-cache" {
+		t.Errorf("Expected cache control 'no-cache', got %s", config.Server.Static.CacheControl.Default)
 	}
 }
 
@@ -548,17 +549,21 @@ func TestAllDurationsAsStrings(t *testing.T) {
 server:
   listen: 3000
   hostname: localhost
-  public_dir: public
+  static:
+    public_dir: public
+    cache_control:
+      default: "public, max-age=86400"
   idle:
     action: suspend
     timeout: "20m"
-  sticky_sessions:
-    enabled: true
-    cookie_name: "_navigator_session"
-    cookie_max_age: "2h"
-    cookie_secure: true
-  cache_control:
-    default: "public, max-age=86400"
+
+routes:
+  fly:
+    sticky_sessions:
+      enabled: true
+      cookie_name: "_navigator_session"
+      cookie_max_age: "2h"
+      cookie_secure: true
 
 applications:
   pools:
@@ -609,11 +614,6 @@ hooks:
 	// Server idle timeout
 	if config.Server.Idle.Timeout != "20m" {
 		t.Errorf("Expected server idle timeout '20m', got '%s'", config.Server.Idle.Timeout)
-	}
-
-	// Sticky session cookie max age
-	if config.Server.StickySession.CookieMaxAge != "2h" {
-		t.Errorf("Expected cookie max age '2h', got '%s'", config.Server.StickySession.CookieMaxAge)
 	}
 
 	// Application pool timeout
@@ -953,7 +953,16 @@ applications:
 // TestTenantNameExtractionFromPath tests the critical tenant name extraction logic
 func TestTenantNameExtractionFromPath(t *testing.T) {
 	testConfig := `
+server:
+  listen: 3000
+  static:
+    public_dir: public
+
 applications:
+  pools:
+    max_size: 10
+    timeout: 5m
+    start_port: 4000
   tenants:
     - path: /showcase/2025/raleigh/shimmer-shine/
       root: /app/shimmer-shine

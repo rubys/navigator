@@ -15,7 +15,8 @@ Create a file named `navigator.yml` in your Rails application root:
 ```yaml title="navigator.yml"
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
 applications:
   tenants:
@@ -64,17 +65,18 @@ The first request may take a few seconds as Rails starts up.
 
 Improve performance by serving assets directly:
 
-```yaml title="navigator.yml" hl_lines="5-10"
+```yaml title="navigator.yml" hl_lines="5-11"
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
-  # Cache static assets
-  cache_control:
-    overrides:
-      - path: /assets/
-        max_age: 24h
-  allowed_extensions: [css, js, png, jpg, gif, ico]
+    # Cache static assets
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 24h
+    allowed_extensions: [css, js, png, jpg, gif, ico]
 
 applications:
   tenants:
@@ -89,17 +91,18 @@ Now Navigator serves static files directly without starting Rails.
 
 Protect your application with basic authentication:
 
-```yaml title="navigator.yml" hl_lines="5-14"
+```yaml title="navigator.yml" hl_lines="5-15"
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
-  # Cache static assets
-  cache_control:
-    overrides:
-      - path: /assets/
-        max_age: 24h
-  allowed_extensions: [css, js, png, jpg, gif, ico]
+    # Cache static assets
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 24h
+    allowed_extensions: [css, js, png, jpg, gif, ico]
 
 auth:
   enabled: true
@@ -129,17 +132,18 @@ echo "admin:$apr1$8QzHdF3N$Ht4rg7RHVV0000000000/" > htpasswd
 
 Pass environment variables to your Rails app:
 
-```yaml title="navigator.yml" hl_lines="22-25"
+```yaml title="navigator.yml" hl_lines="23-26"
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
-  # Cache static assets
-  cache_control:
-    overrides:
-      - path: /assets/
-        max_age: 24h
-  allowed_extensions: [css, js, png, jpg, gif, ico]
+    # Cache static assets
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 24h
+    allowed_extensions: [css, js, png, jpg, gif, ico]
 
 auth:
   enabled: true

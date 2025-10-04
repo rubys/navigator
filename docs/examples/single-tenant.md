@@ -14,7 +14,8 @@ The simplest Navigator setup - serving one Rails application with optimized stat
 ```yaml title="navigator.yml"
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
 applications:
   tenants:
@@ -31,22 +32,19 @@ A complete production setup with all optimizations:
 server:
   listen: 3000
   hostname: example.com
-  public_dir: /var/www/myapp/public
+  static:
+    public_dir: /var/www/myapp/public
 
-# Serve static files directly
-static:
-  directories:
-    - path: /assets/
-      root: /var/www/myapp/public/assets/
-      cache: 86400  # 24 hours
-    - path: /packs/
-      root: /var/www/myapp/public/packs/
-      cache: 31536000  # 1 year (webpack assets)
-  extensions: [html, css, js, png, jpg, gif, ico, svg, woff, woff2, ttf, eot]
-  try_files:
-    enabled: true
-    suffixes: [".html", "index.html"]
-    fallback: rails
+    # Cache configuration
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 24h  # 24 hours
+        - path: /packs/
+          max_age: 365d  # 1 year (webpack assets)
+
+    allowed_extensions: [html, css, js, png, jpg, gif, ico, svg, woff, woff2, ttf, eot]
+    try_files: [".html", "index.html"]
 
 # Optional authentication
 auth:
@@ -67,12 +65,12 @@ applications:
     RAILS_SERVE_STATIC_FILES: "false"  # Navigator handles this
     SECRET_KEY_BASE: "${SECRET_KEY_BASE}"
     DATABASE_URL: "${DATABASE_URL}"
-    
+
   tenants:
     - name: myapp
       path: /
       working_dir: /var/www/myapp
-      
+
 # Resource management
 pools:
   max_size: 5
@@ -157,12 +155,13 @@ Simplified setup for development:
 ```yaml title="navigator-dev.yml"
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
 
 applications:
   global_env:
     RAILS_ENV: development
-    
+
   tenants:
     - name: dev
       path: /
@@ -207,14 +206,14 @@ pools:
 Optimize browser caching:
 
 ```yaml
-static:
-  directories:
-    - path: /assets/
-      root: public/assets/
-      cache: 31536000  # 1 year for fingerprinted assets
-    - path: /images/
-      root: public/images/
-      cache: 3600  # 1 hour for regular images
+server:
+  static:
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 365d  # 1 year for fingerprinted assets
+        - path: /images/
+          max_age: 1h  # 1 hour for regular images
 ```
 
 ## Common Issues

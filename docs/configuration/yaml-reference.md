@@ -2,6 +2,61 @@
 
 Complete reference for all Navigator configuration options.
 
+## Configuration Structure Overview
+
+Navigator's YAML configuration is organized into logical sections:
+
+```yaml
+server:                    # HTTP server settings
+  listen: 3000
+  hostname: "localhost"
+  root_path: "/prefix"
+  static:                  # Static file configuration
+    public_dir: "./public"
+    allowed_extensions: [...]
+    try_files: [...]
+    cache_control: {...}
+  idle:                    # Fly.io machine idle management
+    action: suspend
+    timeout: 20m
+
+auth:                      # Authentication (top-level)
+  enabled: true
+  realm: "Restricted"
+  htpasswd: "./htpasswd"
+  public_paths: [...]
+
+maintenance:               # Maintenance page configuration
+  page: "/503.html"
+
+applications:              # Multi-tenant app configuration
+  pools: {...}
+  framework: {...}
+  env: {...}
+  tenants: [...]
+
+managed_processes:         # External process management
+  - name: redis
+    command: redis-server
+    ...
+
+routes:                    # URL routing and rewriting
+  rewrites: [...]
+  reverse_proxies: [...]
+  fly:                     # Fly.io-specific routing
+    sticky_sessions: {...}
+    replay: [...]
+
+hooks:                     # Lifecycle hooks
+  server: {...}
+  tenant: {...}
+
+logging:                   # Logging configuration
+  format: json
+  file: "..."
+  vector: {...}
+```
+
 ## server
 
 HTTP server configuration.
@@ -10,49 +65,139 @@ HTTP server configuration.
 server:
   listen: 3000                    # Port to listen on (required)
   hostname: "localhost"           # Hostname for requests (optional)
-  public_dir: "./public"          # Default public directory (optional)
   root_path: "/showcase"          # Root URL path prefix (optional)
-  authentication: "./htpasswd"    # Path to htpasswd file (optional)
-  auth_exclude:                   # Paths excluded from auth (optional)
-    - "/assets/"
-    - "*.css"
-    - "*.js"
+
+  # Static file configuration
+  static:
+    public_dir: "./public"        # Directory for static files (optional)
+    allowed_extensions:           # Allowed file extensions (optional)
+      - html
+      - css
+      - js
+      - png
+      - jpg
+    try_files:                    # Try files suffixes (optional)
+      - index.html
+      - .html
+      - .htm
+    cache_control:
+      default: "1h"               # Default cache duration
+      overrides:                  # Path-specific cache durations
+        - path: "/assets/"
+          max_age: "24h"
 
   # Machine idle configuration (Fly.io)
   idle:
     action: suspend               # "suspend" or "stop"
     timeout: 20m                  # Duration: "30s", "5m", "1h30m"
-
-  # Sticky sessions configuration
-  sticky_sessions:
-    enabled: true
-    cookie_name: "_navigator_machine"
-    cookie_max_age: "2h"
-    cookie_secure: true
-    cookie_httponly: true
-    cookie_samesite: "Lax"
-    cookie_path: "/"
-    paths:                        # Optional: specific paths for sticky sessions
-      - "/app/*"
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `listen` | integer/string | `3000` | Port to bind HTTP server |
 | `hostname` | string | `""` | Hostname for Host header matching |
-| `public_dir` | string | `"./public"` | Default directory for static files and maintenance page |
 | `root_path` | string | `""` | Root URL path prefix (e.g., "/showcase") |
-| `authentication` | string | `""` | Path to htpasswd file for authentication |
-| `auth_exclude` | array | `[]` | Glob patterns for paths excluded from auth |
 
-### Maintenance Page
+### server.static
+
+Static file serving configuration.
+
+```yaml
+server:
+  static:
+    public_dir: "./public"
+    allowed_extensions: [html, css, js, png, jpg]
+    try_files: [index.html, .html, .htm]
+    cache_control:
+      default: "1h"
+      overrides:
+        - path: "/assets/"
+          max_age: "24h"
+        - path: "/images/"
+          max_age: "12h"
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `public_dir` | string | `"./public"` | Directory for static files |
+| `allowed_extensions` | array | `[]` | File extensions allowed (empty = all allowed) |
+| `try_files` | array | `[]` | Suffixes to try when resolving paths |
+| `cache_control` | object | - | Cache header configuration |
+| `cache_control.default` | string | `""` | Default cache duration (e.g., "1h") |
+| `cache_control.overrides` | array | `[]` | Path-specific cache configurations |
+| `cache_control.overrides[].path` | string | - | URL path prefix to match |
+| `cache_control.overrides[].max_age` | string | - | Cache duration (e.g., "24h") |
+
+**Allowed Extensions**: If omitted or empty, all files in `public_dir` can be served. If specified, only files with these extensions can be served.
+
+**Try Files**: When present, Navigator attempts each suffix in order before falling back to the application.
+
+Example: For request `/studios/boston` with `try_files: [index.html, .html, .htm]`:
+1. Try `public/studios/boston` (exact match)
+2. Try `public/studios/boston/index.html`
+3. Try `public/studios/boston.html`
+4. Try `public/studios/boston.htm`
+5. Fall back to application
+
+### server.idle
+
+Machine auto-suspend/stop configuration (Fly.io only).
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `action` | string | `""` | Action to take: "suspend" or "stop" |
+| `timeout` | string | `""` | Idle duration before action (e.g., "20m", "1h") |
+
+## auth
+
+Authentication configuration using htpasswd files.
+
+```yaml
+auth:
+  enabled: true                   # Enable/disable authentication
+  realm: "Restricted"             # Authentication realm name
+  htpasswd: "./htpasswd"          # Path to htpasswd file
+  public_paths:                   # Paths that bypass authentication
+    - "/assets/"
+    - "/favicon.ico"
+    - "*.css"
+    - "*.js"
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable authentication |
+| `realm` | string | `"Restricted"` | Basic Auth realm displayed in browser |
+| `htpasswd` | string | `""` | Path to htpasswd file |
+| `public_paths` | array | `[]` | Glob patterns for paths that bypass auth |
+
+### Supported htpasswd Formats
+
+- APR1 (Apache MD5)
+- bcrypt
+- SHA
+- MD5-crypt
+- Plain text (not recommended)
+
+## maintenance
+
+Maintenance page configuration.
+
+```yaml
+maintenance:
+  page: "/503.html"               # Path to maintenance page (within public_dir)
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `page` | string | `"/503.html"` | Path to custom maintenance page |
 
 Navigator automatically serves a maintenance page when:
 - An application is starting and exceeds the `startup_timeout`
 - A Fly-Replay target is unavailable
 - Sticky session routing fails to find the target machine
 
-The maintenance page is served from `{public_dir}/503.html` (e.g., `public/503.html`). If this file doesn't exist, Navigator serves a default maintenance page.
+The maintenance page is served from `{server.static.public_dir}/{maintenance.page}` (e.g., `public/503.html`). If this file doesn't exist, Navigator serves a default maintenance page.
 
 **Recommended 503.html:**
 
@@ -79,130 +224,6 @@ The maintenance page is served from `{public_dir}/503.html` (e.g., `public/503.h
 ```
 
 The `<meta http-equiv="refresh" content="5">` tag automatically reloads the page every 5 seconds, so users don't need to manually refresh while waiting for the application to become ready.
-
-### server.idle
-
-Machine auto-suspend/stop configuration (Fly.io only).
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `action` | string | `""` | Action to take: "suspend" or "stop" |
-| `timeout` | string | `""` | Idle duration before action (e.g., "20m", "1h") |
-
-### server.sticky_sessions
-
-Cookie-based session affinity for routing requests to the same machine.
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Enable sticky sessions |
-| `cookie_name` | string | `"_navigator"` | Name of the session cookie |
-| `cookie_max_age` | string | `"24h"` | Cookie lifetime (duration format) |
-| `cookie_secure` | boolean | `true` | Set Secure flag (HTTPS only) |
-| `cookie_httponly` | boolean | `true` | Set HttpOnly flag |
-| `cookie_samesite` | string | `"Lax"` | SameSite attribute: "Strict", "Lax", "None" |
-| `cookie_path` | string | `"/"` | Cookie path |
-| `paths` | array | `[]` | Specific URL patterns for sticky sessions |
-
-## auth
-
-Authentication configuration using htpasswd files.
-
-```yaml
-auth:
-  enabled: true                   # Enable/disable authentication
-  realm: "Protected Area"         # Authentication realm name
-  htpasswd: "./htpasswd"          # Path to htpasswd file
-  public_paths:                   # Paths that bypass authentication
-    - "/assets/"
-    - "/favicon.ico"
-    - "*.css"
-    - "*.js"
-```
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Enable authentication |
-| `realm` | string | `"Protected Area"` | Basic Auth realm |
-| `htpasswd` | string | `""` | Path to htpasswd file |
-| `public_paths` | array | `[]` | Glob patterns for public paths |
-
-### Supported htpasswd Formats
-
-- APR1 (Apache MD5)
-- bcrypt
-- SHA
-- MD5-crypt
-- Plain text (not recommended)
-
-## Static File Configuration
-
-Static files are configured directly in the `server` section:
-
-```yaml
-server:
-  public_dir: /var/www/public     # Root directory for static files
-
-  # Cache control for specific paths (optional)
-  cache_control:
-    overrides:
-      - path: /assets/
-        max_age: 24h              # Duration format: "24h", "1d", "30d"
-      - path: /images/
-        max_age: 12h
-
-  # Allowed file extensions (optional)
-  # If omitted, ALL files are allowed
-  allowed_extensions: [html, css, js, png, jpg]
-
-  # Try files configuration (optional)
-  # If present, feature is enabled; if absent, disabled
-  try_files: [index.html, .html, .htm]
-```
-
-#### server.cache_control
-
-Per-path cache header customization.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `overrides` | array | List of path-specific cache configurations |
-| `overrides[].path` | string | URL path prefix to match |
-| `overrides[].max_age` | string | Cache duration (e.g., "24h", "1d", "30d") |
-
-#### server.allowed_extensions
-
-Optional list of file extensions allowed for static serving.
-
-| Value | Behavior |
-|-------|----------|
-| Omitted | All files in `public_dir` can be served |
-| List of extensions | Only files with these extensions can be served |
-
-**Examples:**
-- `allowed_extensions: [html, css, js]` - Only HTML, CSS, JS files
-- Omit field entirely - All files allowed
-
-#### server.try_files
-
-Optional list of suffixes to try when resolving file paths.
-
-| Value | Behavior |
-|-------|----------|
-| Present | Try files feature enabled, attempts each suffix in order |
-| Absent | Try files feature disabled |
-
-**Example:**
-```yaml
-try_files: [index.html, .html, .htm]
-```
-
-For request `/studios/boston`:
-1. Try `public/studios/boston` (exact match)
-2. Try `public/studios/boston/index.html`
-3. Try `public/studios/boston.html`
-4. Try `public/studios/boston.htm`
-5. Fall back to application
 
 ## applications
 
@@ -398,13 +419,25 @@ routes:
       headers:                   # Custom headers
         X-Forwarded-Host: "$host"
 
-  fly_replay:                    # Fly.io replay routing
-    - path: "^/api/"             # URL pattern
-      region: "syd"              # Target region
-      app: "my-app"              # Target app
-      machine: "abc123"          # Target machine ID
-      status: 307               # HTTP status
-      methods: [GET, POST]      # HTTP methods
+  fly:                           # Fly.io-specific routing
+    sticky_sessions:             # Cookie-based session affinity
+      enabled: true
+      cookie_name: "_navigator_machine"
+      cookie_max_age: "2h"
+      cookie_secure: true
+      cookie_httponly: true
+      cookie_samesite: "Lax"
+      cookie_path: "/"
+      paths:                     # Optional: specific paths for sticky sessions
+        - "/app/*"
+
+    replay:                      # Fly-Replay routing
+      - path: "^/api/"           # URL pattern
+        region: "syd"            # Target region
+        app: "my-app"            # Target app
+        machine: "abc123"        # Target machine ID
+        status: 307             # HTTP status
+        methods: [GET, POST]    # HTTP methods
 ```
 
 ### rewrites
@@ -452,7 +485,28 @@ routes:
 
 Request `/users/123` → Proxies to `https://api.example.com/v1/user/123`
 
-### fly_replay
+### routes.fly
+
+Fly.io-specific routing configuration.
+
+#### routes.fly.sticky_sessions
+
+Cookie-based session affinity for routing requests to the same machine.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable sticky sessions |
+| `cookie_name` | string | `"_navigator"` | Name of the session cookie |
+| `cookie_max_age` | string | `"24h"` | Cookie lifetime (duration format) |
+| `cookie_secure` | boolean | `true` | Set Secure flag (HTTPS only) |
+| `cookie_httponly` | boolean | `true` | Set HttpOnly flag |
+| `cookie_samesite` | string | `"Lax"` | SameSite attribute: "Strict", "Lax", "None" |
+| `cookie_path` | string | `"/"` | Cookie path |
+| `paths` | array | `[]` | Specific URL patterns for sticky sessions |
+
+#### routes.fly.replay
+
+Fly-Replay routing for region/machine targeting.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -613,8 +667,8 @@ Navigator validates configuration on startup:
 1. **Required fields**: `server.listen`, `applications.tenants[].path`
 2. **Port ranges**: Listen port must be 1-65535
 3. **Path format**: Tenant paths must start and end with `/`
-4. **File paths**: Must be accessible by Navigator process (htpasswd, config files)
-5. **Regex patterns**: Must compile successfully (routes, fly_replay)
+4. **File paths**: Must be accessible by Navigator process (htpasswd, config files, maintenance page)
+5. **Regex patterns**: Must compile successfully (routes.rewrites, routes.fly.replay)
 6. **Process names**: Must be unique within managed_processes
 7. **Duration format**: Must be valid Go duration (e.g., "30s", "5m", "1h30m")
 8. **Hook timeouts**: Should be reasonable (<10m for most operations)
@@ -639,16 +693,23 @@ applications:
 ```yaml
 server:
   listen: 3000
-  public_dir: /var/www/public
-  authentication: /etc/navigator/htpasswd
-  auth_exclude: ["/assets/", "*.css", "*.js"]
+  static:
+    public_dir: /var/www/public
+    allowed_extensions: [html, css, js, png, jpg, gif]
+    cache_control:
+      default: "1h"
+      overrides:
+        - path: /assets/
+          max_age: 24h
 
-  # Static file configuration
-  cache_control:
-    overrides:
-      - path: /assets/
-        max_age: 24h
-  allowed_extensions: [html, css, js, png, jpg, gif]
+auth:
+  enabled: true
+  realm: "Restricted"
+  htpasswd: /etc/navigator/htpasswd
+  public_paths: ["/assets/", "*.css", "*.js"]
+
+maintenance:
+  page: "/503.html"
 
 applications:
   pools:
@@ -717,6 +778,108 @@ applications:
     - path: /
       var:
         database: production
+```
+
+### Complete Fly.io Configuration
+
+```yaml
+server:
+  listen: 3000
+  static:
+    public_dir: /var/www/public
+    allowed_extensions: [html, css, js, png, jpg, svg, ico, woff2]
+    try_files: [index.html, .html]
+    cache_control:
+      default: "1h"
+      overrides:
+        - path: /assets/
+          max_age: 7d
+  idle:
+    action: suspend
+    timeout: 20m
+
+auth:
+  enabled: true
+  realm: "Protected Application"
+  htpasswd: /etc/navigator/htpasswd
+  public_paths:
+    - "/assets/*"
+    - "*.css"
+    - "*.js"
+    - "/favicon.ico"
+
+maintenance:
+  page: "/503.html"
+
+routes:
+  rewrites:
+    - pattern: "^/old-path/(.*)"
+      replacement: "/new-path/$1"
+      redirect: true
+      status: 301
+
+  reverse_proxies:
+    - name: api-backend
+      path: "^/api/"
+      target: "https://api.example.com"
+      strip_path: true
+
+  fly:
+    sticky_sessions:
+      enabled: true
+      cookie_name: "_navigator_machine"
+      cookie_max_age: "2h"
+      cookie_secure: true
+      cookie_httponly: true
+      cookie_samesite: "Lax"
+      paths:
+        - "/app/*"
+        - "/dashboard/*"
+
+    replay:
+      - path: "^/regions/syd/"
+        region: syd
+        status: 307
+
+applications:
+  pools:
+    max_size: 10
+    timeout: 10m
+    start_port: 4000
+
+  health_check: "/up"
+  startup_timeout: "5s"
+
+  env:
+    DATABASE_URL: "sqlite3://db/${database}.sqlite3"
+    RAILS_ENV: production
+
+  tenants:
+    - path: /tenant1/
+      var:
+        database: tenant1
+    - path: /tenant2/
+      var:
+        database: tenant2
+
+managed_processes:
+  - name: redis
+    command: redis-server
+    args: ["/etc/redis/redis.conf"]
+    auto_restart: true
+
+hooks:
+  server:
+    idle:
+      - command: /usr/local/bin/backup-to-s3.sh
+        timeout: 5m
+    resume:
+      - command: /usr/local/bin/restore-from-s3.sh
+        timeout: 2m
+
+logging:
+  format: json
+  file: /var/log/navigator.log
 ```
 
 ## See Also

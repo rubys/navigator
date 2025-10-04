@@ -40,12 +40,14 @@ Navigator provides built-in sticky session support using HTTP cookies. When enab
 ### Basic Configuration
 
 ```yaml
-sticky_sessions:
-  enabled: true
-  cookie_name: "_navigator_machine"
-  cookie_max_age: "2h"
-  cookie_secure: true
-  cookie_httponly: true
+routes:
+  fly:
+    sticky_sessions:
+      enabled: true
+      cookie_name: "_navigator_machine"
+      cookie_max_age: "2h"
+      cookie_secure: true
+      cookie_httponly: true
 ```
 
 ### Path-Specific Sessions
@@ -53,14 +55,16 @@ sticky_sessions:
 Limit sticky sessions to specific URL paths:
 
 ```yaml
-sticky_sessions:
-  enabled: true
-  cookie_name: "_navigator_machine"
-  cookie_max_age: "2h"
-  paths:
-    - "/app/*"
-    - "/dashboard/*"
-    - "/cable"  # Action Cable endpoint
+routes:
+  fly:
+    sticky_sessions:
+      enabled: true
+      cookie_name: "_navigator_machine"
+      cookie_max_age: "2h"
+      paths:
+        - "/app/*"
+        - "/dashboard/*"
+        - "/cable"  # Action Cable endpoint
 ```
 
 ### Complete Example
@@ -68,19 +72,22 @@ sticky_sessions:
 ```yaml
 server:
   listen: 3000
-  public_dir: public
+  static:
+    public_dir: public
 
-sticky_sessions:
-  enabled: true
-  cookie_name: "_navigator_session"
-  cookie_max_age: "4h"
-  cookie_secure: true
-  cookie_httponly: true
-  cookie_samesite: "Lax"
-  paths:
-    - "/app/*"
-    - "/admin/*"
-    - "/cable"
+routes:
+  fly:
+    sticky_sessions:
+      enabled: true
+      cookie_name: "_navigator_session"
+      cookie_max_age: "4h"
+      cookie_secure: true
+      cookie_httponly: true
+      cookie_samesite: "Lax"
+      paths:
+        - "/app/*"
+        - "/admin/*"
+        - "/cable"
 
 applications:
   tenants:
@@ -97,8 +104,10 @@ applications:
 **Description**: Enable or disable sticky session support.
 
 ```yaml
-sticky_sessions:
-  enabled: true
+routes:
+  fly:
+    sticky_sessions:
+      enabled: true
 ```
 
 ### `cookie_name`
@@ -107,8 +116,10 @@ sticky_sessions:
 **Description**: Name of the HTTP cookie used to store the machine ID.
 
 ```yaml
-sticky_sessions:
-  cookie_name: "_my_app_session"
+routes:
+  fly:
+    sticky_sessions:
+      cookie_name: "_my_app_session"
 ```
 
 ### `cookie_max_age`
@@ -123,8 +134,10 @@ sticky_sessions:
 - `"72h"` - 3 days
 
 ```yaml
-sticky_sessions:
-  cookie_max_age: "2h"
+routes:
+  fly:
+    sticky_sessions:
+      cookie_max_age: "2h"
 ```
 
 ### `cookie_secure`
@@ -133,8 +146,10 @@ sticky_sessions:
 **Description**: Set the `Secure` flag, requiring HTTPS. Enable for production.
 
 ```yaml
-sticky_sessions:
-  cookie_secure: true
+routes:
+  fly:
+    sticky_sessions:
+      cookie_secure: true
 ```
 
 ### `cookie_httponly`
@@ -143,8 +158,10 @@ sticky_sessions:
 **Description**: Set the `HttpOnly` flag, preventing JavaScript access. Recommended for security.
 
 ```yaml
-sticky_sessions:
-  cookie_httponly: true
+routes:
+  fly:
+    sticky_sessions:
+      cookie_httponly: true
 ```
 
 ### `cookie_samesite`
@@ -158,8 +175,10 @@ sticky_sessions:
 - `"None"` - Cookie sent with all requests (requires `cookie_secure: true`)
 
 ```yaml
-sticky_sessions:
-  cookie_samesite: "Strict"
+routes:
+  fly:
+    sticky_sessions:
+      cookie_samesite: "Strict"
 ```
 
 ### `paths`
@@ -173,11 +192,13 @@ sticky_sessions:
 - Wildcard prefix: `"*/admin"`
 
 ```yaml
-sticky_sessions:
-  paths:
-    - "/app/*"
-    - "/admin/*"
-    - "/cable"
+routes:
+  fly:
+    sticky_sessions:
+      paths:
+        - "/app/*"
+        - "/admin/*"
+        - "/cable"
 ```
 
 ## How It Works
@@ -230,10 +251,12 @@ Sticky sessions work seamlessly with Fly.io's distributed infrastructure:
 
 ```yaml
 # Works across all Fly.io regions
-sticky_sessions:
-  enabled: true
-  cookie_name: "_fly_machine"
-  cookie_max_age: "2h"
+routes:
+  fly:
+    sticky_sessions:
+      enabled: true
+      cookie_name: "_fly_machine"
+      cookie_max_age: "2h"
 ```
 
 **Benefits**:
@@ -246,18 +269,21 @@ sticky_sessions:
 Sticky sessions integrate with Fly-Replay headers:
 
 ```yaml
-server:
-  rewrite_rules:
+routes:
+  rewrites:
     - pattern: "^/api/(.*)"
       rewrite: "/$1"
-      fly_replay:
+
+  fly:
+    replay:
+      - path: "^/api/"
         region: ord  # Prefer Chicago
         status: 307
 
-sticky_sessions:
-  enabled: true
-  paths:
-    - "/app/*"  # Sticky for app, not API
+    sticky_sessions:
+      enabled: true
+      paths:
+        - "/app/*"  # Sticky for app, not API
 ```
 
 **Behavior**:
@@ -275,8 +301,10 @@ server:
     action: suspend
     timeout: 20m
 
-sticky_sessions:
-  enabled: true
+routes:
+  fly:
+    sticky_sessions:
+      enabled: true
 ```
 
 **Behavior**:
@@ -309,14 +337,17 @@ Perfect for Rails Action Cable with Solid Cable:
 ```yaml
 server:
   listen: 3000
-  public_dir: public
+  static:
+    public_dir: public
 
-sticky_sessions:
-  enabled: true
-  cookie_name: "_cable_machine"
-  cookie_max_age: "24h"
-  paths:
-    - "/cable"  # Only for WebSocket endpoint
+routes:
+  fly:
+    sticky_sessions:
+      enabled: true
+      cookie_name: "_cable_machine"
+      cookie_max_age: "24h"
+      paths:
+        - "/cable"  # Only for WebSocket endpoint
 
 applications:
   tenants:
@@ -343,10 +374,12 @@ applications:
 Use sticky sessions with multi-tenant apps:
 
 ```yaml
-sticky_sessions:
-  enabled: true
-  cookie_name: "_tenant_machine"
-  cookie_max_age: "4h"
+routes:
+  fly:
+    sticky_sessions:
+      enabled: true
+      cookie_name: "_tenant_machine"
+      cookie_max_age: "4h"
 
 applications:
   tenants:
@@ -414,10 +447,12 @@ cat cookies.txt | grep navigator_machine
 
 **Always enable in production**:
 ```yaml
-sticky_sessions:
-  cookie_secure: true      # Requires HTTPS
-  cookie_httponly: true    # Prevents XSS
-  cookie_samesite: "Lax"   # Prevents CSRF
+routes:
+  fly:
+    sticky_sessions:
+      cookie_secure: true      # Requires HTTPS
+      cookie_httponly: true    # Prevents XSS
+      cookie_samesite: "Lax"   # Prevents CSRF
 ```
 
 ### Cookie Tampering
@@ -502,8 +537,10 @@ sticky_sessions:
 ### 1. Set Appropriate Timeout
 
 ```yaml
-sticky_sessions:
-  cookie_max_age: "2h"  # Balance between convenience and stale routes
+routes:
+  fly:
+    sticky_sessions:
+      cookie_max_age: "2h"  # Balance between convenience and stale routes
 ```
 
 **Recommendations**:
@@ -514,10 +551,12 @@ sticky_sessions:
 ### 2. Use Path Restrictions
 
 ```yaml
-sticky_sessions:
-  paths:
-    - "/app/*"   # Only app needs sticky sessions
-    - "/cable"   # WebSocket endpoint
+routes:
+  fly:
+    sticky_sessions:
+      paths:
+        - "/app/*"   # Only app needs sticky sessions
+        - "/cable"   # WebSocket endpoint
 ```
 
 **Benefits**:
@@ -528,10 +567,12 @@ sticky_sessions:
 ### 3. Enable Security Flags
 
 ```yaml
-sticky_sessions:
-  cookie_secure: true      # Production only
-  cookie_httponly: true    # Always enabled
-  cookie_samesite: "Lax"   # CSRF protection
+routes:
+  fly:
+    sticky_sessions:
+      cookie_secure: true      # Production only
+      cookie_httponly: true    # Always enabled
+      cookie_samesite: "Lax"   # CSRF protection
 ```
 
 ### 4. Monitor Cookie Usage
@@ -548,9 +589,11 @@ journalctl -u navigator | grep "machine unavailable" | wc -l
 
 ```yaml
 # Coming soon: Automatic fallback routing
-sticky_sessions:
-  enabled: true
-  fallback_mode: "route_to_available"  # Future feature
+routes:
+  fly:
+    sticky_sessions:
+      enabled: true
+      fallback_mode: "route_to_available"  # Future feature
 ```
 
 ## See Also

@@ -115,7 +115,21 @@ kill_timeout = "60s"
 ```yaml title="config/navigator.yml"
 server:
   listen: 3000
-  public_dir: /app/public
+  static:
+    public_dir: /app/public
+
+    # Cache configuration
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 365d       # 1 year for fingerprinted assets
+        - path: /images/
+          max_age: 24h        # 1 day for images
+        - path: /favicon.ico
+          max_age: 24h
+
+    allowed_extensions: [css, js, png, jpg, gif, ico, svg, woff, woff2, map]
+    try_files: [".html", ".htm"]
 
 pools:
   max_size: 15             # Optimized for 1GB machine
@@ -129,46 +143,29 @@ suspend:
   check_interval: 60       # Check every minute
   grace_period: 120        # 2 minute grace period
 
-# Serve static files directly
-static:
-  directories:
-    - path: /assets/
-      root: /app/public/assets/
-      cache: 31536000       # 1 year for fingerprinted assets
-    - path: /images/  
-      root: /app/public/images/
-      cache: 86400          # 1 day for images
-    - path: /favicon.ico
-      root: /app/public/favicon.ico
-      cache: 86400
-  extensions: [css, js, png, jpg, gif, ico, svg, woff, woff2, map]
-  try_files:
-    enabled: true
-    suffixes: [".html", ".htm"]
-    fallback: rails
-
 # Fly-Replay for optimal regional routing
 routes:
-  fly_replay:
-    # Route PDF generation to primary region (more CPU)
-    - path: "^/api/pdf/"
-      region: ord
-      status: 307
-      
-    # Route image processing to primary region
-    - path: "^/api/images/"  
-      region: ord
-      status: 307
-      
-    # Route European traffic to Frankfurt
-    - path: "^/eu/"
-      region: fra
-      status: 307
-      
-    # Route Asian traffic to Tokyo
-    - path: "^/asia/"
-      region: nrt  
-      status: 307
+  fly:
+    replay:
+      # Route PDF generation to primary region (more CPU)
+      - path: "^/api/pdf/"
+        region: ord
+        status: 307
+
+      # Route image processing to primary region
+      - path: "^/api/images/"
+        region: ord
+        status: 307
+
+      # Route European traffic to Frankfurt
+      - path: "^/eu/"
+        region: fra
+        status: 307
+
+      # Route Asian traffic to Tokyo
+      - path: "^/asia/"
+        region: nrt
+        status: 307
 
 applications:
   global_env:
@@ -178,15 +175,15 @@ applications:
     DATABASE_URL: "${DATABASE_URL}"
     SECRET_KEY_BASE: "${SECRET_KEY_BASE}"
     REDIS_URL: "${REDIS_URL}"
-    
+
     # Performance settings
     RAILS_MAX_THREADS: "15"
     WEB_CONCURRENCY: "1"
-    
+
     # Feature flags
     RAILS_FORCE_SSL: "true"
     RAILS_LOG_LEVEL: "info"
-    
+
   tenants:
     - name: production
       path: /
@@ -321,24 +318,25 @@ flyctl machine list
 ```yaml
 # Update navigator.yml for regional routing
 routes:
-  fly_replay:
-    # Geographic routing examples
-    - path: "^/americas/"
-      region: ord
-      status: 307
-      
-    - path: "^/europe/"  
-      region: fra
-      status: 307
-      
-    - path: "^/apac/"
-      region: nrt
-      status: 307
-      
-    # Load-balancing heavy operations
-    - path: "^/api/heavy/"
-      region: ord      # Route to primary region with more resources
-      status: 307
+  fly:
+    replay:
+      # Geographic routing examples
+      - path: "^/americas/"
+        region: ord
+        status: 307
+
+      - path: "^/europe/"
+        region: fra
+        status: 307
+
+      - path: "^/apac/"
+        region: nrt
+        status: 307
+
+      # Load-balancing heavy operations
+      - path: "^/api/heavy/"
+        region: ord      # Route to primary region with more resources
+        status: 307
 ```
 
 ## Production Optimizations

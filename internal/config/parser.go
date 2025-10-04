@@ -47,10 +47,12 @@ func (p *ConfigParser) Parse() (*Config, error) {
 	p.parseServerConfig()
 	p.parseAuthConfig()
 	p.parseRoutesConfig()
+	p.parseStickySessionConfig()
 	p.parseApplicationConfig()
 	p.parseManagedProcesses()
 	p.parseLoggingConfig()
 	p.parseHooksConfig()
+	p.parseMaintenanceConfig()
 
 	return p.config, nil
 }
@@ -58,19 +60,19 @@ func (p *ConfigParser) Parse() (*Config, error) {
 // parseServerConfig parses server-level configuration
 func (p *ConfigParser) parseServerConfig() {
 	p.config.Server.Hostname = p.yamlConfig.Server.Hostname
-	p.config.Server.PublicDir = p.yamlConfig.Server.PublicDir
 	p.config.Server.RootPath = p.yamlConfig.Server.RootPath
 	p.config.Server.NamedHosts = p.yamlConfig.Server.NamedHosts
 	p.config.Server.Root = p.yamlConfig.Server.Root
-	p.config.Server.TryFiles = p.yamlConfig.Server.TryFiles
-	p.config.Server.AllowedExtensions = p.yamlConfig.Server.AllowedExtensions
-	p.config.Server.Authentication = p.yamlConfig.Server.Authentication
-	p.config.Server.AuthExclude = p.yamlConfig.Server.AuthExclude
+
+	// Parse static file configuration
+	p.config.Server.Static.PublicDir = p.yamlConfig.Server.Static.PublicDir
+	p.config.Server.Static.TryFiles = p.yamlConfig.Server.Static.TryFiles
+	p.config.Server.Static.AllowedExtensions = p.yamlConfig.Server.Static.AllowedExtensions
 
 	// Parse cache control
-	p.config.Server.CacheControl.Default = p.yamlConfig.Server.CacheControl.Default
-	for _, override := range p.yamlConfig.Server.CacheControl.Overrides {
-		p.config.Server.CacheControl.Overrides = append(p.config.Server.CacheControl.Overrides, CacheControlOverride{
+	p.config.Server.Static.CacheControl.Default = p.yamlConfig.Server.Static.CacheControl.Default
+	for _, override := range p.yamlConfig.Server.Static.CacheControl.Overrides {
+		p.config.Server.Static.CacheControl.Overrides = append(p.config.Server.Static.CacheControl.Overrides, CacheControlOverride{
 			Path:   override.Path,
 			MaxAge: override.MaxAge,
 		})
@@ -89,15 +91,32 @@ func (p *ConfigParser) parseServerConfig() {
 	// Set idle configuration
 	p.config.Server.Idle.Action = p.yamlConfig.Server.Idle.Action
 	p.config.Server.Idle.Timeout = p.yamlConfig.Server.Idle.Timeout
+}
 
-	// Parse sticky sessions
-	p.parseStickySessionConfig()
+// parseAuthConfig parses authentication configuration
+func (p *ConfigParser) parseAuthConfig() {
+	p.config.Auth.Enabled = p.yamlConfig.Auth.Enabled
+	p.config.Auth.Realm = p.yamlConfig.Auth.Realm
+	p.config.Auth.HTPasswd = p.yamlConfig.Auth.HTPasswd
+
+	// Only load public paths if auth is enabled
+	if p.yamlConfig.Auth.Enabled {
+		p.config.Auth.PublicPaths = p.yamlConfig.Auth.PublicPaths
+	}
+
+	// Note: PublicPaths patterns are handled as glob patterns in auth.go's ShouldExcludeFromAuth()
+	// We don't compile them as regex here since they use glob syntax (e.g., *.css, *.js)
+}
+
+// parseMaintenanceConfig parses maintenance page configuration
+func (p *ConfigParser) parseMaintenanceConfig() {
+	p.config.Maintenance.Page = p.yamlConfig.Maintenance.Page
 }
 
 // parseStickySessionConfig parses sticky session configuration
 func (p *ConfigParser) parseStickySessionConfig() {
-	ss := &p.config.Server.StickySession
-	yamlSS := &p.yamlConfig.Server.StickySession
+	ss := &p.config.StickySession
+	yamlSS := &p.yamlConfig.Routes.Fly.StickySession
 
 	ss.Enabled = yamlSS.Enabled
 	ss.CookieName = yamlSS.CookieName
@@ -114,17 +133,6 @@ func (p *ConfigParser) parseStickySessionConfig() {
 			ss.cookieMaxAge = duration
 		}
 	}
-}
-
-// parseAuthConfig parses authentication configuration
-func (p *ConfigParser) parseAuthConfig() {
-	if p.yamlConfig.Auth.Enabled {
-		p.config.Server.Authentication = p.yamlConfig.Auth.HTPasswd
-		p.config.Server.AuthExclude = p.yamlConfig.Auth.PublicPaths
-	}
-
-	// Note: AuthExclude patterns are handled as glob patterns in auth.go's ShouldExcludeFromAuth()
-	// We don't compile them as regex here since they use glob syntax (e.g., *.css, *.js)
 }
 
 // parseApplicationConfig parses application pool and tenant configuration
@@ -219,10 +227,14 @@ func (p *ConfigParser) parseHooksConfig() {
 
 // parseRoutesConfig parses routes configuration
 func (p *ConfigParser) parseRoutesConfig() {
-	p.config.Routes = p.yamlConfig.Routes
+	// Copy routes configuration
+	p.config.Routes.Redirects = p.yamlConfig.Routes.Redirects
+	p.config.Routes.Rewrites = p.yamlConfig.Routes.Rewrites
+	p.config.Routes.ReverseProxies = p.yamlConfig.Routes.ReverseProxies
+	p.config.Routes.FlyReplay = p.yamlConfig.Routes.FlyReplay
 
 	// Convert routes to rewrite rules if needed
-	for _, redirect := range p.config.Routes.Redirects {
+	for _, redirect := range p.yamlConfig.Routes.Redirects {
 		if pattern, err := regexp.Compile(redirect.From); err == nil {
 			p.config.Server.RewriteRules = append(p.config.Server.RewriteRules, RewriteRule{
 				Pattern:     pattern,
@@ -232,7 +244,7 @@ func (p *ConfigParser) parseRoutesConfig() {
 		}
 	}
 
-	for _, rewrite := range p.config.Routes.Rewrites {
+	for _, rewrite := range p.yamlConfig.Routes.Rewrites {
 		if pattern, err := regexp.Compile(rewrite.From); err == nil {
 			p.config.Server.RewriteRules = append(p.config.Server.RewriteRules, RewriteRule{
 				Pattern:     pattern,
@@ -242,8 +254,14 @@ func (p *ConfigParser) parseRoutesConfig() {
 		}
 	}
 
+	// Support both old and new fly_replay formats
+	flyReplays := p.yamlConfig.Routes.FlyReplay
+	if len(p.yamlConfig.Routes.Fly.Replay) > 0 {
+		flyReplays = p.yamlConfig.Routes.Fly.Replay
+	}
+
 	// Convert fly-replay routes to rewrite rules
-	for _, flyReplay := range p.config.Routes.FlyReplay {
+	for _, flyReplay := range flyReplays {
 		if pattern, err := regexp.Compile(flyReplay.Path); err == nil {
 			// Determine target format for fly-replay
 			var target string

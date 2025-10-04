@@ -194,23 +194,24 @@ Route requests to specific Fly.io regions, applications, or machines for optimal
 
 ```yaml
 routes:
-  fly_replay:
-    # Region-based routing
-    - path: "^/sydney/"
-      region: syd
-      status: 307
-      methods: [GET, POST]
-    
-    # App-based routing  
-    - path: "^/.*\\.pdf$"
-      app: pdf-generator
-      status: 307
-    
-    # Machine-specific routing
-    - path: "^/priority/.*"
-      machine: "48e403dc711e18"
-      app: priority-processor  
-      status: 307
+  fly:
+    replay:
+      # Region-based routing
+      - path: "^/sydney/"
+        region: syd
+        status: 307
+        methods: [GET, POST]
+
+      # App-based routing
+      - path: "^/.*\\.pdf$"
+        app: pdf-generator
+        status: 307
+
+      # Machine-specific routing
+      - path: "^/priority/.*"
+        machine: "48e403dc711e18"
+        app: priority-processor
+        status: 307
 ```
 
 ### Fly-Replay Configuration
@@ -258,56 +259,59 @@ Navigator automatically falls back to reverse proxy for requests that can't use 
 
 ```yaml
 routes:
-  fly_replay:
-    # Route by geographic prefix
-    - path: "^/asia/"
-      region: sin
-      methods: [GET]
-    
-    - path: "^/europe/"
-      region: fra
-      methods: [GET]
-    
-    - path: "^/americas/"
-      region: ord
-      methods: [GET]
+  fly:
+    replay:
+      # Route by geographic prefix
+      - path: "^/asia/"
+        region: sin
+        methods: [GET]
 
-    # Heavy processing to dedicated region
-    - path: "^/reports/"
-      region: fra  # EU region with more CPU
-      methods: [POST]
+      - path: "^/europe/"
+        region: fra
+        methods: [GET]
+
+      - path: "^/americas/"
+        region: ord
+        methods: [GET]
+
+      # Heavy processing to dedicated region
+      - path: "^/reports/"
+        region: fra  # EU region with more CPU
+        methods: [POST]
 ```
 
 ### 2. Service-Specific Routing
 
 ```yaml
 routes:
-  fly_replay:
-    # PDF generation service
-    - path: "^/.*\\.pdf$"
-      app: pdf-service
-      
-    # Image processing
-    - path: "^/images/resize/"
-      app: image-processor
-      
-    # Search service  
-    - path: "^/search/"
-      app: search-engine
+  fly:
+    replay:
+      # PDF generation service
+      - path: "^/.*\\.pdf$"
+        app: pdf-service
+
+      # Image processing
+      - path: "^/images/resize/"
+        app: image-processor
+
+      # Search service
+      - path: "^/search/"
+        app: search-engine
 ```
 
 ### 3. Load Balancing by Machine
 
 ```yaml
 routes:
-  fly_replay:
-    # High-priority requests to specific machine
-    - path: "^/priority/"
-      machine: "e24a0123456"
-      app: main-app
-      
-    # Regular traffic uses default routing
-    # (no fly_replay rule = normal load balancing)
+  fly:
+    replay:
+      # High-priority requests to specific machine
+      - path: "^/priority/"
+        machine: "e24a0123456"
+        app: main-app
+
+      # Regular traffic uses default routing
+      # (no fly replay rule = normal load balancing)
 ```
 
 ### 4. Development vs Production Routing
@@ -329,13 +333,14 @@ routes:
 
     ```yaml
     routes:
-      fly_replay:
-        - path: "^/api/heavy/"
-          region: fra  # Route heavy API calls to EU
-          
-        - path: "^/api/search/"
-          app: search-service
-          
+      fly:
+        replay:
+          - path: "^/api/heavy/"
+            region: fra  # Route heavy API calls to EU
+
+          - path: "^/api/search/"
+            app: search-service
+
       rewrites:
         # Redirect old API versions
         - pattern: "^/api/v[12]/(.*)"
@@ -456,16 +461,17 @@ Control which HTTP methods trigger routing rules:
 
 ```yaml
 routes:
-  fly_replay:
-    # Only GET requests to region
-    - path: "^/catalog/"
-      region: syd
-      methods: [GET, HEAD]
-    
-    # POST requests to processing service
-    - path: "^/process/"
-      app: processor
-      methods: [POST, PUT]
+  fly:
+    replay:
+      # Only GET requests to region
+      - path: "^/catalog/"
+        region: syd
+        methods: [GET, HEAD]
+
+      # POST requests to processing service
+      - path: "^/process/"
+        app: processor
+        methods: [POST, PUT]
 
 applications:
   tenants:
@@ -496,6 +502,9 @@ routes:
 ### Maintenance Mode
 
 ```yaml
+maintenance:
+  page: "/503.html"  # Custom maintenance page
+
 routes:
   rewrites:
     # Redirect everything to maintenance page
@@ -503,12 +512,11 @@ routes:
       replacement: "/maintenance"
       redirect: true
       status: 503
-      
-  # Except for assets
+
+server:
+  # Assets still served
   static:
-    directories:
-      - path: /assets/
-        root: public/assets/
+    public_dir: public/
 ```
 
 ## Testing Routing Rules
@@ -584,13 +592,14 @@ routes:
 
 ```yaml
 routes:
-  fly_replay:
-    # Use specific patterns to avoid unnecessary checks
-    - path: "^/heavy-compute/"  # Specific
-      region: fra
-      
-    # Avoid overly broad patterns
-    # - path: ".*"  # Matches everything!
+  fly:
+    replay:
+      # Use specific patterns to avoid unnecessary checks
+      - path: "^/heavy-compute/"  # Specific
+        region: fra
+
+      # Avoid overly broad patterns
+      # - path: ".*"  # Matches everything!
 ```
 
 ## Troubleshooting
@@ -623,6 +632,7 @@ routes:
        - pattern: "^/old"
          replacement: "/new"
          redirect: true  # Must be true for HTTP redirect
+         status: 301     # Or 302 for temporary
    ```
 
 2. **Verify status code**: Default is 302 (temporary)

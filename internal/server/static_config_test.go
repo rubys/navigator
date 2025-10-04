@@ -52,9 +52,9 @@ func TestServerTryFilesWithFileResolution(t *testing.T) {
 
 	// Create config with server-level try_files
 	cfg := &config.Config{}
-	cfg.Server.PublicDir = tempDir
-	cfg.Server.TryFiles = []string{"index.html", ".html", ".htm"}
-	cfg.Server.AllowedExtensions = []string{"html", "htm"}
+	cfg.Server.Static.PublicDir = tempDir
+	cfg.Server.Static.TryFiles = []string{"index.html", ".html", ".htm"}
+	cfg.Server.Static.AllowedExtensions = []string{"html", "htm"}
 
 	handler := NewStaticFileHandler(cfg)
 
@@ -190,8 +190,8 @@ func TestServerAllowedExtensions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config.Config{}
-			cfg.Server.PublicDir = tempDir
-			cfg.Server.AllowedExtensions = tt.allowedExtensions
+			cfg.Server.Static.PublicDir = tempDir
+			cfg.Server.Static.AllowedExtensions = tt.allowedExtensions
 
 			handler := NewStaticFileHandler(cfg)
 
@@ -244,9 +244,9 @@ func TestServerCacheControl(t *testing.T) {
 
 	// Create config with cache control
 	cfg := &config.Config{}
-	cfg.Server.PublicDir = tempDir
-	cfg.Server.CacheControl.Default = "1h"
-	cfg.Server.CacheControl.Overrides = []config.CacheControlOverride{
+	cfg.Server.Static.PublicDir = tempDir
+	cfg.Server.Static.CacheControl.Default = "1h"
+	cfg.Server.Static.CacheControl.Overrides = []config.CacheControlOverride{
 		{Path: "/assets/", MaxAge: "24h"},
 		{Path: "/images/", MaxAge: "12h"},
 		{Path: "/docs/", MaxAge: "30m"},
@@ -339,9 +339,9 @@ func TestServerTryFilesWithAllowedExtensions(t *testing.T) {
 	}
 
 	cfg := &config.Config{}
-	cfg.Server.PublicDir = tempDir
-	cfg.Server.TryFiles = []string{".html", ".json", ".txt"}
-	cfg.Server.AllowedExtensions = []string{"html", "json"} // Note: try_files doesn't enforce this
+	cfg.Server.Static.PublicDir = tempDir
+	cfg.Server.Static.TryFiles = []string{".html", ".json", ".txt"}
+	cfg.Server.Static.AllowedExtensions = []string{"html", "json"} // Note: try_files doesn't enforce this
 
 	handler := NewStaticFileHandler(cfg)
 
@@ -403,8 +403,8 @@ func TestServerTryFilesDisabled(t *testing.T) {
 
 	// Config WITHOUT try_files
 	cfg := &config.Config{}
-	cfg.Server.PublicDir = tempDir
-	cfg.Server.TryFiles = []string{} // Empty = disabled
+	cfg.Server.Static.PublicDir = tempDir
+	cfg.Server.Static.TryFiles = []string{} // Empty = disabled
 
 	handler := NewStaticFileHandler(cfg)
 

@@ -70,8 +70,8 @@ func (a *BasicAuth) RequireAuth(w http.ResponseWriter) {
 
 // ShouldExcludeFromAuth checks if a path should be excluded from authentication
 func ShouldExcludeFromAuth(path string, cfg *config.Config) bool {
-	// Check simple exclusion paths first (from YAML auth_exclude)
-	for _, excludePath := range cfg.Server.AuthExclude {
+	// Check simple exclusion paths first (from YAML auth.public_paths)
+	for _, excludePath := range cfg.Auth.PublicPaths {
 		// Handle glob patterns like *.css
 		if strings.HasPrefix(excludePath, "*") {
 			if strings.HasSuffix(path, excludePath[1:]) {
@@ -98,7 +98,7 @@ func ShouldExcludeFromAuth(path string, cfg *config.Config) bool {
 	}
 
 	// Check regex auth patterns from the config file
-	for _, authPattern := range cfg.Server.AuthPatterns {
+	for _, authPattern := range cfg.Auth.AuthPatterns {
 		if authPattern.Pattern.MatchString(path) && authPattern.Action == "off" {
 			return true
 		}

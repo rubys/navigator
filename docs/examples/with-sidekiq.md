@@ -15,7 +15,15 @@ Configure Navigator to manage both your Rails application and Sidekiq workers fo
 ```yaml title="navigator.yml"
 server:
   listen: 3000
-  public_dir: ./public
+  static:
+    public_dir: ./public
+
+    # Cache configuration
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 24h
+    allowed_extensions: [css, js, png, jpg, gif]
 
 # Managed processes start before Rails
 managed_processes:
@@ -26,7 +34,7 @@ managed_processes:
     working_dir: /var/lib/redis
     auto_restart: true
     start_delay: 0
-    
+
   # Sidekiq worker process
   - name: sidekiq
     command: bundle
@@ -44,19 +52,11 @@ applications:
     RAILS_ENV: production
     REDIS_URL: redis://localhost:6379/0
     DATABASE_URL: postgresql://localhost/myapp
-    
+
   tenants:
     - name: myapp
       path: /
       working_dir: /var/www/app
-
-# Static files
-static:
-  directories:
-    - path: /assets/
-      root: public/assets/
-      cache: 86400
-  extensions: [css, js, png, jpg, gif]
 ```
 
 ## Rails Setup

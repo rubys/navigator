@@ -145,7 +145,8 @@ sudo chmod 750 /etc/navigator
 sudo tee /etc/navigator/production.yml << 'EOF'
 server:
   listen: 3000
-  public_dir: /var/www/app/public
+  static:
+    public_dir: /var/www/app/public
 
 pools:
   max_size: 10
@@ -155,7 +156,7 @@ applications:
   global_env:
     RAILS_ENV: production
     RAILS_SERVE_STATIC_FILES: "false"
-  
+
   tenants:
     - name: production
       path: /

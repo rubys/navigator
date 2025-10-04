@@ -5,26 +5,37 @@
 server:
   listen: 3000
   hostname: localhost
-  public_dir: public
 
-# Sticky sessions configuration
-sticky_sessions:
-  enabled: true
-  cookie_name: "_navigator_machine"
-  cookie_max_age: "2h"        # Session duration (e.g., "30m", "1h", "24h")
-  cookie_secure: true         # Use secure cookies in production
-  cookie_httponly: true       # Prevent JavaScript access
-  cookie_samesite: "Lax"      # CSRF protection
+  # Static file configuration
+  static:
+    public_dir: public
+    cache_control:
+      overrides:
+        - path: /assets/
+          max_age: 1h
+        - path: /public/
+          max_age: 1h
 
-  # Apply sticky sessions only to specific paths
-  paths:
-    - "/app/*"                # Main application paths
-    - "/dashboard/*"          # Dashboard requires session continuity
-    - "/cable"                # WebSocket connections
-    - "/upload/*"             # File upload sessions
-
-# WebSocket support with sticky routing using reverse proxies
+# Routes configuration with sticky sessions and reverse proxies
 routes:
+  # Sticky sessions configuration
+  fly:
+    sticky_sessions:
+      enabled: true
+      cookie_name: "_navigator_machine"
+      cookie_max_age: "2h"        # Session duration (e.g., "30m", "1h", "24h")
+      cookie_secure: true         # Use secure cookies in production
+      cookie_httponly: true       # Prevent JavaScript access
+      cookie_samesite: "Lax"      # CSRF protection
+
+      # Apply sticky sessions only to specific paths
+      paths:
+        - "/app/*"                # Main application paths
+        - "/dashboard/*"          # Dashboard requires session continuity
+        - "/cable"                # WebSocket connections
+        - "/upload/*"             # File upload sessions
+
+  # WebSocket support with sticky routing using reverse proxies
   reverse_proxies:
     - name: action-cable-websocket
       path: "^/cable"
@@ -73,12 +84,3 @@ applications:
         RAILS_ENV: production
         DATABASE_URL: sqlite3:/data/tenant-b/production.sqlite3
         ACTIVE_STORAGE_DISK_ROOT: /data/tenant-b/storage
-
-# Static files bypass sticky sessions
-static_files:
-  paths:
-    - /assets/*
-    - /public/*
-    - /favicon.ico
-  headers:
-    cache_control: "public, max-age=3600"

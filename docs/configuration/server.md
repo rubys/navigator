@@ -8,8 +8,11 @@ The `server` section defines how Navigator binds to network interfaces and serve
 server:
   listen: 3000              # Port to bind to (required)
   hostname: "localhost"     # Hostname for routing (optional)
-  public_dir: "./public"    # Default public directory (optional)
   root_path: ""             # URL path prefix (optional)
+
+  # Static file configuration
+  static:
+    public_dir: "./public"  # Public directory for static files
 ```
 
 ## Configuration Options
@@ -60,17 +63,18 @@ server:
 - **Multi-domain**: Leave empty to accept all domains
 - **Development**: Use `localhost` for local testing
 
-### public_dir
+### static.public_dir
 
-**Optional**: Default directory for serving static files when no specific static configuration is provided.
+**Optional**: Directory for serving static files.
 
 ```yaml
 server:
-  public_dir: "./public"           # Relative to working directory
-  # or
-  public_dir: "/var/www/public"    # Absolute path
-  # or
-  public_dir: "/app/public"        # Docker container path
+  static:
+    public_dir: "./public"           # Relative to working directory
+    # or
+    public_dir: "/var/www/public"    # Absolute path
+    # or
+    public_dir: "/app/public"        # Docker container path
 ```
 
 **Default Behavior**: If not specified, Navigator looks for `public/` in the current working directory.
@@ -96,8 +100,9 @@ server:
 ```yaml
 server:
   listen: 3000
-  hostname: "localhost" 
-  public_dir: "./public"
+  hostname: "localhost"
+  static:
+    public_dir: "./public"
 ```
 
 **Characteristics**:
@@ -111,7 +116,8 @@ server:
 server:
   listen: 3000
   hostname: "staging.myapp.com"
-  public_dir: "/var/www/app/public"
+  static:
+    public_dir: "/var/www/app/public"
 ```
 
 **Characteristics**:
@@ -125,7 +131,8 @@ server:
 server:
   listen: "${PORT:-3000}"
   hostname: "myapp.com"
-  public_dir: "/var/www/app/public"
+  static:
+    public_dir: "/var/www/app/public"
 ```
 
 **Characteristics**:
@@ -139,7 +146,8 @@ server:
 server:
   listen: 3000              # Internal container port
   hostname: ""              # Accept any hostname
-  public_dir: "/app/public"
+  static:
+    public_dir: "/app/public"
 ```
 
 **Characteristics**:
@@ -153,8 +161,9 @@ server:
 server:
   listen: 3000              # Internal port
   hostname: ""              # Proxy handles hostname
-  public_dir: "/app/public"
   root_path: "/api"         # Strip /api prefix
+  static:
+    public_dir: "/app/public"
 ```
 
 **nginx Configuration**:
@@ -198,7 +207,8 @@ server:
 server:
   listen: 8080              # Non-privileged port
   hostname: ""              # Pod networking
-  public_dir: "/app/public"
+  static:
+    public_dir: "/app/public"
 ```
 
 ```yaml title="deployment.yaml"
@@ -263,15 +273,18 @@ server:
 ```yaml
 # Fast - SSD storage
 server:
-  public_dir: "/var/www/app/public"
+  static:
+    public_dir: "/var/www/app/public"
 
-# Slower - network storage  
+# Slower - network storage
 server:
-  public_dir: "/nfs/shared/public"
+  static:
+    public_dir: "/nfs/shared/public"
 
 # Fastest - memory filesystem (temporary files only)
 server:
-  public_dir: "/tmp/public"
+  static:
+    public_dir: "/tmp/public"
 ```
 
 ### Connection Limits
@@ -372,7 +385,8 @@ stat /var/www/app/public/
 
 # Use absolute path
 server:
-  public_dir: "/var/www/app/public"
+  static:
+    public_dir: "/var/www/app/public"
 ```
 
 ### Hostname Mismatch
@@ -447,7 +461,8 @@ server:
 server:
   listen: "127.0.0.1:3000"  # Specific interface
   hostname: "myapp.com"     # Validate hostname
-  public_dir: "/var/www/app/public"  # Absolute path
+  static:
+    public_dir: "/var/www/app/public"  # Absolute path
 ```
 
 ### 3. Path Management
@@ -455,11 +470,13 @@ server:
 ```yaml
 # Development - relative paths
 server:
-  public_dir: "./public"
+  static:
+    public_dir: "./public"
 
 # Production - absolute paths
 server:
-  public_dir: "/var/www/app/public"
+  static:
+    public_dir: "/var/www/app/public"
 ```
 
 ### 4. Testing Strategy
