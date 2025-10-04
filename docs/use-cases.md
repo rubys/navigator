@@ -1,17 +1,18 @@
 # Use Cases
 
-Navigator excels at solving specific architectural challenges in multi-tenant and distributed applications. This page explores proven use cases with real-world examples and configuration patterns.
+Navigator addresses common challenges in multi-tenant and distributed applications. This page describes some typical use cases with configuration examples.
 
 ## Background
 
 Navigator was designed to address challenges that arise in modern multi-tenant Rails applications, particularly those using SQLite for database-per-tenant architectures. While SQLite was the motivation for many features, Navigator is database-agnostic and works with any Rails backend.
 
 **Key Resources:**
-- [Multi-Tenant Rails: Everybody Gets a Database](https://www.youtube.com/watch?v=Sc4FJ0EZTAg) - Stephen Margheim
-- [SQLite Replication with Beamer](https://www.youtube.com/watch?v=lcved9uEV5U) - Mike Dalessio
+
+- [Multi-Tenant Rails: Everybody Gets a Database](https://www.youtube.com/watch?v=Sc4FJ0EZTAg) - Mike Dalessio 
+- [SQLite Replication with Beamer](https://www.youtube.com/watch?v=lcved9uEV5U) - Stephen Margheim
 - [Kamal Geo Proxy](https://www.youtube.com/watch?v=gcwzWzC7gUA&t=3541s) - Kevin McConnell
 
-Navigator is inspired by Basecamp's [thruster](https://github.com/basecamp/thruster) and implemented as a reverse proxy in Go.
+Navigator is inspired by Basecamp's [Thruster](https://github.com/basecamp/thruster) and implemented as a reverse proxy in Go.
 
 ## Quick Start
 
@@ -64,12 +65,12 @@ applications:
         tenant_id: widgets_production
 ```
 
-### Benefits
+### How it works
 
-- **Isolation**: Each tenant has its own process and database
-- **Resource efficiency**: Processes start on-demand and idle out
-- **Simple deployment**: Single Docker image for all tenants
-- **Template flexibility**: Customize environment per tenant
+- Each tenant has its own process and database
+- Processes start on-demand and idle out when not in use
+- Single Docker image serves all tenants
+- Template variables customize environment per tenant
 
 See [multi-tenant-monorepo-example.yml](https://github.com/rubys/navigator/blob/main/examples/multi-tenant-monorepo-example.yml) for a complete example.
 
@@ -81,11 +82,9 @@ See [multi-tenant-monorepo-example.yml](https://github.com/rubys/navigator/blob/
 
 **Solution**: Navigator tracks active requests and triggers machine suspension or shutdown after a configurable idle timeout.
 
-### Why This Matters
+### How it works
 
-Fly.io supports [autostop](https://fly.io/docs/launch/autostop-autostart/) and [suspend](https://fly.io/docs/reference/suspend-resume/) for idle machines. This isn't just for cost savings—it makes it practical to distribute your application across hundreds of machines that only run when needed.
-
-Manual control over when machines suspend/stop and what actions to take before/after state changes requires custom code to track requests. Navigator handles this automatically.
+Fly.io supports [autostop](https://fly.io/docs/launch/autostop-autostart/) and [suspend](https://fly.io/docs/reference/suspend-resume/) for idle machines. Navigator tracks active requests and triggers suspension/shutdown after a configurable timeout, enabling distribution across many machines that only run when needed.
 
 ### Lifecycle Hooks
 
@@ -144,13 +143,9 @@ WebSockets enable two-way communication between server and browser, with connect
 **Rails 7 and earlier**: Three services (Rails, Redis, Action Cable)
 **Rails 8 with Solid Cable**: Action Cable and Rails must run on the same machine
 
-### How Navigator Helps
+### How it works
 
-Traditionally, you'd need:
-- Reverse proxy ([Nginx](https://nginx.org/) or [Traefik](https://traefik.io/traefik)) for routing
-- Process manager ([Foreman](https://github.com/ddollar/foreman) or [Overmind](https://github.com/DarthSim/overmind)) for services
-
-Navigator combines both without modifying your Rails configuration.
+Navigator combines reverse proxy routing and process management in a single tool, eliminating the need for separate tools like Nginx/Traefik and Foreman/Overmind.
 
 ### Configuration Example
 
@@ -228,12 +223,12 @@ applications:
       working_dir: /app
 ```
 
-### Benefits
+### How it works
 
-- **Consistent routing**: Same user always hits same machine
-- **WebSocket compatibility**: Maintains long-lived connections
-- **Local cache hits**: Access machine-specific cached data
-- **Simple configuration**: No external session store required
+- Same user always routes to same machine
+- Maintains long-lived WebSocket connections
+- Enables machine-specific cached data
+- No external session store required
 
 See [sticky-sessions-example.yml](https://github.com/rubys/navigator/blob/main/examples/sticky-sessions-example.yml) and [Sticky Sessions feature page](features/sticky-sessions.md) for more details.
 
