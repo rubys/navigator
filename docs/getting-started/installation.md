@@ -9,12 +9,12 @@ Navigator can be installed in several ways depending on your needs and environme
 - **Memory**: Minimum 128MB (plus Rails app requirements)
 - **Go**: Version 1.21+ (only if building from source)
 
-!!! success "Cross-Platform Support (v0.11.0+)"
-    Navigator now offers **native support** for all major platforms:
+!!! success "Cross-Platform Support"
+    Navigator offers **native support** for all major platforms:
 
     - **Linux**: AMD64, ARM64
     - **macOS**: Intel (AMD64), Apple Silicon (ARM64)
-    - **Windows**: AMD64, ARM64 (**NEW** - native Windows support!)
+    - **Windows**: AMD64, ARM64 (native Windows support)
 
     Platform-specific signal handling ensures proper behavior on all operating systems.
 
@@ -84,11 +84,7 @@ make build
 go build -mod=readonly -o bin/navigator cmd/navigator-refactored/main.go
 
 # Install globally (optional)
-# Use the refactored version (v0.11.0+)
 sudo cp bin/navigator-refactored /usr/local/bin/navigator
-
-# Or if you built with the direct command:
-# sudo cp bin/navigator /usr/local/bin/
 ```
 
 ### Docker

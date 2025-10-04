@@ -2,10 +2,12 @@
 
 A lightweight web server for multi-tenant applications with on-demand process management. Deploy multiple customers or projects from a single configuration file.
 
-!!! success "Latest Release: v0.11.0"
-    Enhanced test coverage (81.2%) and full cross-platform support (Linux, macOS, Windows).
+!!! success "Latest Release: v0.12.0"
+    **Configuration Modernization Release** - Reorganized configuration structure for better clarity and discoverability.
 
-    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v0.11.0)
+    ⚠️ **Breaking Changes**: Configuration files must be updated to new format.
+
+    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v0.12.0) | [Migration Guide](configuration/yaml-reference.md)
 
 ## What Can Navigator Do For You?
 
