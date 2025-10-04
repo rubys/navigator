@@ -326,7 +326,7 @@ routes:
           replacement: "/api/$1"
           redirect: false
     
-    # No fly_replay in development
+    # No routes.fly.replay in development
     ```
 
 === "Production"

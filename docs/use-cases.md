@@ -258,16 +258,15 @@ Navigator takes a middle ground: when requests can't be routed to the intended d
 
 ```yaml
 server:
-  rewrite_rules:
-    - pattern: "^/api/(.*)"
-      rewrite: "/$1"
-      fly_replay:
+  listen: 3000
+
+routes:
+  fly:
+    replay:
+      - path: "^/api/"
         app: api-backend
         status: 307
-
-    - pattern: "^/admin/(.*)"
-      rewrite: "/$1"
-      fly_replay:
+      - path: "^/admin/"
         region: ord  # Chicago
         status: 307
 

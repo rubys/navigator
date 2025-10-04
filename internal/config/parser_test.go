@@ -282,7 +282,7 @@ func TestConfigParser_ParseAuthConfig(t *testing.T) {
 func TestConfigParser_ParseFlyReplayRoutes(t *testing.T) {
 	yamlConfig := func() YAMLConfig {
 		cfg := YAMLConfig{}
-		cfg.Routes.FlyReplay = []struct {
+		cfg.Routes.Fly.Replay = []struct {
 			Path   string `yaml:"path"`
 			App    string `yaml:"app"`
 			Region string `yaml:"region"`
@@ -385,11 +385,11 @@ routes:
       path: "^/cable"
       target: "http://localhost:28080"
       websocket: true
-  fly_replay:
-    - path: "^/admin"
-      region: "lax"
-      status: 307
   fly:
+    replay:
+      - path: "^/admin"
+        region: "lax"
+        status: 307
     sticky_sessions:
       enabled: true
       cookie_name: "_navigator_session"
@@ -424,9 +424,16 @@ logging:
 	if len(config.Routes.ReverseProxies) != 1 {
 		t.Errorf("Expected 1 reverse proxy, got %d", len(config.Routes.ReverseProxies))
 	}
-	// StandaloneServers removed - using Routes.ReverseProxies instead
-	if len(config.Routes.FlyReplay) != 1 {
-		t.Errorf("Expected 1 fly replay route, got %d", len(config.Routes.FlyReplay))
+	// Verify fly-replay was converted to rewrite rules
+	flyReplayFound := false
+	for _, rule := range config.Server.RewriteRules {
+		if strings.HasPrefix(rule.Flag, "fly-replay:") {
+			flyReplayFound = true
+			break
+		}
+	}
+	if !flyReplayFound {
+		t.Error("Expected fly-replay rewrite rule not found")
 	}
 	if len(config.Server.RewriteRules) < 1 {
 		t.Error("Expected at least 1 rewrite rule from redirect")

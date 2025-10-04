@@ -240,7 +240,7 @@ routes:
         app: enterprise-app
 
       # Standard customers use default routing
-      # (no fly_replay rule = normal load balancing)
+      # (no routes.fly.replay rule = normal load balancing)
 ```
 
 ## Fallback Proxy Configuration

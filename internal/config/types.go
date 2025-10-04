@@ -112,14 +112,7 @@ type RoutesConfig struct {
 		To   string `yaml:"to"`
 	} `yaml:"rewrites"`
 	ReverseProxies []ProxyRoute `yaml:"reverse_proxies"`
-	FlyReplay      []struct {
-		Path   string `yaml:"path"`
-		App    string `yaml:"app"`
-		Region string `yaml:"region"`
-		Status int    `yaml:"status"`
-	} `yaml:"fly_replay"`
-	// New nested structure for Fly.io features
-	Fly struct {
+	Fly            struct {
 		StickySession StickySessionConfig `yaml:"sticky_sessions"`
 		Replay        []struct {
 			Path   string `yaml:"path"`
@@ -300,14 +293,7 @@ type YAMLConfig struct {
 			To   string `yaml:"to"`
 		} `yaml:"rewrites"`
 		ReverseProxies []ProxyRoute `yaml:"reverse_proxies"`
-		// Support both old and new fly_replay formats
-		FlyReplay []struct {
-			Path   string `yaml:"path"`
-			App    string `yaml:"app"`
-			Region string `yaml:"region"`
-			Status int    `yaml:"status"`
-		} `yaml:"fly_replay"`
-		Fly struct {
+		Fly            struct {
 			StickySession struct {
 				Enabled        bool     `yaml:"enabled"`
 				CookieName     string   `yaml:"cookie_name"`

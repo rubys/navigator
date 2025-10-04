@@ -231,7 +231,6 @@ func (p *ConfigParser) parseRoutesConfig() {
 	p.config.Routes.Redirects = p.yamlConfig.Routes.Redirects
 	p.config.Routes.Rewrites = p.yamlConfig.Routes.Rewrites
 	p.config.Routes.ReverseProxies = p.yamlConfig.Routes.ReverseProxies
-	p.config.Routes.FlyReplay = p.yamlConfig.Routes.FlyReplay
 
 	// Convert routes to rewrite rules if needed
 	for _, redirect := range p.yamlConfig.Routes.Redirects {
@@ -254,13 +253,8 @@ func (p *ConfigParser) parseRoutesConfig() {
 		}
 	}
 
-	// Support both old and new fly_replay formats
-	flyReplays := p.yamlConfig.Routes.FlyReplay
-	if len(p.yamlConfig.Routes.Fly.Replay) > 0 {
-		flyReplays = p.yamlConfig.Routes.Fly.Replay
-	}
-
 	// Convert fly-replay routes to rewrite rules
+	flyReplays := p.yamlConfig.Routes.Fly.Replay
 	for _, flyReplay := range flyReplays {
 		if pattern, err := regexp.Compile(flyReplay.Path); err == nil {
 			// Determine target format for fly-replay
