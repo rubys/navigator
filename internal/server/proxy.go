@@ -19,6 +19,20 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// singleJoiningSlash joins two URL paths with a single slash between them
+// This is the same logic used by httputil.ReverseProxy
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
+	}
+	return a + b
+}
+
 // handleReverseProxies checks and handles reverse proxy routes
 func (h *Handler) handleReverseProxies(w http.ResponseWriter, r *http.Request) bool {
 	if h.config.Routes.ReverseProxies == nil {
@@ -96,7 +110,47 @@ func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route 
 	// Customize the director to modify the request
 	originalDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
+		// Calculate the final path BEFORE calling originalDirector
+		// because originalDirector combines target path + request path
+		var finalPath string
+
+		// If target has capture group substitution, use the substituted path
+		if hasSubstitution {
+			finalPath = targetURL.Path
+		} else if route.StripPath {
+			// Strip path from the ORIGINAL request path, then combine with target
+			strippedPath := r.URL.Path
+			if route.Prefix != "" {
+				// Simple prefix stripping
+				strippedPath = strings.TrimPrefix(r.URL.Path, route.Prefix)
+				if !strings.HasPrefix(strippedPath, "/") {
+					strippedPath = "/" + strippedPath
+				}
+			} else if route.Path != "" {
+				// Regex-based path stripping using capture groups
+				if pattern, err := regexp.Compile(route.Path); err == nil {
+					matches := pattern.FindStringSubmatch(r.URL.Path)
+					if len(matches) > 1 {
+						// Use first capture group as the new path
+						strippedPath = "/" + matches[1]
+					}
+				}
+			}
+			// Combine target path with stripped request path
+			finalPath = singleJoiningSlash(targetURL.Path, strippedPath)
+		} else {
+			// No stripping - let originalDirector handle path joining
+			finalPath = ""
+		}
+
+		// Call original director to set scheme, host, etc.
 		originalDirector(req)
+
+		// Override path if we calculated it
+		if finalPath != "" {
+			req.URL.Path = finalPath
+			req.URL.RawPath = ""
+		}
 
 		// Apply custom headers
 		for key, value := range route.Headers {
@@ -105,31 +159,6 @@ func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route 
 			headerValue = strings.ReplaceAll(headerValue, "$scheme", getScheme(req))
 			headerValue = strings.ReplaceAll(headerValue, "$host", req.Host)
 			req.Header.Set(key, headerValue)
-		}
-
-		// If target has capture group substitution, we've already built the full path
-		// Don't append the original path - just use the target path as-is
-		if hasSubstitution {
-			req.URL.Path = targetURL.Path
-			req.URL.RawPath = ""
-		} else if route.StripPath {
-			// Strip path if configured (only when not using substitution)
-			if route.Prefix != "" {
-				// Simple prefix stripping
-				req.URL.Path = strings.TrimPrefix(req.URL.Path, route.Prefix)
-				if !strings.HasPrefix(req.URL.Path, "/") {
-					req.URL.Path = "/" + req.URL.Path
-				}
-			} else if route.Path != "" {
-				// Regex-based path stripping using capture groups
-				if pattern, err := regexp.Compile(route.Path); err == nil {
-					matches := pattern.FindStringSubmatch(r.URL.Path)
-					if len(matches) > 1 {
-						// Use first capture group as the new path
-						req.URL.Path = "/" + matches[1]
-					}
-				}
-			}
 		}
 
 		slog.Debug("Proxying HTTP request",

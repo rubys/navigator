@@ -154,35 +154,72 @@ func TestHTTPProxy_HeaderForwarding(t *testing.T) {
 }
 
 func TestHTTPProxy_StripPath(t *testing.T) {
-	var receivedPath string
+	t.Run("strip prefix with no target path", func(t *testing.T) {
+		var receivedPath string
 
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedPath = r.URL.Path
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer backend.Close()
+		backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			receivedPath = r.URL.Path
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer backend.Close()
 
-	route := &config.ProxyRoute{
-		Prefix:    "/api/v1",
-		Target:    backend.URL,
-		StripPath: true,
-	}
+		route := &config.ProxyRoute{
+			Prefix:    "/api/v1",
+			Target:    backend.URL,
+			StripPath: true,
+		}
 
-	cfg := &config.Config{
-		Routes: config.RoutesConfig{
-			ReverseProxies: []config.ProxyRoute{*route},
-		},
-	}
-	handler := &Handler{config: cfg}
+		cfg := &config.Config{
+			Routes: config.RoutesConfig{
+				ReverseProxies: []config.ProxyRoute{*route},
+			},
+		}
+		handler := &Handler{config: cfg}
 
-	req := httptest.NewRequest("GET", "/api/v1/users", nil)
-	w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/api/v1/users", nil)
+		w := httptest.NewRecorder()
 
-	handler.handleReverseProxies(w, req)
+		handler.handleReverseProxies(w, req)
 
-	if receivedPath != "/users" {
-		t.Errorf("Expected path '/users', got %s", receivedPath)
-	}
+		if receivedPath != "/users" {
+			t.Errorf("Expected path '/users', got %s", receivedPath)
+		}
+	})
+
+	t.Run("strip prefix - correct usage pattern", func(t *testing.T) {
+		var receivedPath string
+
+		backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			receivedPath = r.URL.Path
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer backend.Close()
+
+		// Correct usage: target has no path, stripped path provides the final path
+		// Request: /showcase/regions/iad/cable -> strip /showcase/regions/iad -> /cable
+		// Target: http://backend (no path) -> final: http://backend/cable
+		route := &config.ProxyRoute{
+			Prefix:    "/showcase/regions/iad",
+			Target:    backend.URL,
+			StripPath: true,
+		}
+
+		cfg := &config.Config{
+			Routes: config.RoutesConfig{
+				ReverseProxies: []config.ProxyRoute{*route},
+			},
+		}
+		handler := &Handler{config: cfg}
+
+		req := httptest.NewRequest("GET", "/showcase/regions/iad/cable", nil)
+		w := httptest.NewRecorder()
+
+		handler.handleReverseProxies(w, req)
+
+		if receivedPath != "/cable" {
+			t.Errorf("Expected path '/cable', got %s", receivedPath)
+		}
+	})
 }
 
 func TestReverseProxy_PathRegexMatching(t *testing.T) {
