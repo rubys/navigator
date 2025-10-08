@@ -228,7 +228,7 @@ func (l *ServerLifecycle) Run() error {
 	// Start server in goroutine
 	serverErrors := make(chan error, 1)
 	go func() {
-		slog.Info("Navigator starting", "address", addr)
+		slog.Info("Navigator starting", "version", version, "address", addr)
 
 		// Execute server ready hooks
 		if err := process.ExecuteServerHooks(l.cfg.Hooks.Ready, "ready"); err != nil {
