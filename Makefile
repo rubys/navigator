@@ -2,6 +2,13 @@
 
 .PHONY: all build build-legacy build-refactored clean lint test test-fast test-full test-integration test-stress help
 
+# Version info for build
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo "none")
+BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+LDFLAGS := -X 'main.version=$(VERSION)' -X 'main.commit=$(COMMIT)' -X 'main.buildTime=$(BUILD_TIME)'
+
 # Default target
 all: build
 
@@ -11,14 +18,14 @@ build: build-legacy build-refactored
 build-legacy:
 	@echo "Building navigator-legacy..."
 	@mkdir -p bin
-	go build -mod=readonly -o bin/navigator-legacy cmd/navigator-legacy/main.go
+	go build -mod=readonly -ldflags="$(LDFLAGS)" -o bin/navigator-legacy cmd/navigator-legacy/main.go
 	@echo "Navigator built successfully at bin/navigator-legacy"
 
 # Build the refactored navigator executable
 build-refactored:
 	@echo "Building navigator-refactored..."
 	@mkdir -p bin
-	go build -mod=readonly -o bin/navigator-refactored cmd/navigator-refactored/main.go
+	go build -mod=readonly -ldflags="$(LDFLAGS)" -o bin/navigator-refactored cmd/navigator-refactored/main.go
 	@echo "Navigator-refactored built successfully at bin/navigator-refactored"
 
 # Clean build artifacts

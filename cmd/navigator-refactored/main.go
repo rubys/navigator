@@ -22,6 +22,12 @@ import (
 	"github.com/rubys/navigator/internal/utils"
 )
 
+var (
+	version   = "dev"     // Set via -ldflags at build time
+	commit    = "none"    // Git commit hash
+	buildTime = "unknown" // Build timestamp
+)
+
 func main() {
 	// Initialize basic logger
 	initLogger()
@@ -162,7 +168,13 @@ func handleCommandLineArgs() error {
 			os.Exit(0)
 
 		case "--version", "-v":
-			fmt.Println("Navigator v1.0.0")
+			if version != "dev" {
+				fmt.Printf("Navigator %s\n", version)
+			} else if commit != "none" {
+				fmt.Printf("Navigator %s (commit: %s)\n", version, commit[:8])
+			} else {
+				fmt.Printf("Navigator %s (built: %s)\n", version, buildTime)
+			}
 			os.Exit(0)
 		}
 	}
@@ -176,6 +188,7 @@ func printHelp() {
 	fmt.Println("  navigator [config-file]     Start server with optional config file")
 	fmt.Println("  navigator -s reload         Reload configuration of running server")
 	fmt.Println("  navigator --help            Show this help message")
+	fmt.Println("  navigator --version         Show version information")
 	fmt.Println()
 	fmt.Println("Default config file: config/navigator.yml")
 	fmt.Println()

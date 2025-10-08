@@ -46,9 +46,9 @@ jobs:
     - name: Build binaries
       run: |
         mkdir -p dist
-        
+
         # Build flags with version info
-        BUILD_FLAGS="-s -w -X main.version=${{ env.VERSION }} -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.gitCommit=$(git rev-parse --short HEAD)"
+        BUILD_FLAGS="-s -w -X main.version=${{ env.VERSION }} -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.commit=$(git rev-parse HEAD)"
         
         # Linux AMD64
         echo "Building for Linux AMD64..."
@@ -172,13 +172,19 @@ jobs:
       run: |
         # Log in to Docker Hub
         echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
-        
-        # Build the Docker image
-        docker build -t samruby/navigator:${{ env.VERSION }} -t samruby/navigator:latest .
-        
+
+        # Build the Docker image with version info
+        docker build \
+          --build-arg VERSION=${{ env.VERSION }} \
+          --build-arg COMMIT=$(git rev-parse HEAD) \
+          --build-arg BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+          -t samruby/navigator:${{ env.VERSION }} \
+          -t samruby/navigator:latest \
+          .
+
         # Push both tags to Docker Hub
         docker push samruby/navigator:${{ env.VERSION }}
         docker push samruby/navigator:latest
-        
+
         # Log out from Docker Hub
         docker logout
