@@ -30,6 +30,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var (
+	version   = "dev"     // Set via -ldflags at build time
+	commit    = "none"    // Git commit hash
+	buildTime = "unknown" // Build timestamp
+)
+
 // Constants for configuration defaults and limits
 const (
 	// Timeout constants
@@ -1460,6 +1466,18 @@ func main() {
 		}
 	}
 
+	// Handle --version option
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
+		if version != "dev" {
+			fmt.Printf("Navigator %s\n", version)
+		} else if commit != "none" {
+			fmt.Printf("Navigator %s (commit: %s)\n", version, commit[:8])
+		} else {
+			fmt.Printf("Navigator %s (built: %s)\n", version, buildTime)
+		}
+		os.Exit(0)
+	}
+
 	// Handle --help option
 	if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
 		fmt.Println("Navigator - Web application server")
@@ -1468,6 +1486,7 @@ func main() {
 		fmt.Println("  navigator [config-file]     Start server with optional config file")
 		fmt.Println("  navigator -s reload         Reload configuration of running server")
 		fmt.Println("  navigator --help            Show this help message")
+		fmt.Println("  navigator --version         Show version information")
 		fmt.Println()
 		fmt.Println("Default config file: config/navigator.yml")
 		fmt.Println()

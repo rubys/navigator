@@ -2,8 +2,8 @@
 
 Ready-to-use Navigator configurations for common scenarios. Each example is complete and tested.
 
-!!! info "Updated for v0.11.0"
-    All examples have been verified to work with Navigator v0.11.0's refactored architecture. The configuration format remains unchanged, ensuring backwards compatibility.
+!!! warning "Updated for v0.12.0"
+    All examples have been updated to use the new configuration structure introduced in v0.12.0. The configuration format has changed significantly - see the [YAML Reference](../configuration/yaml-reference.md) for migration details.
 
 ## Quick Reference
 

@@ -80,8 +80,6 @@ func (p *ConfigParser) parseServerConfig() {
 	p.config.Server.Hostname = p.yamlConfig.Server.Hostname
 	// Normalize root_path to always have a trailing slash (unless empty)
 	p.config.Server.RootPath = normalizePathWithTrailingSlash(p.yamlConfig.Server.RootPath)
-	p.config.Server.NamedHosts = p.yamlConfig.Server.NamedHosts
-	p.config.Server.Root = p.yamlConfig.Server.Root
 
 	// Parse static file configuration
 	p.config.Server.Static.PublicDir = p.yamlConfig.Server.Static.PublicDir

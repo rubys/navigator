@@ -160,11 +160,9 @@ type MaintenanceConfig struct {
 // Config represents the main configuration
 type Config struct {
 	Server struct {
-		Listen       string   `yaml:"listen"`
-		Hostname     string   `yaml:"hostname"`
-		RootPath     string   `yaml:"root_path"`
-		NamedHosts   []string `yaml:"named_hosts"`
-		Root         string   `yaml:"root"`
+		Listen       string `yaml:"listen"`
+		Hostname     string `yaml:"hostname"`
+		RootPath     string `yaml:"root_path"`
 		RewriteRules []RewriteRule
 		Static       StaticConfig
 		Idle         struct {
@@ -261,12 +259,10 @@ type YAMLConfig struct {
 		PublicPaths []string `yaml:"public_paths"`
 	} `yaml:"auth"`
 	Server struct {
-		Listen     interface{} `yaml:"listen"`
-		Hostname   string      `yaml:"hostname"`
-		RootPath   string      `yaml:"root_path"`
-		NamedHosts []string    `yaml:"named_hosts"`
-		Root       string      `yaml:"root"`
-		Static     struct {
+		Listen   interface{} `yaml:"listen"`
+		Hostname string      `yaml:"hostname"`
+		RootPath string      `yaml:"root_path"`
+		Static   struct {
 			PublicDir         string   `yaml:"public_dir"`
 			AllowedExtensions []string `yaml:"allowed_extensions"`
 			TryFiles          []string `yaml:"try_files"`

@@ -2,11 +2,14 @@
 
 Navigator provides a comprehensive set of features for multi-tenant web applications, from basic process management to advanced regional routing.
 
-!!! tip "What's New in v0.11.0"
-    - **Modular Architecture**: Refactored from single-file to clean package structure
-    - **Enhanced Testing**: 81.2% test coverage across all packages
-    - **Cross-Platform**: Native Windows support alongside Linux and macOS
-    - **Improved Reliability**: Better error handling and logging utilities
+!!! tip "What's New in v0.12.0"
+    - **Configuration Modernization**: Reorganized YAML structure for better clarity
+    - **Reverse Proxy Enhancements**: Capture group substitution in proxy targets
+    - **Configurable Health Checks**: Global and per-tenant health check endpoints
+    - **Startup Timeout Control**: Configurable maintenance page timing
+    - **Per-Tenant WebSocket Tracking**: Fine-grained WebSocket connection control
+    - **Reliability Improvements**: Fixed 502 errors during cold starts and shutdowns
+    - **Better Status Codes**: 503 for maintenance, 499 for client disconnects
 
 ## Core Features
 

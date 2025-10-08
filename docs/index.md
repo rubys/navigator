@@ -2,19 +2,21 @@
 
 A lightweight web server for multi-tenant applications with on-demand process management. Deploy multiple customers or projects from a single configuration file.
 
-!!! success "Latest Release: v0.11.0"
-    Enhanced test coverage (81.2%) and full cross-platform support (Linux, macOS, Windows).
+!!! success "Latest Release: v0.12.0"
+    **Configuration Modernization Release** - Reorganized configuration structure for better clarity and discoverability.
 
-    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v0.11.0)
+    ⚠️ **Breaking Changes**: Configuration files must be updated to new format.
 
-## What Can Navigator Do For You?
+    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v0.12.0) | [Migration Guide](configuration/yaml-reference.md)
 
-- **Serve multiple tenants** - Each customer gets their own database and isolated process
-- **Save on hosting costs** - Automatic machine suspension when idle (Fly.io)
-- **Simplify WebSocket deployments** - Built-in support for Rails Action Cable
-- **Deploy globally** - Smart regional routing with automatic fallback
+## Features
 
-Trusted in production serving 75+ customers across 8 countries.
+- Serve multiple tenants with isolated processes and databases
+- Automatic machine suspension when idle (Fly.io)
+- Built-in WebSocket support for Rails Action Cable
+- Regional routing with automatic fallback
+
+Used in production serving 75+ customers across 8 countries.
 
 ## Quick Start
 
@@ -68,20 +70,20 @@ applications:
 
 ## Common Use Cases
 
-- **Multi-tenant SaaS** - Serve multiple customers with isolated databases
+- Multi-tenant applications with isolated databases
   [See configuration →](use-cases.md#use-case-1-multi-tenant-and-monorepos)
 
-- **Cost optimization** - Auto-suspend idle machines on Fly.io
+- Auto-suspend idle machines on Fly.io
   [Learn more →](use-cases.md#use-case-2-machine-auto-suspend-flyio)
 
-- **WebSocket support** - Standalone Action Cable with Rails 8
+- Standalone Action Cable with Rails 8
   [View example →](use-cases.md#use-case-3-websocket-support)
 
-- **Sticky sessions** - Route users to the same machine
+- Sticky sessions for stateful applications
   [Read guide →](use-cases.md#use-case-4-sticky-sessions)
 
-- **Regional routing** - Deploy closer to your users
-  [Explore Fly-Replay →](use-cases.md#use-case-5-dynamic-routing-with-fly-replay)
+- Regional routing with Fly-Replay
+  [See example →](use-cases.md#use-case-5-dynamic-routing-with-fly-replay)
 
 ## Learn More
 
