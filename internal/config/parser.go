@@ -7,6 +7,21 @@ import (
 	"time"
 )
 
+// normalizePathWithTrailingSlash ensures a path has a trailing slash
+// Returns empty string for empty input
+// Returns "/" for "/" input
+// Returns "/path/" for "/path" or "/path/" input
+func normalizePathWithTrailingSlash(path string) string {
+	if path == "" {
+		return ""
+	}
+	// Ensure it has a trailing slash
+	if !strings.HasSuffix(path, "/") {
+		return path + "/"
+	}
+	return path
+}
+
 // expandVariables expands ${var} placeholders in the given map using provided variables
 func expandVariables(env map[string]string, vars map[string]interface{}) map[string]string {
 	result := make(map[string]string)
@@ -54,13 +69,17 @@ func (p *ConfigParser) Parse() (*Config, error) {
 	p.parseHooksConfig()
 	p.parseMaintenanceConfig()
 
+	// Add automatic trailing slash redirects after all other parsing
+	p.addTrailingSlashRedirects()
+
 	return p.config, nil
 }
 
 // parseServerConfig parses server-level configuration
 func (p *ConfigParser) parseServerConfig() {
 	p.config.Server.Hostname = p.yamlConfig.Server.Hostname
-	p.config.Server.RootPath = p.yamlConfig.Server.RootPath
+	// Normalize root_path to always have a trailing slash (unless empty)
+	p.config.Server.RootPath = normalizePathWithTrailingSlash(p.yamlConfig.Server.RootPath)
 	p.config.Server.NamedHosts = p.yamlConfig.Server.NamedHosts
 	p.config.Server.Root = p.yamlConfig.Server.Root
 
@@ -170,7 +189,7 @@ func (p *ConfigParser) parseApplicationConfig() {
 
 		tenant := Tenant{
 			Name:            tenantName,
-			Path:            yamlTenant.Path, // Preserve original path for matching
+			Path:            normalizePathWithTrailingSlash(yamlTenant.Path), // Normalize with trailing slash
 			Root:            yamlTenant.Root,
 			PublicDir:       yamlTenant.PublicDir,
 			Framework:       yamlTenant.Framework,
@@ -279,5 +298,37 @@ func (p *ConfigParser) parseRoutesConfig() {
 				Flag:        fmt.Sprintf("fly-replay:%s:%d", target, status),
 			})
 		}
+	}
+}
+
+// addTrailingSlashRedirects adds automatic redirects from non-trailing-slash to trailing-slash versions
+// for both root_path and all tenant paths
+func (p *ConfigParser) addTrailingSlashRedirects() {
+	// Add redirect for root_path (if not empty and not just "/")
+	if p.config.Server.RootPath != "" && p.config.Server.RootPath != "/" {
+		// Remove trailing slash to create the "from" pattern
+		pathWithoutSlash := strings.TrimSuffix(p.config.Server.RootPath, "/")
+		// Create regex pattern that matches the path without trailing slash at end of string
+		pattern := regexp.MustCompile("^" + regexp.QuoteMeta(pathWithoutSlash) + "$")
+
+		p.config.Server.RewriteRules = append(p.config.Server.RewriteRules, RewriteRule{
+			Pattern:     pattern,
+			Replacement: p.config.Server.RootPath, // The normalized version with trailing slash
+			Flag:        "redirect",
+		})
+	}
+
+	// Add redirects for all tenant paths
+	for _, tenant := range p.config.Applications.Tenants {
+		// Remove trailing slash to create the "from" pattern
+		pathWithoutSlash := strings.TrimSuffix(tenant.Path, "/")
+		// Create regex pattern that matches the path without trailing slash at end of string
+		pattern := regexp.MustCompile("^" + regexp.QuoteMeta(pathWithoutSlash) + "$")
+
+		p.config.Server.RewriteRules = append(p.config.Server.RewriteRules, RewriteRule{
+			Pattern:     pattern,
+			Replacement: tenant.Path, // The normalized version with trailing slash
+			Flag:        "redirect",
+		})
 	}
 }

@@ -62,9 +62,9 @@ applications:
 		t.Errorf("Expected public_dir public, got %s", config.Server.Static.PublicDir)
 	}
 
-	// RootPath should be correctly parsed from YAML
-	if config.Server.RootPath != "/showcase" {
-		t.Errorf("Expected root_path /showcase, got %s", config.Server.RootPath)
+	// RootPath should be normalized with trailing slash
+	if config.Server.RootPath != "/showcase/" {
+		t.Errorf("Expected root_path /showcase/, got %s", config.Server.RootPath)
 	}
 
 	// Verify idle config

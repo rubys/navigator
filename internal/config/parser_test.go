@@ -563,3 +563,221 @@ func formatBoolPtr(b *bool) string {
 	}
 	return "false"
 }
+
+func TestNormalizePathWithTrailingSlash(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "empty string",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "root path",
+			input: "/",
+			want:  "/",
+		},
+		{
+			name:  "path without trailing slash",
+			input: "/showcase",
+			want:  "/showcase/",
+		},
+		{
+			name:  "path with trailing slash",
+			input: "/showcase/",
+			want:  "/showcase/",
+		},
+		{
+			name:  "nested path without trailing slash",
+			input: "/showcase/2025/raleigh",
+			want:  "/showcase/2025/raleigh/",
+		},
+		{
+			name:  "nested path with trailing slash",
+			input: "/showcase/2025/raleigh/",
+			want:  "/showcase/2025/raleigh/",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizePathWithTrailingSlash(tt.input)
+			if got != tt.want {
+				t.Errorf("normalizePathWithTrailingSlash(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTrailingSlashRedirects(t *testing.T) {
+	yamlConfig := `
+server:
+  listen: 3000
+  root_path: /showcase
+
+applications:
+  tenants:
+    - path: /showcase/2025/raleigh
+      root: /app/raleigh
+    - path: /showcase/2025/boston/
+      root: /app/boston
+`
+
+	// Parse YAML
+	config, err := ParseYAML([]byte(yamlConfig))
+	if err != nil {
+		t.Fatalf("ParseYAML() error = %v", err)
+	}
+
+	// Verify root_path was normalized
+	if config.Server.RootPath != "/showcase/" {
+		t.Errorf("RootPath = %q, want %q", config.Server.RootPath, "/showcase/")
+	}
+
+	// Verify tenant paths were normalized
+	if len(config.Applications.Tenants) != 2 {
+		t.Fatalf("Expected 2 tenants, got %d", len(config.Applications.Tenants))
+	}
+
+	if config.Applications.Tenants[0].Path != "/showcase/2025/raleigh/" {
+		t.Errorf("Tenant 0 Path = %q, want %q", config.Applications.Tenants[0].Path, "/showcase/2025/raleigh/")
+	}
+
+	if config.Applications.Tenants[1].Path != "/showcase/2025/boston/" {
+		t.Errorf("Tenant 1 Path = %q, want %q", config.Applications.Tenants[1].Path, "/showcase/2025/boston/")
+	}
+
+	// Verify automatic redirects were created
+	// Should have: 1 for root_path + 2 for tenants = 3 redirect rules
+	redirectCount := 0
+	for _, rule := range config.Server.RewriteRules {
+		if rule.Flag == "redirect" {
+			redirectCount++
+		}
+	}
+
+	if redirectCount < 3 {
+		t.Errorf("Expected at least 3 redirect rules, got %d", redirectCount)
+	}
+
+	// Verify specific redirects
+	testCases := []struct {
+		from string
+		to   string
+		desc string
+	}{
+		{from: "/showcase", to: "/showcase/", desc: "root_path redirect"},
+		{from: "/showcase/2025/raleigh", to: "/showcase/2025/raleigh/", desc: "tenant 0 redirect"},
+		{from: "/showcase/2025/boston", to: "/showcase/2025/boston/", desc: "tenant 1 redirect"},
+	}
+
+	for _, tc := range testCases {
+		found := false
+		for _, rule := range config.Server.RewriteRules {
+			if rule.Flag == "redirect" && rule.Replacement == tc.to {
+				// Test if the pattern matches the "from" path
+				if rule.Pattern.MatchString(tc.from) {
+					found = true
+					// Verify it doesn't match the path WITH trailing slash
+					if rule.Pattern.MatchString(tc.to) {
+						t.Errorf("%s: pattern should not match %q (with trailing slash)", tc.desc, tc.to)
+					}
+					break
+				}
+			}
+		}
+		if !found {
+			t.Errorf("%s: redirect from %q to %q not found", tc.desc, tc.from, tc.to)
+		}
+	}
+}
+
+func TestTrailingSlashRedirectsEmptyRootPath(t *testing.T) {
+	yamlConfig := `
+server:
+  listen: 3000
+  root_path: ""
+
+applications:
+  tenants:
+    - path: /2025/raleigh
+      root: /app/raleigh
+`
+
+	// Parse YAML
+	config, err := ParseYAML([]byte(yamlConfig))
+	if err != nil {
+		t.Fatalf("ParseYAML() error = %v", err)
+	}
+
+	// Verify empty root_path stays empty
+	if config.Server.RootPath != "" {
+		t.Errorf("RootPath = %q, want empty string", config.Server.RootPath)
+	}
+
+	// Verify tenant path was normalized
+	if config.Applications.Tenants[0].Path != "/2025/raleigh/" {
+		t.Errorf("Tenant Path = %q, want %q", config.Applications.Tenants[0].Path, "/2025/raleigh/")
+	}
+
+	// Should only have redirect for tenant (not root_path since it's empty)
+	redirectCount := 0
+	for _, rule := range config.Server.RewriteRules {
+		if rule.Flag == "redirect" {
+			redirectCount++
+		}
+	}
+
+	// Should have 1 redirect for the tenant
+	if redirectCount < 1 {
+		t.Errorf("Expected at least 1 redirect rule, got %d", redirectCount)
+	}
+}
+
+func TestTrailingSlashRedirectsRootSlash(t *testing.T) {
+	yamlConfig := `
+server:
+  listen: 3000
+  root_path: /
+
+applications:
+  tenants:
+    - path: /2025/raleigh
+      root: /app/raleigh
+`
+
+	// Parse YAML
+	config, err := ParseYAML([]byte(yamlConfig))
+	if err != nil {
+		t.Fatalf("ParseYAML() error = %v", err)
+	}
+
+	// Verify root "/" stays as "/"
+	if config.Server.RootPath != "/" {
+		t.Errorf("RootPath = %q, want %q", config.Server.RootPath, "/")
+	}
+
+	// Should only have redirect for tenant (not root_path since it's just "/")
+	redirectCount := 0
+	rootPathRedirect := false
+	for _, rule := range config.Server.RewriteRules {
+		if rule.Flag == "redirect" {
+			redirectCount++
+			if rule.Replacement == "/" {
+				rootPathRedirect = true
+			}
+		}
+	}
+
+	// Should have 1 redirect for the tenant, but NOT for root_path
+	if redirectCount != 1 {
+		t.Errorf("Expected exactly 1 redirect rule, got %d", redirectCount)
+	}
+
+	if rootPathRedirect {
+		t.Error("Should not create redirect for root_path when it is '/'")
+	}
+}
