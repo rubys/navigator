@@ -193,19 +193,20 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 		targetURL.Scheme = "wss"
 	}
 
-	// Build target WebSocket URL
-	var targetPath string
+	// Build target WebSocket URL with same strip_path logic as HTTP proxy
+	var finalPath string
 	if route.StripPath && route.Prefix != "" {
-		targetPath = strings.TrimPrefix(r.URL.Path, route.Prefix)
+		strippedPath := strings.TrimPrefix(r.URL.Path, route.Prefix)
+		if !strings.HasPrefix(strippedPath, "/") {
+			strippedPath = "/" + strippedPath
+		}
+		// Combine target path with stripped request path
+		finalPath = singleJoiningSlash(targetURL.Path, strippedPath)
 	} else {
-		targetPath = r.URL.Path
+		finalPath = r.URL.Path
 	}
 
-	if !strings.HasPrefix(targetPath, "/") {
-		targetPath = "/" + targetPath
-	}
-
-	targetURL.Path = targetPath
+	targetURL.Path = finalPath
 	targetURL.RawQuery = r.URL.RawQuery
 
 	slog.Debug("Proxying WebSocket connection",
@@ -215,8 +216,13 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 	// Connect to backend WebSocket server
 	backendHeader := http.Header{}
 	for key, values := range r.Header {
-		// Skip hop-by-hop headers and WebSocket-specific headers
-		if isHopByHopHeader(key) || isWebSocketHeader(key) {
+		// Skip hop-by-hop headers (standard HTTP proxy behavior)
+		if isHopByHopHeader(key) {
+			continue
+		}
+		// Skip WebSocket handshake headers (connection-specific)
+		// but forward application headers like Sec-WebSocket-Protocol
+		if isWebSocketHandshakeHeader(key) {
 			continue
 		}
 		for _, value := range values {
@@ -245,8 +251,13 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 	}
 	defer backendConn.Close()
 
-	// Upgrade client connection
-	clientConn, err := upgrader.Upgrade(w, r, nil)
+	// Upgrade client connection with matching subprotocol
+	responseHeader := http.Header{}
+	if backendResp != nil && backendResp.Header.Get("Sec-WebSocket-Protocol") != "" {
+		responseHeader.Set("Sec-WebSocket-Protocol", backendResp.Header.Get("Sec-WebSocket-Protocol"))
+	}
+
+	clientConn, err := upgrader.Upgrade(w, r, responseHeader)
 	if err != nil {
 		slog.Error("Failed to upgrade client connection", "error", err)
 		return
@@ -327,23 +338,31 @@ func isHopByHopHeader(header string) bool {
 	return false
 }
 
-// isWebSocketHeader checks if a header is WebSocket-specific
-func isWebSocketHeader(header string) bool {
-	wsHeaders := []string{
-		"Sec-WebSocket-Key",
-		"Sec-WebSocket-Version",
-		"Sec-WebSocket-Extensions",
-		"Sec-WebSocket-Accept",
-		"Sec-WebSocket-Protocol",
+// isWebSocketHandshakeHeader checks if a header is WebSocket connection-specific
+// These headers are generated per WebSocket connection and must not be forwarded
+// to the backend, as we're establishing two separate WebSocket connections
+// (client->proxy and proxy->backend).
+func isWebSocketHandshakeHeader(header string) bool {
+	handshakeHeaders := []string{
+		"Sec-WebSocket-Key",        // Random nonce for this connection
+		"Sec-WebSocket-Accept",     // Response hash for this connection
+		"Sec-WebSocket-Version",    // WebSocket protocol version
+		"Sec-WebSocket-Extensions", // Connection-specific features (compression, etc.)
 	}
 
 	header = strings.ToLower(header)
-	for _, h := range wsHeaders {
+	for _, h := range handshakeHeaders {
 		if strings.ToLower(h) == header {
 			return true
 		}
 	}
 	return false
+}
+
+// isWebSocketHeader checks if a header is WebSocket-related (kept for compatibility)
+func isWebSocketHeader(header string) bool {
+	return isWebSocketHandshakeHeader(header) ||
+		strings.ToLower(header) == "sec-websocket-protocol"
 }
 
 // getClientIP extracts the client IP from the request
