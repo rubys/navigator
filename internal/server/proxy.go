@@ -87,8 +87,9 @@ func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route 
 	if hasSubstitution && route.Path != "" {
 		if pattern, err := regexp.Compile(route.Path); err == nil {
 			matches := pattern.FindStringSubmatch(r.URL.Path)
-			if len(matches) > 0 {
+			if len(matches) > 1 {
 				// Replace $1, $2, etc. with capture groups
+				// matches[0] is the full match, matches[1+] are capture groups
 				for i := 1; i < len(matches); i++ {
 					placeholder := "$" + string(rune('0'+i))
 					targetTemplate = strings.ReplaceAll(targetTemplate, placeholder, matches[i])
@@ -178,9 +179,28 @@ func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route 
 
 // handleWebSocketProxy handles WebSocket reverse proxy
 func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, route *config.ProxyRoute) {
-	targetURL, err := url.Parse(route.Target)
+	// Check if target contains capture group variables ($1, $2, etc.)
+	targetTemplate := route.Target
+	hasSubstitution := strings.Contains(targetTemplate, "$")
+
+	// If we have regex pattern with substitution, do the replacement
+	if hasSubstitution && route.Path != "" {
+		if pattern, err := regexp.Compile(route.Path); err == nil {
+			matches := pattern.FindStringSubmatch(r.URL.Path)
+			if len(matches) > 1 {
+				// Replace $1, $2, etc. with capture groups
+				// matches[0] is the full match, matches[1+] are capture groups
+				for i := 1; i < len(matches); i++ {
+					placeholder := "$" + string(rune('0'+i))
+					targetTemplate = strings.ReplaceAll(targetTemplate, placeholder, matches[i])
+				}
+			}
+		}
+	}
+
+	targetURL, err := url.Parse(targetTemplate)
 	if err != nil {
-		slog.Error("Invalid WebSocket target URL", "target", route.Target, "error", err)
+		slog.Error("Invalid WebSocket target URL", "target", targetTemplate, "error", err)
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
 	}
@@ -193,9 +213,12 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 		targetURL.Scheme = "wss"
 	}
 
-	// Build target WebSocket URL with same strip_path logic as HTTP proxy
+	// Build target WebSocket URL with same logic as HTTP proxy
 	var finalPath string
-	if route.StripPath && route.Prefix != "" {
+	if hasSubstitution {
+		// If we did capture group substitution, use the resulting path
+		finalPath = targetURL.Path
+	} else if route.StripPath && route.Prefix != "" {
 		strippedPath := strings.TrimPrefix(r.URL.Path, route.Prefix)
 		if !strings.HasPrefix(strippedPath, "/") {
 			strippedPath = "/" + strippedPath
