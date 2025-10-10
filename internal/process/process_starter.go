@@ -48,6 +48,12 @@ func (ps *ProcessStarter) StartWebApp(app *WebApp, tenant *config.Tenant) error 
 	// Setup command environment and working directory
 	ps.setupCommand(cmd, tenant, app.Port)
 
+	// Setup memory limits and user credentials (Linux only)
+	if err := ps.setupCgroupAndCredentials(cmd, app, tenant); err != nil {
+		cancel()
+		return fmt.Errorf("failed to setup cgroup/credentials: %w", err)
+	}
+
 	// Create log writers for the app output
 	tenantName := tenant.Name
 	stdout := CreateLogWriter(tenantName, "stdout", ps.config.Logging)
@@ -61,6 +67,16 @@ func (ps *ProcessStarter) StartWebApp(app *WebApp, tenant *config.Tenant) error 
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start web app: %w", err)
+	}
+
+	// Add process to cgroup after start (Linux only)
+	if app.CgroupPath != "" {
+		if err := AddProcessToCgroup(app.CgroupPath, cmd.Process.Pid); err != nil {
+			slog.Error("Failed to add process to cgroup",
+				"tenant", tenantName,
+				"pid", cmd.Process.Pid,
+				"error", err)
+		}
 	}
 
 	// Execute tenant start hooks
@@ -212,4 +228,56 @@ func (ps *ProcessStarter) getHealthCheckEndpoint(tenant *config.Tenant) string {
 	}
 	// 3. Default to root path
 	return "/"
+}
+
+// setupCgroupAndCredentials configures memory limits and process credentials
+// This is only functional on Linux when running as root
+func (ps *ProcessStarter) setupCgroupAndCredentials(cmd *exec.Cmd, app *WebApp, tenant *config.Tenant) error {
+	tenantName := tenant.Name
+
+	// Determine memory limit (tenant override or pool default)
+	memLimit := tenant.MemoryLimit
+	if memLimit == "" {
+		memLimit = ps.config.Applications.Pools.DefaultMemoryLimit
+	}
+
+	// Parse memory limit
+	limitBytes, err := ParseMemorySize(memLimit)
+	if err != nil {
+		return fmt.Errorf("invalid memory limit %q: %w", memLimit, err)
+	}
+
+	// Setup cgroup before starting process (Linux only, requires root)
+	if limitBytes > 0 {
+		cgroupPath, err := SetupCgroupMemoryLimit(tenantName, limitBytes)
+		if err != nil {
+			return fmt.Errorf("failed to setup cgroup: %w", err)
+		}
+		app.CgroupPath = cgroupPath
+		app.MemoryLimit = limitBytes
+	}
+
+	// Determine user and group (tenant override or pool default)
+	user := tenant.User
+	if user == "" {
+		user = ps.config.Applications.Pools.User
+	}
+	group := tenant.Group
+	if group == "" {
+		group = ps.config.Applications.Pools.Group
+	}
+
+	// Get user credentials (Unix only)
+	if user != "" {
+		cred, err := GetUserCredentials(user, group)
+		if err != nil {
+			return fmt.Errorf("failed to get user credentials: %w", err)
+		}
+		if cred != nil {
+			// Set process credentials (only works on Unix with SysProcAttr)
+			ps.setProcessCredentials(cmd, cred)
+		}
+	}
+
+	return nil
 }

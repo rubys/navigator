@@ -65,10 +65,10 @@ cmd.SysProcAttr = &syscall.SysProcAttr{
 AddProcessToCgroup(cgroupPath, cmd.Process.Pid)
 ```
 
-### 4. OOM Detection and Auto-Restart
+### 4. OOM Detection and Cleanup
 **File**: `internal/process/webapp.go`
 
-Modify process monitoring to detect OOM kills:
+Modify process monitoring to detect OOM kills and clean up:
 ```go
 // In goroutine that waits for process
 go func() {
@@ -76,30 +76,23 @@ go func() {
 
     // Check if OOM killed
     if IsOOMKill(app.CgroupPath) {
-        app.OOMCount++
-        app.LastOOMTime = time.Now()
-
-        slog.Error("Tenant OOM killed",
+        slog.Error("Tenant OOM killed by kernel",
             "tenant", tenantName,
-            "limit", formatBytes(app.MemoryLimit),
-            "oomCount", app.OOMCount)
+            "limit", formatBytes(app.MemoryLimit))
 
-        // Check for OOM restart loop (3 in 5 minutes)
-        if app.OOMCount >= 3 &&
-           time.Since(app.LastOOMTime) < 5*time.Minute {
-            slog.Error("Tenant in OOM loop, stopping",
-                "tenant", tenantName)
-            delete(m.apps, tenantName)
-            return
-        }
-
-        // Auto-restart after brief delay
-        time.Sleep(2 * time.Second)
+        // Remove from registry
+        // Next request will trigger restart via GetOrStartApp()
+        m.mutex.Lock()
         delete(m.apps, tenantName)
-        // Next request will trigger restart
+        m.mutex.Unlock()
+
+        // Note: Keep cgroup in place for reuse on restart
+        // Only cleanup cgroup on Navigator shutdown
     }
 }()
 ```
+
+**Behavior**: OOM killed tenants are removed from the app registry but their cgroup remains. The next incoming request will trigger a restart via the normal `GetOrStartApp()` flow.
 
 ### 5. Cleanup on Shutdown
 **File**: `internal/process/webapp.go`

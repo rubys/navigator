@@ -35,6 +35,12 @@ type WebApp struct {
 	wsConnections    map[string]interface{}
 	wsConnectionsMux sync.RWMutex
 	activeWebSockets int32 // Atomic counter for active WebSocket connections
+
+	// Memory limit tracking (Linux only)
+	CgroupPath   string    // Cgroup path for memory limiting (Linux only)
+	MemoryLimit  int64     // Memory limit in bytes (0 = no limit)
+	OOMCount     int       // Number of times this tenant has been OOM killed
+	LastOOMTime  time.Time // Timestamp of last OOM kill
 }
 
 // ReadyChan returns the channel that's closed when the app is ready
@@ -187,6 +193,29 @@ func (m *AppManager) monitorAppIdleTimeout(tenantName string) {
 			return // App was removed
 		}
 
+		// Check for OOM kills (Linux only)
+		if app.CgroupPath != "" && IsOOMKill(app.CgroupPath) {
+			// Update OOM count and timestamp
+			app.mutex.Lock()
+			app.OOMCount++
+			app.LastOOMTime = time.Now()
+			oomCount := app.OOMCount
+			app.mutex.Unlock()
+
+			slog.Error("Tenant OOM killed by kernel",
+				"tenant", tenantName,
+				"limit", formatBytes(app.MemoryLimit),
+				"oomCount", oomCount)
+
+			// Remove from registry
+			// Next request will trigger restart via GetOrStartApp()
+			m.mutex.Lock()
+			delete(m.apps, tenantName)
+			m.mutex.Unlock()
+
+			return // Exit the monitoring goroutine
+		}
+
 		app.mutex.Lock()
 		idleTime := time.Since(app.LastActivity)
 		app.mutex.Unlock()
@@ -333,6 +362,15 @@ func (m *AppManager) CleanupWithContext(ctx context.Context) {
 			if app.cancel != nil {
 				app.cancel()
 			}
+
+			// Cleanup cgroup on shutdown (Linux only)
+			if app.CgroupPath != "" {
+				if err := CleanupCgroup(tenantName); err != nil {
+					slog.Warn("Failed to cleanup cgroup",
+						"tenant", tenantName,
+						"error", err)
+				}
+			}
 		}
 
 		// Clear the apps map
@@ -414,4 +452,21 @@ func cleanupPidFile(pidfilePath string) error {
 // ParseURL safely parses a URL string
 func (app *WebApp) ParseURL() (*url.URL, error) {
 	return url.Parse(app.URL)
+}
+
+// formatBytes formats bytes as human-readable string
+func formatBytes(bytes int64) string {
+	if bytes == 0 {
+		return "0 B"
+	}
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
