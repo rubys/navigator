@@ -35,17 +35,29 @@ func SetupCgroupMemoryLimit(tenantName string, limitBytes int64) (string, error)
 		cgroupName = "app"
 	}
 
+	// Create parent navigator cgroup first
+	navigatorPath := filepath.Join(cgroupRoot, "navigator")
+	if err := os.MkdirAll(navigatorPath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create navigator cgroup: %w", err)
+	}
+
+	// Enable memory controller in root for navigator cgroup
+	if err := enableMemoryControllerInParent(cgroupRoot, "navigator"); err != nil {
+		slog.Warn("Failed to enable memory controller in root, continuing anyway",
+			"error", err)
+	}
+
 	// Create tenant-specific cgroup under navigator/
-	cgroupPath := filepath.Join(cgroupRoot, "navigator", sanitizeCgroupName(cgroupName))
+	cgroupPath := filepath.Join(navigatorPath, sanitizeCgroupName(cgroupName))
 
 	// Create cgroup directory
 	if err := os.MkdirAll(cgroupPath, 0755); err != nil {
 		return "", fmt.Errorf("failed to create cgroup: %w", err)
 	}
 
-	// Enable memory controller if not already enabled
-	if err := enableMemoryController(cgroupPath); err != nil {
-		slog.Warn("Failed to enable memory controller, continuing anyway",
+	// Enable memory controller for tenant cgroup
+	if err := enableMemoryControllerInParent(navigatorPath, sanitizeCgroupName(cgroupName)); err != nil {
+		slog.Warn("Failed to enable memory controller in navigator, continuing anyway",
 			"tenant", tenantName,
 			"error", err)
 	}
@@ -167,22 +179,15 @@ func GetMemoryUsage(cgroupPath string) int64 {
 	return usage
 }
 
-// enableMemoryController enables the memory controller for a cgroup
-func enableMemoryController(cgroupPath string) error {
-	// Get parent cgroup path
-	parentPath := filepath.Dir(cgroupPath)
-	if parentPath == cgroupRoot {
-		// Already at root, can't enable controller here
-		return nil
-	}
-
+// enableMemoryControllerInParent enables the memory controller in parent for child cgroup
+func enableMemoryControllerInParent(parentPath, childName string) error {
 	// Write to parent's cgroup.subtree_control
 	subtreeControlPath := filepath.Join(parentPath, "cgroup.subtree_control")
 
 	// Read current controllers
 	data, err := os.ReadFile(subtreeControlPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read subtree_control: %w", err)
 	}
 
 	controllers := string(data)
@@ -193,9 +198,7 @@ func enableMemoryController(cgroupPath string) error {
 
 	// Enable memory controller
 	if err := os.WriteFile(subtreeControlPath, []byte("+memory"), 0644); err != nil {
-		// If it fails, it might already be enabled or we don't have permission
-		// Don't treat this as fatal
-		return err
+		return fmt.Errorf("failed to enable memory controller: %w", err)
 	}
 
 	return nil
