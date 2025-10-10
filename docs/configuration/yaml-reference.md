@@ -236,6 +236,9 @@ applications:
     max_size: 10                  # Maximum app processes
     timeout: 5m                   # Idle timeout (duration format)
     start_port: 4000              # Starting port for allocation
+    default_memory_limit: "512M"  # Default memory limit per tenant (Linux only)
+    user: "rails"                 # Default user to run tenants as (Unix only)
+    group: "rails"                # Default group to run tenants as (Unix only)
 
   # Startup configuration
   health_check: "/up"             # Default health check endpoint
@@ -275,6 +278,9 @@ applications:
       health_check: "/health"     # Override: custom health check endpoint
       startup_timeout: "10s"      # Override: wait longer for this tenant
       track_websockets: false     # Override: disable WebSocket tracking
+      memory_limit: "1G"          # Override: memory limit for this tenant (Linux only)
+      user: "app"                 # Override: user for this tenant (Unix only)
+      group: "app"                # Override: group for this tenant (Unix only)
 
       # Tenant-specific lifecycle hooks
       hooks:
@@ -295,6 +301,24 @@ Process pool management for tenant applications.
 | `max_size` | integer | `10` | Maximum number of app processes |
 | `timeout` | string | `"5m"` | Idle timeout (duration: "5m", "10m") |
 | `start_port` | integer | `4000` | Starting port for dynamic allocation |
+| `default_memory_limit` | string | `""` | Default memory limit (e.g., "512M", "1G") - Linux only, requires root |
+| `user` | string | `""` | Default user to run tenant processes as - Unix only |
+| `group` | string | `""` | Default group to run tenant processes as - Unix only |
+
+**Memory Limits (Linux only)**:
+- Requires running Navigator as root on Linux with cgroups v2
+- Uses Linux cgroups to enforce per-tenant memory limits
+- When a tenant exceeds its limit, the kernel OOM kills only that tenant
+- OOM-killed tenants are removed from the registry and restart on next request
+- Cgroups persist during idle timeout, only cleaned up on Navigator shutdown
+- Supported formats: "512M", "1G", "2048M", "1.5G"
+- On non-Linux or non-root: Configuration is ignored (graceful degradation)
+
+**User/Group Credentials (Unix only)**:
+- Runs tenant processes as specified non-root user for security isolation
+- Navigator must run as root to drop privileges to specified user/group
+- Enhances security by limiting tenant process permissions
+- On Windows or when not running as root: Configuration is ignored
 
 ### applications.health_check
 
@@ -369,9 +393,14 @@ List of tenant applications.
 | `args` | array | | Server arguments override |
 | `health_check` | string | | Health check endpoint override (e.g., "/up") |
 | `track_websockets` | boolean | | Override WebSocket tracking (nil = use global) |
+| `memory_limit` | string | | Memory limit override (e.g., "1G") - Linux only |
+| `user` | string | | User override (runs as this user) - Unix only |
+| `group` | string | | Group override (runs as this group) - Unix only |
 | `hooks` | object | | Tenant-specific lifecycle hooks |
 
 **Note**: The `name` field is automatically derived from the `path` (e.g., `/showcase/2025/boston/` → `2025/boston`).
+
+**Per-Tenant Memory Limits**: Useful for tenants with different resource requirements. For example, a large event might use `memory_limit: "1G"` while smaller events use the pool default of `512M`.
 
 ## managed_processes
 
