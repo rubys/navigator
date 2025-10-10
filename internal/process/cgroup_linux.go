@@ -29,8 +29,14 @@ func SetupCgroupMemoryLimit(tenantName string, limitBytes int64) (string, error)
 		return "", nil
 	}
 
+	// Use default name "app" if tenant name is empty (framework mode)
+	cgroupName := tenantName
+	if cgroupName == "" {
+		cgroupName = "app"
+	}
+
 	// Create tenant-specific cgroup under navigator/
-	cgroupPath := filepath.Join(cgroupRoot, "navigator", sanitizeCgroupName(tenantName))
+	cgroupPath := filepath.Join(cgroupRoot, "navigator", sanitizeCgroupName(cgroupName))
 
 	// Create cgroup directory
 	if err := os.MkdirAll(cgroupPath, 0755); err != nil {
@@ -79,7 +85,13 @@ func AddProcessToCgroup(cgroupPath string, pid int) error {
 // CleanupCgroup removes a tenant's cgroup directory
 // This should only be called when the cgroup is empty (no processes)
 func CleanupCgroup(tenantName string) error {
-	cgroupPath := filepath.Join(cgroupRoot, "navigator", sanitizeCgroupName(tenantName))
+	// Use default name "app" if tenant name is empty (framework mode)
+	cgroupName := tenantName
+	if cgroupName == "" {
+		cgroupName = "app"
+	}
+
+	cgroupPath := filepath.Join(cgroupRoot, "navigator", sanitizeCgroupName(cgroupName))
 
 	if err := os.Remove(cgroupPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove cgroup: %w", err)
