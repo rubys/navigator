@@ -198,9 +198,12 @@ type Applications struct {
 
 // Pools represents application pool configuration
 type Pools struct {
-	MaxSize   int    `yaml:"max_size"`
-	Timeout   string `yaml:"timeout"` // Duration string like "5m", "10m"
-	StartPort int    `yaml:"start_port"`
+	MaxSize         int    `yaml:"max_size"`
+	Timeout         string `yaml:"timeout"`          // Duration string like "5m", "10m"
+	StartPort       int    `yaml:"start_port"`
+	DefaultMemoryLimit string `yaml:"default_memory_limit"` // Default memory limit for tenants (e.g., "512M", "1G")
+	User            string `yaml:"user"`             // Default user to run tenant processes as
+	Group           string `yaml:"group"`            // Default group to run tenant processes as
 }
 
 // ProxyRoute represents a proxy route configuration
@@ -222,6 +225,10 @@ type WebApp struct {
 	Port         int
 	StartTime    time.Time
 	LastActivity time.Time
+	CgroupPath   string    // Cgroup path for memory limiting (Linux only)
+	MemoryLimit  int64     // Memory limit in bytes (0 = no limit)
+	OOMCount     int       // Number of times this tenant has been OOM killed
+	LastOOMTime  time.Time // Timestamp of last OOM kill
 }
 
 // FrameworkConfig represents framework-specific configuration
@@ -248,6 +255,9 @@ type Tenant struct {
 	HealthCheck     string                 `yaml:"health_check"`     // Override health check endpoint for this tenant
 	StartupTimeout  string                 `yaml:"startup_timeout"`  // Override startup timeout for this tenant (e.g., "10s")
 	TrackWebSockets *bool                  `yaml:"track_websockets"` // Override WebSocket tracking (nil = use global default)
+	MemoryLimit     string                 `yaml:"memory_limit"`     // Memory limit for this tenant (e.g., "512M", "1G") - Linux only
+	User            string                 `yaml:"user"`             // User to run this tenant's process as
+	Group           string                 `yaml:"group"`            // Group to run this tenant's process as
 }
 
 // YAMLConfig represents the raw YAML configuration structure
@@ -310,9 +320,12 @@ type YAMLConfig struct {
 	} `yaml:"routes"`
 	Applications struct {
 		Pools struct {
-			MaxSize   int    `yaml:"max_size"`
-			Timeout   string `yaml:"timeout"`
-			StartPort int    `yaml:"start_port"`
+			MaxSize            int    `yaml:"max_size"`
+			Timeout            string `yaml:"timeout"`
+			StartPort          int    `yaml:"start_port"`
+			DefaultMemoryLimit string `yaml:"default_memory_limit"`
+			User               string `yaml:"user"`
+			Group              string `yaml:"group"`
 		} `yaml:"pools"`
 		Framework struct {
 			Command      string   `yaml:"command"`
@@ -334,6 +347,9 @@ type YAMLConfig struct {
 			HealthCheck     string                 `yaml:"health_check"`
 			StartupTimeout  string                 `yaml:"startup_timeout"`
 			TrackWebSockets *bool                  `yaml:"track_websockets"`
+			MemoryLimit     string                 `yaml:"memory_limit"`
+			User            string                 `yaml:"user"`
+			Group           string                 `yaml:"group"`
 			Hooks           struct {
 				Start []HookConfig `yaml:"start"`
 				Stop  []HookConfig `yaml:"stop"`
