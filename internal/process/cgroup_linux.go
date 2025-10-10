@@ -196,20 +196,6 @@ func sanitizeCgroupName(name string) string {
 	return re.ReplaceAllString(name, "_")
 }
 
-// formatBytes formats bytes as human-readable string
-func formatBytes(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
-}
-
 // ParseMemorySize parses memory size strings like "512M", "1G", "2048M"
 func ParseMemorySize(sizeStr string) (int64, error) {
 	if sizeStr == "" {
