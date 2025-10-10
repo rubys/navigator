@@ -27,122 +27,98 @@ This feature adds per-tenant memory limiting using Linux cgroups v2, with gracef
   - `credentials_unix.go` - User/group lookup for Unix
   - `credentials_windows.go` - Stub for Windows
 
+## ✅ Completed (continued)
+
+### 3. Process Startup Integration (commit: 52b95f0)
+**Files**: `internal/process/process_starter.go`, `process_starter_unix.go`, `process_starter_windows.go`
+
+Modified `StartWebApp()` to:
+- Added `setupCgroupAndCredentials()` helper function
+- Determines memory limit from tenant-specific or pool default configuration
+- Parses memory limit using `ParseMemorySize()`
+- Calls `SetupCgroupMemoryLimit()` to create cgroup (Linux only, requires root)
+- Gets user/group credentials via `GetUserCredentials()` (Unix only)
+- Sets process credentials via platform-specific `setProcessCredentials()`
+- Adds process to cgroup after `cmd.Start()` via `AddProcessToCgroup()`
+
+**Platform-specific implementations:**
+- `process_starter_unix.go`: Sets `cmd.SysProcAttr.Credential` on Unix
+- `process_starter_windows.go`: No-op stub for Windows
+
+### 4. OOM Detection and Cleanup (commit: 52b95f0)
+**File**: `internal/process/webapp.go`
+
+Modified `monitorAppIdleTimeout()` to detect OOM kills:
+- Added OOM detection check using `IsOOMKill(app.CgroupPath)` every 30 seconds
+- Updates `app.OOMCount` and `app.LastOOMTime` when OOM detected
+- Logs OOM events with tenant name, limit, and OOM count
+- Removes OOM-killed tenants from registry via `delete(m.apps, tenantName)`
+- Cgroup remains in place for reuse on restart
+- Next incoming request triggers restart via `GetOrStartApp()`
+
+Also added:
+- `formatBytes()` helper function for human-readable memory sizes
+- Added memory limit tracking fields to `WebApp` struct
+
+### 5. Cleanup on Shutdown (commit: 52b95f0)
+**File**: `internal/process/webapp.go`
+
+Modified `CleanupWithContext()` to clean up cgroups:
+- Added `CleanupCgroup(tenantName)` call for each app with `CgroupPath` set
+- Logs warning if cgroup cleanup fails (non-fatal)
+- Removes cgroup directories when Navigator shuts down
+- Cgroups only cleaned up on shutdown, not on idle timeout
+
+### 6. Update Documentation (commits: 77bbd41, 4b32c6b)
+
+#### A. YAML Reference (commit: 77bbd41)
+**File**: `docs/configuration/yaml-reference.md`
+
+Added documentation for:
+- `applications.pools.default_memory_limit` field with examples
+- `applications.pools.user` and `group` fields
+- `applications.tenants[].memory_limit` override field
+- `applications.tenants[].user` and `group` override fields
+- Detailed explanation of Linux/cgroups requirements
+- Graceful degradation behavior on non-Linux platforms
+- Memory size format reference (512M, 1G, etc.)
+
+#### B. Feature Documentation (commit: 4b32c6b)
+**File**: `docs/features/memory-limits.md`
+
+Created comprehensive feature documentation covering:
+- Overview and how it works (cgroups v2, OOM kills)
+- Platform requirements (Linux, root, cgroups v2)
+- Configuration examples (basic and per-tenant)
+- Capacity planning (Rails 8 + Puma baseline, machine sizing)
+- OOM kill behavior and automatic restart
+- Monitoring (log messages, cgroup stats, OOM tracking)
+- Deployment guides (Fly.io, Kamal)
+- Troubleshooting common issues
+- Best practices and security considerations
+- Implementation details (cgroup hierarchy, process assignment)
+
 ## 🚧 Remaining Work
-
-### 3. Integrate into Process Startup
-**File**: `internal/process/process_starter.go`
-
-Need to modify `StartWebApp()` to:
-```go
-// 1. Get memory limit (tenant override or default)
-memLimit := getMemoryLimit(tenant, config.Applications.Pools)
-
-// 2. Parse memory limit
-limitBytes, err := ParseMemorySize(memLimit)
-
-// 3. Setup cgroup before starting process
-cgroupPath, err := SetupCgroupMemoryLimit(tenant.Name, limitBytes)
-app.CgroupPath = cgroupPath
-app.MemoryLimit = limitBytes
-
-// 4. Get user/group credentials
-user := tenant.User
-if user == "" {
-    user = config.Applications.Pools.User
-}
-group := tenant.Group
-if group == "" {
-    group = config.Applications.Pools.Group
-}
-cred, err := GetUserCredentials(user, group)
-
-// 5. Start process with credentials
-cmd.SysProcAttr = &syscall.SysProcAttr{
-    Credential: cred, // Run as specified user/group
-}
-
-// 6. After cmd.Start(), add to cgroup
-AddProcessToCgroup(cgroupPath, cmd.Process.Pid)
-```
-
-### 4. OOM Detection and Cleanup
-**File**: `internal/process/webapp.go`
-
-Modify process monitoring to detect OOM kills and clean up:
-```go
-// In goroutine that waits for process
-go func() {
-    err := cmd.Wait()
-
-    // Check if OOM killed
-    if IsOOMKill(app.CgroupPath) {
-        slog.Error("Tenant OOM killed by kernel",
-            "tenant", tenantName,
-            "limit", formatBytes(app.MemoryLimit))
-
-        // Remove from registry
-        // Next request will trigger restart via GetOrStartApp()
-        m.mutex.Lock()
-        delete(m.apps, tenantName)
-        m.mutex.Unlock()
-
-        // Note: Keep cgroup in place for reuse on restart
-        // Only cleanup cgroup on Navigator shutdown
-    }
-}()
-```
-
-**Behavior**: OOM killed tenants are removed from the app registry but their cgroup remains. The next incoming request will trigger a restart via the normal `GetOrStartApp()` flow.
-
-### 5. Cleanup on Shutdown
-**File**: `internal/process/webapp.go`
-
-In `CleanupWithContext()`:
-```go
-for tenantName, app := range m.apps {
-    // ... existing cleanup ...
-
-    // Cleanup cgroup on shutdown
-    if app.CgroupPath != "" {
-        CleanupCgroup(tenantName)
-    }
-}
-```
-
-### 6. Update Documentation
-
-#### A. YAML Reference (`docs/configuration/yaml-reference.md`)
-Add to `applications.pools`:
-```yaml
-default_memory_limit: "512M"  # Default memory limit per tenant (Linux only)
-user: "rails"                 # Default user to run tenants as
-group: "rails"                # Default group to run tenants as
-```
-
-Add to `applications.tenants[]`:
-```yaml
-memory_limit: "1G"    # Override memory limit for this tenant
-user: "app"           # Override user for this tenant
-group: "app"          # Override group for this tenant
-```
-
-#### B. Feature Documentation (`docs/features/memory-limits.md`)
-Create new page explaining:
-- What per-tenant memory limits are
-- Linux cgroups v2 requirement
-- Configuration examples
-- OOM kill behavior and auto-restart
-- Monitoring OOM events
-- Platform support (Linux vs others)
 
 ### 7. Tests
 **File**: `internal/process/cgroup_test.go`
 
 Test cases needed:
-- `TestParseMemorySize()` - Parse various formats
-- `TestSetupCgroupMemoryLimit()` - Mock cgroup creation
-- `TestIsOOMKill()` - Parse memory.events
-- `TestGetUserCredentials()` - User/group lookup
+- `TestParseMemorySize()` - Parse various memory size formats
+  - Valid: "512M", "1G", "1.5G", "2048M"
+  - Invalid: "invalid", "M", "-512M"
+  - Edge cases: "", "0", "1.5.5G"
+- `TestSetupCgroupMemoryLimit()` - Mock cgroup creation (difficult to test without root)
+- `TestIsOOMKill()` - Parse memory.events file
+  - OOM count > 0 returns true
+  - OOM count = 0 returns false
+  - Missing file returns false
+- `TestGetUserCredentials()` - User/group lookup (Unix only)
+  - Valid user and group
+  - Valid user, no group (uses user's primary group)
+  - Empty username (returns nil)
+  - Non-existent user (returns error)
+  - Non-existent group (returns error)
 
 ## Configuration Example
 
@@ -200,11 +176,39 @@ applications:
 | macOS | ⚠️ Logged, skipped | ⚠️ Logged, skipped | Graceful degradation |
 | Windows | ⚠️ Logged, skipped | ⚠️ Not supported | Graceful degradation |
 
+## Status Summary
+
+### Completed ✅
+1. ✅ Configuration fields added to types.go (commit: e3d803d)
+2. ✅ Platform-specific cgroup management (commit: dca7e46)
+3. ✅ Process startup integration (commit: 52b95f0)
+4. ✅ OOM detection and cleanup (commit: 52b95f0)
+5. ✅ Shutdown cleanup (commit: 52b95f0)
+6. ✅ YAML reference documentation (commit: 77bbd41)
+7. ✅ Feature documentation page (commit: 4b32c6b)
+8. ✅ Builds successfully on macOS (graceful degradation)
+
+### Remaining 🚧
+1. 🚧 Write tests for cgroup functionality (item 7)
+2. 🚧 Deploy to Fly.io for Linux testing
+3. 🚧 Merge to main after successful testing
+
 ## Next Steps
 
-1. Complete items 3-5 (integrate into process management)
-2. Update documentation (items 6A-6B)
-3. Write tests (item 7)
-4. Test locally on macOS
-5. Deploy to Fly.io for Linux testing
-6. Merge to main after successful testing
+1. **Write tests** (item 7):
+   - Focus on `TestParseMemorySize()` (platform-independent)
+   - Test `GetUserCredentials()` error handling
+   - Skip or mock tests requiring root/Linux
+
+2. **Test on Fly.io** (Linux/Debian Trixie):
+   - Deploy with memory limits configured
+   - Verify cgroups are created (`ls /sys/fs/cgroup/navigator/`)
+   - Trigger OOM condition (memory leak test)
+   - Verify OOM kill and auto-restart
+   - Check `memory.events` for OOM counters
+   - Verify processes run as specified user (`ps aux | grep rails`)
+
+3. **Merge after testing**:
+   - Create pull request from `feature/per-tenant-memory-limits` to `main`
+   - Include testing notes and observations
+   - Merge after successful Fly.io validation
