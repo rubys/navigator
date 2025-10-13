@@ -2,14 +2,12 @@
 
 Navigator provides a comprehensive set of features for multi-tenant web applications, from basic process management to advanced regional routing.
 
-!!! tip "What's New in v0.12.0"
-    - **Configuration Modernization**: Reorganized YAML structure for better clarity
-    - **Reverse Proxy Enhancements**: Capture group substitution in proxy targets
-    - **Configurable Health Checks**: Global and per-tenant health check endpoints
-    - **Startup Timeout Control**: Configurable maintenance page timing
-    - **Per-Tenant WebSocket Tracking**: Fine-grained WebSocket connection control
-    - **Reliability Improvements**: Fixed 502 errors during cold starts and shutdowns
-    - **Better Status Codes**: 503 for maintenance, 499 for client disconnects
+!!! tip "What's New in v0.13.0"
+    - **Dynamic Version Reporting**: `--version` flag shows build information
+    - **Automatic Trailing Slash Handling**: Normalize URLs with redirects
+    - **Enhanced Proxy Handlers**: Fixed regex capture group substitution
+    - **WebSocket Improvements**: Fixed subprotocol negotiation for Action Cable
+    - **Path Stripping Fix**: Correct strip_path behavior with target paths
 
 ## Core Features
 
@@ -21,6 +19,16 @@ Navigator provides a comprehensive set of features for multi-tenant web applicat
 - **Resource limits** - Configurable pool sizes and timeouts
 
 [Learn more about Process Management](process-management.md)
+
+### :chart_with_upwards_trend: Memory Limits
+- **Per-tenant limits** - Enforce memory limits using Linux cgroups
+- **Cgroups v1/v2 support** - Automatic detection and support for both versions
+- **OOM protection** - Isolate memory-hungry tenants from others
+- **Auto-restart on OOM** - Tenants restart automatically after kernel kills
+- **Memory statistics** - Automatic logging of peak usage and utilization
+- **User/group isolation** - Run tenant processes as non-root users
+
+[Learn more about Memory Limits](memory-limits.md)
 
 ### :file_folder: Static File Serving
 - **Direct filesystem serving** - Bypass application for static content
@@ -132,6 +140,8 @@ Navigator provides a comprehensive set of features for multi-tenant web applicat
 
 ### Process Isolation
 - **Separate processes** - Rails apps run in separate processes
+- **Memory isolation** - Per-tenant memory limits with cgroups (Linux)
+- **User/group isolation** - Run tenants as non-root users (Unix)
 - **Working directories** - Each app has its own working directory
 - **Environment isolation** - Separate environment variables
 

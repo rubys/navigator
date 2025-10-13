@@ -101,12 +101,14 @@ nav:
   - Features:
     - features/index.md
     - Process Management: features/process-management.md
+    - Memory Limits: features/memory-limits.md
     - Try Files: features/try-files.md
     - Fly-Replay: features/fly-replay.md
     - Sticky Sessions: features/sticky-sessions.md
     - Hot Reload: features/hot-reload.md
     - Machine Suspend: features/machine-suspend.md
     - WebSocket Support: features/websocket-support.md
+    - Lifecycle Hooks: features/lifecycle-hooks.md
     - Logging: features/logging.md
   - Reference:
     - reference/index.md

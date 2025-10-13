@@ -15,14 +15,20 @@ Navigator uses Linux control groups (cgroups) v2 to enforce hard memory limits f
 ## Platform Requirements
 
 **Linux Only:**
-- Linux operating system with kernel 5.4+ (cgroups v2)
+- Linux operating system with kernel 4.5+ (cgroups v1) or 5.4+ (cgroups v2)
 - Navigator running as root
-- Debian Trixie (13), Ubuntu 22.04+, or equivalent
+- Debian 12+ (Bookworm), Ubuntu 22.04+, or equivalent
+- Automatic detection and support for both cgroups v1 and v2
 
 **Graceful Degradation:**
 - macOS: Configuration ignored, logged at debug level
 - Windows: Configuration ignored, logged at debug level
 - Non-root: Configuration ignored, logged at debug level
+
+**Cgroups Version Support:**
+- **cgroups v2** (preferred): Modern unified hierarchy, better resource control
+- **cgroups v1** (legacy): Supported with automatic fallback for older systems
+- Navigator automatically detects and uses the available cgroups version
 
 ## Configuration
 
@@ -167,7 +173,7 @@ ERROR Tenant OOM killed by kernel tenant=2025/boston limit=512.0 MiB oomCount=1
 
 ### Automatic Restart
 
-1. **Detection**: Navigator detects OOM via cgroup events (every 30 seconds)
+1. **Detection**: Navigator periodically detects OOM via cgroup events
 2. **Cleanup**: Removes tenant from process registry
 3. **Next request**: Incoming request triggers restart via `GetOrStartApp()`
 4. **Fresh start**: New process starts with same memory limit
@@ -203,6 +209,32 @@ ERROR Tenant OOM killed by kernel tenant=2025/boston limit=512.0 MiB oomCount=1
 # Repeated OOM (investigate tenant)
 ERROR Tenant OOM killed by kernel tenant=2025/boston limit=512.0 MiB oomCount=5
 ```
+
+### Memory Statistics on Shutdown
+
+Navigator automatically logs detailed memory statistics when tenants stop (either from idle timeout or Navigator shutdown):
+
+```log
+# Tenant shutdown statistics (cgroups v2)
+INFO Memory statistics tenant=2025/boston peak=487.3 MiB current=412.8 MiB limit=512.0 MiB utilization=95.2% failcnt=0 oomKills=0
+
+# Tenant shutdown statistics (cgroups v1)
+INFO Memory statistics tenant=2025/newyork peak=623.1 MiB current=598.2 MiB limit=768.0 MiB utilization=81.1% failcnt=2 oomKills=0
+```
+
+**Statistics provided:**
+- **Peak usage**: Maximum memory used since Navigator started (or cgroup creation)
+- **Current usage**: Memory in use at shutdown time
+- **Limit**: Configured memory limit for this tenant
+- **Utilization**: Peak usage as percentage of limit
+- **Failcnt**: Number of times the memory limit was hit (cgroups v1 only)
+- **OOM kills**: Number of times kernel killed the tenant for exceeding limit
+
+**Use cases:**
+- Identify right-sizing opportunities (consistently low utilization = reduce limit)
+- Detect memory growth patterns (increasing peak usage over time)
+- Validate capacity planning (ensure tenants stay within limits)
+- Track memory efficiency across tenant restarts
 
 ### Checking Memory Usage
 
@@ -315,22 +347,23 @@ User=root
 
 ### Cgroup Not Created
 
-Verify cgroups v2 is available:
+Check which cgroups version is available:
 
 ```bash
 # Check cgroup version
 mount | grep cgroup
 
-# Should show:
+# cgroups v2 (preferred):
 # cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime)
+
+# cgroups v1 (supported):
+# tmpfs on /sys/fs/cgroup type tmpfs (ro,nosuid,nodev,noexec,mode=755)
+# cgroup on /sys/fs/cgroup/memory type cgroup (rw,nosuid,nodev,noexec,relatime,memory)
 ```
 
-If using cgroups v1:
+Navigator automatically detects and uses the available version. Both v1 and v2 are fully supported.
 
-```bash
-# Upgrade to Ubuntu 22.04+, Debian 12+, or equivalent
-# cgroups v2 requires modern kernel (5.4+)
-```
+**Preference for v2**: While both versions work, cgroups v2 provides better resource control and is the modern standard. Consider upgrading to Ubuntu 22.04+, Debian 12+, or equivalent for v2 support.
 
 ### Permission Denied Errors
 
@@ -375,9 +408,14 @@ If a tenant repeatedly hits memory limit:
 
 3. **Check for memory leaks**:
    ```ruby
-   # Enable memory profiling in Rails
-   # config/environments/production.rb
-   config.middleware.use Rack::Attack
+   # Use memory profiling tools for Rails
+   # Add to Gemfile:
+   gem 'memory_profiler'
+   gem 'derailed_benchmarks'
+
+   # Profile memory in production:
+   # bundle exec derailed bundle:mem
+   # bundle exec derailed exec perf:mem
    ```
 
 ## Security Considerations
