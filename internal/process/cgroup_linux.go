@@ -13,11 +13,97 @@ import (
 	"log/slog"
 )
 
-const cgroupRoot = "/sys/fs/cgroup"
+const (
+	cgroupRoot   = "/sys/fs/cgroup"
+	cgroupV1Root = "/sys/fs/cgroup/memory"
+)
+
+// cgroupVersion represents the detected cgroup version
+type cgroupVersion int
+
+const (
+	cgroupNone cgroupVersion = iota
+	cgroupV1
+	cgroupV2
+)
+
+var (
+	detectedVersion cgroupVersion
+	cgroupV2Root    string // Dynamically determined cgroup v2 root path
+)
+
+// detectCgroupVersion determines which cgroup version is available and usable
+func detectCgroupVersion() cgroupVersion {
+	// Check for cgroup v2 with usable memory controller
+	// Try both common mount points: /sys/fs/cgroup (unified) and /sys/fs/cgroup/unified
+	v2Paths := []string{cgroupRoot, filepath.Join(cgroupRoot, "unified")}
+
+	for _, v2Path := range v2Paths {
+		controllersPath := filepath.Join(v2Path, "cgroup.controllers")
+		if data, err := os.ReadFile(controllersPath); err == nil {
+			controllers := strings.TrimSpace(string(data))
+
+			// If cgroup.controllers is empty, v2 is not usable (hybrid mode with v1 active)
+			if controllers == "" {
+				slog.Debug("cgroup v2 path exists but cgroup.controllers is empty (v1 active)",
+					"path", v2Path)
+				continue
+			}
+
+			if strings.Contains(controllers, "memory") {
+				// Memory controller is listed in cgroup.controllers, but we need to check
+				// if it's enabled in cgroup.subtree_control or can be enabled
+				subtreeControlPath := filepath.Join(v2Path, "cgroup.subtree_control")
+				if subtreeData, err := os.ReadFile(subtreeControlPath); err == nil {
+					subtreeControllers := strings.TrimSpace(string(subtreeData))
+
+					// If memory is already enabled in subtree_control, v2 is usable
+					if strings.Contains(subtreeControllers, "memory") {
+						cgroupV2Root = v2Path
+						slog.Debug("cgroup v2 memory controller enabled in subtree_control",
+							"path", v2Path,
+							"subtree_control", subtreeControllers)
+						return cgroupV2
+					}
+
+					// Memory is not enabled. In hybrid mode (v1 active), subtree_control is empty
+					// and we cannot enable controllers. Skip this v2 path and fall back to v1.
+					slog.Debug("cgroup v2 memory in controllers but not in subtree_control (v1 active)",
+						"path", v2Path,
+						"controllers", controllers,
+						"subtree_control", subtreeControllers)
+					continue
+				}
+				// Could not read subtree_control, skip this v2 path
+				slog.Debug("cgroup v2 memory in controllers but cannot read subtree_control",
+					"path", v2Path,
+					"controllers", controllers)
+				continue
+			}
+
+			slog.Debug("cgroup v2 exists but no memory controller in cgroup.controllers",
+				"path", v2Path,
+				"controllers", controllers)
+		}
+	}
+
+	// Check for cgroup v1 memory controller
+	if _, err := os.Stat(cgroupV1Root); err == nil {
+		// Verify we can read memory settings
+		if _, err := os.ReadFile(filepath.Join(cgroupV1Root, "memory.limit_in_bytes")); err == nil {
+			slog.Debug("Detected cgroup v1 with memory controller")
+			return cgroupV1
+		}
+		slog.Debug("cgroup v1 path exists but cannot read memory.limit_in_bytes")
+	}
+
+	slog.Debug("No usable cgroup memory controller detected")
+	return cgroupNone
+}
 
 // SetupCgroupMemoryLimit creates a cgroup and sets memory limit for a tenant.
 // Returns cgroup path or empty string if not running as root or if limit is 0.
-// On Linux, this uses cgroups v2 to enforce memory limits.
+// On Linux, this uses cgroups v2 or v1 depending on what's available.
 func SetupCgroupMemoryLimit(tenantName string, limitBytes int64) (string, error) {
 	if limitBytes == 0 {
 		return "", nil // No limit requested
@@ -29,26 +115,50 @@ func SetupCgroupMemoryLimit(tenantName string, limitBytes int64) (string, error)
 		return "", nil
 	}
 
+	// Detect cgroup version on first use
+	if detectedVersion == cgroupNone {
+		detectedVersion = detectCgroupVersion()
+		if detectedVersion == cgroupNone {
+			slog.Warn("No usable cgroup memory controller found, memory limits will be ignored",
+				"tenant", tenantName)
+			return "", nil
+		}
+	}
+
 	// Use default name "app" if tenant name is empty (framework mode)
 	cgroupName := tenantName
 	if cgroupName == "" {
 		cgroupName = "app"
 	}
+	cgroupName = sanitizeCgroupName(cgroupName)
 
+	// Setup based on detected version
+	switch detectedVersion {
+	case cgroupV2:
+		return setupCgroupV2(cgroupName, limitBytes, tenantName)
+	case cgroupV1:
+		return setupCgroupV1(cgroupName, limitBytes, tenantName)
+	default:
+		return "", nil
+	}
+}
+
+// setupCgroupV2 configures memory limits using cgroups v2
+func setupCgroupV2(cgroupName string, limitBytes int64, tenantName string) (string, error) {
 	// Create parent navigator cgroup first
-	navigatorPath := filepath.Join(cgroupRoot, "navigator")
+	navigatorPath := filepath.Join(cgroupV2Root, "navigator")
 	if err := os.MkdirAll(navigatorPath, 0755); err != nil {
 		return "", fmt.Errorf("failed to create navigator cgroup: %w", err)
 	}
 
 	// Enable memory controller in root for navigator cgroup
-	if err := enableMemoryControllerInParent(cgroupRoot, "navigator"); err != nil {
+	if err := enableMemoryControllerInParent(cgroupV2Root, "navigator"); err != nil {
 		slog.Warn("Failed to enable memory controller in root, continuing anyway",
 			"error", err)
 	}
 
 	// Create tenant-specific cgroup under navigator/
-	cgroupPath := filepath.Join(navigatorPath, sanitizeCgroupName(cgroupName))
+	cgroupPath := filepath.Join(navigatorPath, cgroupName)
 
 	// Create cgroup directory
 	if err := os.MkdirAll(cgroupPath, 0755); err != nil {
@@ -56,7 +166,7 @@ func SetupCgroupMemoryLimit(tenantName string, limitBytes int64) (string, error)
 	}
 
 	// Enable memory controller for tenant cgroup
-	if err := enableMemoryControllerInParent(navigatorPath, sanitizeCgroupName(cgroupName)); err != nil {
+	if err := enableMemoryControllerInParent(navigatorPath, cgroupName); err != nil {
 		slog.Warn("Failed to enable memory controller in navigator, continuing anyway",
 			"tenant", tenantName,
 			"error", err)
@@ -68,7 +178,37 @@ func SetupCgroupMemoryLimit(tenantName string, limitBytes int64) (string, error)
 		return "", fmt.Errorf("failed to set memory.max: %w", err)
 	}
 
-	slog.Info("Memory limit configured for tenant",
+	slog.Info("Memory limit configured for tenant (cgroup v2)",
+		"tenant", tenantName,
+		"limit", formatBytes(limitBytes),
+		"cgroup", cgroupPath)
+
+	return cgroupPath, nil
+}
+
+// setupCgroupV1 configures memory limits using cgroups v1
+func setupCgroupV1(cgroupName string, limitBytes int64, tenantName string) (string, error) {
+	// Create navigator parent cgroup
+	navigatorPath := filepath.Join(cgroupV1Root, "navigator")
+	if err := os.MkdirAll(navigatorPath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create navigator cgroup: %w", err)
+	}
+
+	// Create tenant-specific cgroup under navigator/
+	cgroupPath := filepath.Join(navigatorPath, cgroupName)
+
+	// Create cgroup directory
+	if err := os.MkdirAll(cgroupPath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create cgroup: %w", err)
+	}
+
+	// Write memory.limit_in_bytes (v1 format)
+	memLimitPath := filepath.Join(cgroupPath, "memory.limit_in_bytes")
+	if err := os.WriteFile(memLimitPath, []byte(strconv.FormatInt(limitBytes, 10)), 0644); err != nil {
+		return "", fmt.Errorf("failed to set memory.limit_in_bytes: %w", err)
+	}
+
+	slog.Info("Memory limit configured for tenant (cgroup v1)",
 		"tenant", tenantName,
 		"limit", formatBytes(limitBytes),
 		"cgroup", cgroupPath)
@@ -102,16 +242,37 @@ func CleanupCgroup(tenantName string) error {
 	if cgroupName == "" {
 		cgroupName = "app"
 	}
+	cgroupName = sanitizeCgroupName(cgroupName)
 
-	cgroupPath := filepath.Join(cgroupRoot, "navigator", sanitizeCgroupName(cgroupName))
+	// Try to remove from both v1 and v2 locations (one will fail, that's ok)
+	var lastErr error
 
-	if err := os.Remove(cgroupPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove cgroup: %w", err)
+	// Try v2 location
+	cgroupV2Path := filepath.Join(cgroupV2Root, "navigator", cgroupName)
+	if err := os.Remove(cgroupV2Path); err != nil && !os.IsNotExist(err) {
+		lastErr = err
+	} else if err == nil {
+		slog.Debug("Cgroup removed (v2)",
+			"tenant", tenantName,
+			"cgroup", cgroupV2Path)
+		return nil
 	}
 
-	slog.Debug("Cgroup removed",
-		"tenant", tenantName,
-		"cgroup", cgroupPath)
+	// Try v1 location
+	cgroupV1Path := filepath.Join(cgroupV1Root, "navigator", cgroupName)
+	if err := os.Remove(cgroupV1Path); err != nil && !os.IsNotExist(err) {
+		lastErr = err
+	} else if err == nil {
+		slog.Debug("Cgroup removed (v1)",
+			"tenant", tenantName,
+			"cgroup", cgroupV1Path)
+		return nil
+	}
+
+	// If we got a real error (not just "doesn't exist"), return it
+	if lastErr != nil {
+		return fmt.Errorf("failed to remove cgroup: %w", lastErr)
+	}
 
 	return nil
 }
@@ -122,23 +283,31 @@ func IsOOMKill(cgroupPath string) bool {
 		return false
 	}
 
-	// Check memory.events for oom_kill counter
+	// Try v2 format first (memory.events)
 	eventsPath := filepath.Join(cgroupPath, "memory.events")
-	data, err := os.ReadFile(eventsPath)
-	if err != nil {
-		return false
+	if data, err := os.ReadFile(eventsPath); err == nil {
+		// Look for "oom_kill N" where N > 0
+		re := regexp.MustCompile(`oom_kill\s+(\d+)`)
+		matches := re.FindSubmatch(data)
+		if len(matches) >= 2 {
+			count, _ := strconv.Atoi(string(matches[1]))
+			return count > 0
+		}
 	}
 
-	// Look for "oom_kill N" where N > 0
-	// Format: "oom_kill 1" or "oom_kill 2", etc.
-	re := regexp.MustCompile(`oom_kill\s+(\d+)`)
-	matches := re.FindSubmatch(data)
-	if len(matches) < 2 {
-		return false
+	// Try v1 format (memory.oom_control)
+	oomControlPath := filepath.Join(cgroupPath, "memory.oom_control")
+	if data, err := os.ReadFile(oomControlPath); err == nil {
+		// Look for "oom_kill N" or "under_oom 1"
+		re := regexp.MustCompile(`oom_kill\s+(\d+)`)
+		matches := re.FindSubmatch(data)
+		if len(matches) >= 2 {
+			count, _ := strconv.Atoi(string(matches[1]))
+			return count > 0
+		}
 	}
 
-	count, _ := strconv.Atoi(string(matches[1]))
-	return count > 0
+	return false
 }
 
 // GetOOMKillCount returns the number of OOM kills for a cgroup
@@ -147,20 +316,29 @@ func GetOOMKillCount(cgroupPath string) int {
 		return 0
 	}
 
+	// Try v2 format first (memory.events)
 	eventsPath := filepath.Join(cgroupPath, "memory.events")
-	data, err := os.ReadFile(eventsPath)
-	if err != nil {
-		return 0
+	if data, err := os.ReadFile(eventsPath); err == nil {
+		re := regexp.MustCompile(`oom_kill\s+(\d+)`)
+		matches := re.FindSubmatch(data)
+		if len(matches) >= 2 {
+			count, _ := strconv.Atoi(string(matches[1]))
+			return count
+		}
 	}
 
-	re := regexp.MustCompile(`oom_kill\s+(\d+)`)
-	matches := re.FindSubmatch(data)
-	if len(matches) < 2 {
-		return 0
+	// Try v1 format (memory.oom_control)
+	oomControlPath := filepath.Join(cgroupPath, "memory.oom_control")
+	if data, err := os.ReadFile(oomControlPath); err == nil {
+		re := regexp.MustCompile(`oom_kill\s+(\d+)`)
+		matches := re.FindSubmatch(data)
+		if len(matches) >= 2 {
+			count, _ := strconv.Atoi(string(matches[1]))
+			return count
+		}
 	}
 
-	count, _ := strconv.Atoi(string(matches[1]))
-	return count
+	return 0
 }
 
 // GetMemoryUsage returns current memory usage for a cgroup in bytes
@@ -169,14 +347,21 @@ func GetMemoryUsage(cgroupPath string) int64 {
 		return 0
 	}
 
+	// Try v2 format first (memory.current)
 	currentPath := filepath.Join(cgroupPath, "memory.current")
-	data, err := os.ReadFile(currentPath)
-	if err != nil {
-		return 0
+	if data, err := os.ReadFile(currentPath); err == nil {
+		usage, _ := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
+		return usage
 	}
 
-	usage, _ := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
-	return usage
+	// Try v1 format (memory.usage_in_bytes)
+	usagePath := filepath.Join(cgroupPath, "memory.usage_in_bytes")
+	if data, err := os.ReadFile(usagePath); err == nil {
+		usage, _ := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
+		return usage
+	}
+
+	return 0
 }
 
 // enableMemoryControllerInParent enables the memory controller in parent for child cgroup
