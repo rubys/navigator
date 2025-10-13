@@ -37,10 +37,10 @@ type WebApp struct {
 	activeWebSockets int32 // Atomic counter for active WebSocket connections
 
 	// Memory limit tracking (Linux only)
-	CgroupPath   string    // Cgroup path for memory limiting (Linux only)
-	MemoryLimit  int64     // Memory limit in bytes (0 = no limit)
-	OOMCount     int       // Number of times this tenant has been OOM killed
-	LastOOMTime  time.Time // Timestamp of last OOM kill
+	CgroupPath  string    // Cgroup path for memory limiting (Linux only)
+	MemoryLimit int64     // Memory limit in bytes (0 = no limit)
+	OOMCount    int       // Number of times this tenant has been OOM killed
+	LastOOMTime time.Time // Timestamp of last OOM kill
 }
 
 // ReadyChan returns the channel that's closed when the app is ready

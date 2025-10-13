@@ -198,12 +198,12 @@ type Applications struct {
 
 // Pools represents application pool configuration
 type Pools struct {
-	MaxSize         int    `yaml:"max_size"`
-	Timeout         string `yaml:"timeout"`          // Duration string like "5m", "10m"
-	StartPort       int    `yaml:"start_port"`
+	MaxSize            int    `yaml:"max_size"`
+	Timeout            string `yaml:"timeout"` // Duration string like "5m", "10m"
+	StartPort          int    `yaml:"start_port"`
 	DefaultMemoryLimit string `yaml:"default_memory_limit"` // Default memory limit for tenants (e.g., "512M", "1G")
-	User            string `yaml:"user"`             // Default user to run tenant processes as
-	Group           string `yaml:"group"`            // Default group to run tenant processes as
+	User               string `yaml:"user"`                 // Default user to run tenant processes as
+	Group              string `yaml:"group"`                // Default group to run tenant processes as
 }
 
 // ProxyRoute represents a proxy route configuration
