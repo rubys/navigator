@@ -234,6 +234,59 @@ func AddProcessToCgroup(cgroupPath string, pid int) error {
 	return nil
 }
 
+// LogMemoryStats logs memory usage statistics for a cgroup before cleanup
+func LogMemoryStats(cgroupPath string, tenantName string) {
+	if cgroupPath == "" {
+		return
+	}
+
+	// Read peak usage
+	maxUsage := readInt64FromFile(filepath.Join(cgroupPath, "memory.max_usage_in_bytes"))
+	if maxUsage == 0 {
+		maxUsage = readInt64FromFile(filepath.Join(cgroupPath, "memory.peak")) // v2 format
+	}
+
+	// Read current usage
+	currentUsage := GetMemoryUsage(cgroupPath)
+
+	// Read limit
+	limit := readInt64FromFile(filepath.Join(cgroupPath, "memory.limit_in_bytes"))
+	if limit == 0 {
+		limit = readInt64FromFile(filepath.Join(cgroupPath, "memory.max")) // v2 format
+	}
+
+	// Read failcnt (how many times limit was hit)
+	failcnt := readInt64FromFile(filepath.Join(cgroupPath, "memory.failcnt"))
+
+	// Read OOM kill count
+	oomKills := GetOOMKillCount(cgroupPath)
+
+	// Calculate utilization percentage
+	var utilizationPct float64
+	if limit > 0 && maxUsage > 0 {
+		utilizationPct = float64(maxUsage) / float64(limit) * 100
+	}
+
+	slog.Info("Tenant memory statistics",
+		"tenant", tenantName,
+		"peak_usage", formatBytes(maxUsage),
+		"current_usage", formatBytes(currentUsage),
+		"limit", formatBytes(limit),
+		"utilization_pct", fmt.Sprintf("%.1f", utilizationPct),
+		"limit_hits", failcnt,
+		"oom_kills", oomKills)
+}
+
+// readInt64FromFile reads an int64 value from a file, returns 0 on error
+func readInt64FromFile(path string) int64 {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	value, _ := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
+	return value
+}
+
 // CleanupCgroup removes a tenant's cgroup directory
 // This should only be called when the cgroup is empty (no processes)
 func CleanupCgroup(tenantName string) error {

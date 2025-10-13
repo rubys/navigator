@@ -272,6 +272,11 @@ func (m *AppManager) monitorAppIdleTimeout(tenantName string) {
 			delete(m.apps, tenantName)
 			m.mutex.Unlock()
 
+			// Log memory statistics (Linux only)
+			if app.CgroupPath != "" {
+				LogMemoryStats(app.CgroupPath, tenantName)
+			}
+
 			// Clean up PID file
 			if app.Tenant != nil {
 				if pidfile, ok := app.Tenant.Env["PIDFILE"]; ok {
@@ -363,8 +368,9 @@ func (m *AppManager) CleanupWithContext(ctx context.Context) {
 				app.cancel()
 			}
 
-			// Cleanup cgroup on shutdown (Linux only)
+			// Log memory statistics and cleanup cgroup on shutdown (Linux only)
 			if app.CgroupPath != "" {
+				LogMemoryStats(app.CgroupPath, tenantName)
 				if err := CleanupCgroup(tenantName); err != nil {
 					slog.Warn("Failed to cleanup cgroup",
 						"tenant", tenantName,

@@ -45,3 +45,8 @@ func ParseMemorySize(sizeStr string) (int64, error) {
 	// to avoid import issues. On Linux, the real implementation is used.
 	return 0, nil
 }
+
+// LogMemoryStats is a no-op on non-Linux platforms
+func LogMemoryStats(cgroupPath string, tenantName string) {
+	// No memory statistics available on non-Linux platforms
+}
