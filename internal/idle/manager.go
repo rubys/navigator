@@ -135,7 +135,7 @@ func (m *Manager) RequestFinished() {
 	// If no more active requests, start idle timer
 	if m.activeRequests == 0 && m.timer == nil {
 		m.timer = time.AfterFunc(m.idleTimeout, m.handleIdle)
-		slog.Info("Started idle timer",
+		slog.Debug("Started idle timer",
 			"timeout", m.idleTimeout,
 			"action", m.action)
 	}
