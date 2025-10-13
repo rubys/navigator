@@ -481,7 +481,7 @@ func ParseMemorySize(sizeStr string) (int64, error) {
 	unit = strings.TrimSuffix(unit, "IB")
 	unit = strings.TrimSuffix(unit, "B")
 
-	multiplier := int64(1)
+	var multiplier int64
 	switch unit {
 	case "K":
 		multiplier = 1024
