@@ -309,6 +309,11 @@ func (l *ServerLifecycle) handleReload() {
 		l.srv.Handler = newHandler
 	}
 
+	// Execute server start hooks after configuration reload
+	if err := process.ExecuteServerHooks(newConfig.Hooks.Start, "start"); err != nil {
+		slog.Error("Failed to execute start hooks after reload", "error", err)
+	}
+
 	slog.Info("Configuration reloaded successfully")
 }
 
