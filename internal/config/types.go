@@ -137,11 +137,11 @@ type CacheControl struct {
 
 // AuthConfig represents authentication configuration
 type AuthConfig struct {
-	Enabled      bool     `yaml:"enabled"`
-	Realm        string   `yaml:"realm"`
-	HTPasswd     string   `yaml:"htpasswd"`
-	PublicPaths  []string `yaml:"public_paths"`
-	AuthPatterns []AuthPattern
+	Enabled      bool          `yaml:"enabled"`
+	Realm        string        `yaml:"realm"`
+	HTPasswd     string        `yaml:"htpasswd"`
+	PublicPaths  []string      `yaml:"public_paths"`
+	AuthPatterns []AuthPattern `yaml:"auth_patterns"`
 }
 
 // StaticConfig represents static file serving configuration
@@ -263,10 +263,14 @@ type Tenant struct {
 // YAMLConfig represents the raw YAML configuration structure
 type YAMLConfig struct {
 	Auth struct {
-		Enabled     bool     `yaml:"enabled"`
-		Realm       string   `yaml:"realm"`
-		HTPasswd    string   `yaml:"htpasswd"`
-		PublicPaths []string `yaml:"public_paths"`
+		Enabled      bool     `yaml:"enabled"`
+		Realm        string   `yaml:"realm"`
+		HTPasswd     string   `yaml:"htpasswd"`
+		PublicPaths  []string `yaml:"public_paths"`
+		AuthPatterns []struct {
+			Pattern string `yaml:"pattern"`
+			Action  string `yaml:"action"`
+		} `yaml:"auth_patterns"`
 	} `yaml:"auth"`
 	Server struct {
 		Listen   interface{} `yaml:"listen"`

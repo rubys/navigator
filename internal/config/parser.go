@@ -119,6 +119,20 @@ func (p *ConfigParser) parseAuthConfig() {
 	// Only load public paths if auth is enabled
 	if p.yamlConfig.Auth.Enabled {
 		p.config.Auth.PublicPaths = p.yamlConfig.Auth.PublicPaths
+
+		// Compile auth patterns (regex patterns for excluding paths from auth)
+		for _, pattern := range p.yamlConfig.Auth.AuthPatterns {
+			compiled, err := regexp.Compile(pattern.Pattern)
+			if err != nil {
+				// Use slog since it's already imported via the package
+				fmt.Printf("WARN: Invalid auth pattern, skipping: %s (error: %v)\n", pattern.Pattern, err)
+				continue
+			}
+			p.config.Auth.AuthPatterns = append(p.config.Auth.AuthPatterns, AuthPattern{
+				Pattern: compiled,
+				Action:  pattern.Action,
+			})
+		}
 	}
 
 	// Note: PublicPaths patterns are handled as glob patterns in auth.go's ShouldExcludeFromAuth()

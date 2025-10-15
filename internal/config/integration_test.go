@@ -18,10 +18,14 @@ func TestParseAuthConfig_NoWarningsForGlobPatterns(t *testing.T) {
 	// Create config with glob patterns
 	yamlConfig := YAMLConfig{
 		Auth: struct {
-			Enabled     bool     `yaml:"enabled"`
-			Realm       string   `yaml:"realm"`
-			HTPasswd    string   `yaml:"htpasswd"`
-			PublicPaths []string `yaml:"public_paths"`
+			Enabled      bool     `yaml:"enabled"`
+			Realm        string   `yaml:"realm"`
+			HTPasswd     string   `yaml:"htpasswd"`
+			PublicPaths  []string `yaml:"public_paths"`
+			AuthPatterns []struct {
+				Pattern string `yaml:"pattern"`
+				Action  string `yaml:"action"`
+			} `yaml:"auth_patterns"`
 		}{
 			Enabled:  true,
 			HTPasswd: "/etc/htpasswd",
@@ -36,6 +40,10 @@ func TestParseAuthConfig_NoWarningsForGlobPatterns(t *testing.T) {
 				"/assets/",
 				"/favicon.ico",
 			},
+			AuthPatterns: []struct {
+				Pattern string `yaml:"pattern"`
+				Action  string `yaml:"action"`
+			}{},
 		},
 	}
 
