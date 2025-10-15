@@ -3,6 +3,7 @@ package auth
 import (
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"testing"
 
 	"github.com/rubys/navigator/internal/config"
@@ -373,4 +374,125 @@ func TestLoadAuthFileWithValidFile(t *testing.T) {
 	if auth != nil {
 		t.Error("LoadAuthFile with empty filename should return nil")
 	}
+}
+
+func TestShouldExcludeFromAuthWithPatterns(t *testing.T) {
+	tests := []struct {
+		name         string
+		path         string
+		authPatterns []config.AuthPattern
+		publicPaths  []string
+		expected     bool
+	}{
+		{
+			name: "Auth pattern with action=off matches",
+			path: "/showcase/2025/boston/",
+			authPatterns: []config.AuthPattern{
+				{
+					Pattern: mustCompileRegex(t, "^/showcase/2025/(boston|seattle)/?$"),
+					Action:  "off",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Auth pattern with action=off does not match",
+			path: "/showcase/2025/boston/disney/",
+			authPatterns: []config.AuthPattern{
+				{
+					Pattern: mustCompileRegex(t, "^/showcase/2025/(boston|seattle)/?$"),
+					Action:  "off",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Auth pattern with custom realm does not exclude",
+			path: "/admin/panel",
+			authPatterns: []config.AuthPattern{
+				{
+					Pattern: mustCompileRegex(t, "^/admin/"),
+					Action:  "Admin Only",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Auth patterns checked before public paths",
+			path: "/showcase/2025/boston/",
+			authPatterns: []config.AuthPattern{
+				{
+					Pattern: mustCompileRegex(t, "^/showcase/2025/(boston|seattle)/?$"),
+					Action:  "off",
+				},
+			},
+			publicPaths: []string{"*.css"},
+			expected:    true,
+		},
+		{
+			name: "Public paths checked when no auth pattern matches",
+			path: "/styles.css",
+			authPatterns: []config.AuthPattern{
+				{
+					Pattern: mustCompileRegex(t, "^/showcase/"),
+					Action:  "off",
+				},
+			},
+			publicPaths: []string{"*.css"},
+			expected:    true,
+		},
+		{
+			name: "Multiple auth patterns with alternations",
+			path: "/showcase/2025/raleigh/disney/public/heats",
+			authPatterns: []config.AuthPattern{
+				{
+					Pattern: mustCompileRegex(t, "^/showcase/2025/(boston|seattle|raleigh|portland)/?$"),
+					Action:  "off",
+				},
+				{
+					Pattern: mustCompileRegex(t, "^/showcase/2025/(boston|seattle|raleigh)/[^/]+/public/"),
+					Action:  "off",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Protected tenant path not matched by patterns",
+			path: "/showcase/2025/boston/disney/entries",
+			authPatterns: []config.AuthPattern{
+				{
+					Pattern: mustCompileRegex(t, "^/showcase/2025/(boston|seattle)/?$"),
+					Action:  "off",
+				},
+				{
+					Pattern: mustCompileRegex(t, "^/showcase/2025/[^/]+/[^/]+/public/"),
+					Action:  "off",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.Auth.AuthPatterns = tt.authPatterns
+			cfg.Auth.PublicPaths = tt.publicPaths
+
+			result := ShouldExcludeFromAuth(tt.path, cfg)
+			if result != tt.expected {
+				t.Errorf("ShouldExcludeFromAuth(%q) = %v, expected %v",
+					tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+// Helper function to compile regex patterns for tests
+func mustCompileRegex(t *testing.T, pattern string) *regexp.Regexp {
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		t.Fatalf("Failed to compile regex %q: %v", pattern, err)
+	}
+	return compiled
 }

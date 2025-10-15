@@ -157,11 +157,14 @@ auth:
   enabled: true                   # Enable/disable authentication
   realm: "Restricted"             # Authentication realm name
   htpasswd: "./htpasswd"          # Path to htpasswd file
-  public_paths:                   # Paths that bypass authentication
+  public_paths:                   # Simple patterns that bypass authentication
     - "/assets/"
     - "/favicon.ico"
     - "*.css"
     - "*.js"
+  auth_patterns:                  # Advanced regex patterns for auth control
+    - pattern: "^/showcase/2025/(boston|seattle)/?$"
+      action: "off"               # "off" = bypass auth, or realm name
 ```
 
 | Field | Type | Default | Description |
@@ -169,7 +172,14 @@ auth:
 | `enabled` | boolean | `false` | Enable authentication |
 | `realm` | string | `"Restricted"` | Basic Auth realm displayed in browser |
 | `htpasswd` | string | `""` | Path to htpasswd file |
-| `public_paths` | array | `[]` | Glob patterns for paths that bypass auth |
+| `public_paths` | array | `[]` | Glob/prefix patterns for paths that bypass auth |
+| `auth_patterns` | array | `[]` | Regex patterns with actions for auth control |
+
+**Auth patterns** support complex regex matching and are checked before `public_paths`. Each pattern has:
+- `pattern`: Regular expression to match against the request path
+- `action`: `"off"` to bypass auth, or a realm name to require auth with that realm
+
+See [Authentication](authentication.md) for detailed examples and performance tips.
 
 ### Supported htpasswd Formats
 

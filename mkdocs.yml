@@ -120,6 +120,9 @@ nav:
     - Production: deployment/production.md
     - Fly.io: deployment/fly-io.md
     - Monitoring: deployment/monitoring.md
+  - Internals:
+    - internals/index.md
+    - Request Flow: internals/request-flow.md
   - Documentation Overview: DOCUMENTATION_OVERVIEW.md
 
 extra:

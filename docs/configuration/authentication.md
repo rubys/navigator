@@ -26,7 +26,8 @@ auth:
 | `enabled` | boolean | `false` | Enable/disable authentication |
 | `realm` | string | `"Protected Area"` | Authentication realm name |
 | `htpasswd` | string | `""` | Path to htpasswd file |
-| `public_paths` | array | `[]` | Patterns for paths that bypass auth |
+| `public_paths` | array | `[]` | Glob/prefix patterns for paths that bypass auth |
+| `auth_patterns` | array | `[]` | Regex patterns with actions for auth control |
 
 ## Creating htpasswd Files
 
@@ -122,6 +123,106 @@ auth:
 2. **Prefix match**: `/assets/` matches `/assets/style.css`, `/assets/images/logo.png`
 3. **Glob patterns**: `*.css` matches any path ending in `.css`
 4. **Wildcards**: `*` matches any characters, `?` matches single character
+
+## Auth Patterns (Advanced)
+
+For complex authentication requirements, use `auth_patterns` with regex patterns:
+
+```yaml
+auth:
+  enabled: true
+  htpasswd: /etc/navigator/htpasswd
+  realm: "Protected Area"
+
+  # Simple glob patterns (checked second)
+  public_paths:
+    - /assets/
+    - "*.css"
+    - "*.js"
+
+  # Regex patterns (checked first)
+  auth_patterns:
+    # Allow studio index pages but not tenant apps
+    - pattern: "^/showcase/2025/(raleigh|boston|seattle)/?$"
+      action: "off"
+
+    # Allow public paths within tenants
+    - pattern: "^/showcase/2025/[^/]+/[^/]+/public/"
+      action: "off"
+
+    # Require different realm for admin area
+    - pattern: "^/admin/"
+      action: "Admin Only"
+```
+
+### Auth Pattern Options
+
+Each auth pattern has two fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pattern` | string | Regular expression to match against request path |
+| `action` | string | `"off"` (bypass auth) or realm name (require auth with specific realm) |
+
+### When to Use Auth Patterns
+
+Use **auth_patterns** instead of **public_paths** when you need:
+
+1. **Complex path matching**: Match specific paths with regex precision
+2. **Grouped alternations**: One pattern for multiple similar paths (better performance)
+3. **Exact matching**: Match paths precisely without wildcards
+4. **Per-pattern realms**: Different auth realms for different patterns
+
+**Example: Multi-tenant with public pages**
+
+```yaml
+auth_patterns:
+  # Group studios by year for better performance
+  - pattern: "^/showcase/2025/(boston|seattle|raleigh|portland)/?$"
+    action: "off"
+
+  # Group public tenant paths
+  - pattern: "^/showcase/2025/(boston|seattle)/public/(heats|entries)$"
+    action: "off"
+```
+
+This approach is much more efficient than creating individual patterns for each studio or path.
+
+### Pattern Evaluation Order
+
+Navigator checks auth exclusions in this order:
+
+1. **Auth Patterns** (most specific): Regex patterns from `auth_patterns`
+2. **Public Paths** (general): Glob/prefix patterns from `public_paths`
+
+If any pattern matches and has `action: "off"`, authentication is bypassed.
+
+### Performance Tips
+
+**DO**: Use grouped alternations
+```yaml
+# GOOD: One pattern, fast evaluation
+auth_patterns:
+  - pattern: "^/(boston|seattle|raleigh)/?$"
+    action: "off"
+```
+
+**DON'T**: Create many individual patterns
+```yaml
+# BAD: Multiple patterns, slower evaluation
+auth_patterns:
+  - pattern: "^/boston/?$"
+    action: "off"
+  - pattern: "^/seattle/?$"
+    action: "off"
+  - pattern: "^/raleigh/?$"
+    action: "off"
+```
+
+Grouped alternations reduce:
+- Regex compilation overhead at startup
+- Number of pattern checks per request
+- Memory usage
 
 ## Per-Application Authentication
 
