@@ -74,6 +74,25 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 		// Get current app name to determine if we're replaying to a different app
 		currentAppName := os.Getenv("FLY_APP_NAME")
 
+		// Build transform headers that preserve Authorization
+		// The Authorization header must be explicitly preserved during fly-replay
+		// to prevent authentication failures on the target machine
+		buildTransformHeaders := func() []map[string]string {
+			headers := []map[string]string{
+				{"name": "X-Navigator-Retry", "value": "true"},
+			}
+
+			// Explicitly preserve Authorization header if present
+			if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+				headers = append(headers, map[string]string{
+					"name":  "Authorization",
+					"value": authHeader,
+				})
+			}
+
+			return headers
+		}
+
 		// Parse target to determine if it's machine, app, or region
 		var responseMap map[string]interface{}
 		if strings.HasPrefix(target, "machine=") {
@@ -89,12 +108,10 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 					"prefer_instance": machineID,
 				}
 
-				// Only add retry header if staying within the same app
+				// Only add transform if staying within the same app
 				if currentAppName == appName {
 					responseMap["transform"] = map[string]interface{}{
-						"set_headers": []map[string]string{
-							{"name": "X-Navigator-Retry", "value": "true"},
-						},
+						"set_headers": buildTransformHeaders(),
 					}
 				}
 			}
@@ -106,12 +123,10 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 				"app": appName,
 			}
 
-			// Only add retry header if staying within the same app
+			// Only add transform if staying within the same app
 			if currentAppName == appName {
 				responseMap["transform"] = map[string]interface{}{
-					"set_headers": []map[string]string{
-						{"name": "X-Navigator-Retry", "value": "true"},
-					},
+					"set_headers": buildTransformHeaders(),
 				}
 			}
 		} else {
@@ -119,9 +134,7 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 			responseMap = map[string]interface{}{
 				"region": target + ",any",
 				"transform": map[string]interface{}{
-					"set_headers": []map[string]string{
-						{"name": "X-Navigator-Retry", "value": "true"},
-					},
+					"set_headers": buildTransformHeaders(),
 				},
 			}
 		}
