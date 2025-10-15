@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/rubys/navigator/internal/config"
 	"github.com/tg123/go-htpasswd"
@@ -15,6 +16,7 @@ type BasicAuth struct {
 	File    *htpasswd.File
 	Realm   string
 	Exclude []string
+	mu      sync.RWMutex // Protects concurrent access to File
 }
 
 // LoadAuthFile loads an htpasswd file for authentication
@@ -40,6 +42,13 @@ func LoadAuthFile(filename, realm string, exclude []string) (*BasicAuth, error) 
 
 // CheckAuth checks basic authentication credentials
 func (a *BasicAuth) CheckAuth(r *http.Request) bool {
+	// Lock for concurrent access to htpasswd.File
+	// The go-htpasswd library may not be thread-safe
+	if a != nil {
+		a.mu.RLock()
+		defer a.mu.RUnlock()
+	}
+
 	if a == nil || a.File == nil {
 		return true // No auth configured
 	}

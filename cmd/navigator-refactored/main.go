@@ -276,7 +276,19 @@ func (l *ServerLifecycle) handleReload() {
 	l.processManager.UpdateManagedProcesses(newConfig)
 	l.idleManager.UpdateConfig(newConfig)
 
-	// Reload auth if configured
+	// Update logging format if changed
+	setupLogging(newConfig)
+
+	// Replace config
+	l.cfg = newConfig
+
+	// Execute server start hooks BEFORE loading auth
+	// This is important because hooks may update the htpasswd file
+	if err := process.ExecuteServerHooks(newConfig.Hooks.Start, "start"); err != nil {
+		slog.Error("Failed to execute start hooks after reload", "error", err)
+	}
+
+	// Reload auth if configured (AFTER hooks execute, since they may update htpasswd)
 	if newConfig.Auth.Enabled && newConfig.Auth.HTPasswd != "" {
 		realm := newConfig.Auth.Realm
 		if realm == "" {
@@ -297,21 +309,10 @@ func (l *ServerLifecycle) handleReload() {
 		l.basicAuth = nil
 	}
 
-	// Update logging format if changed
-	setupLogging(newConfig)
-
-	// Replace config and recreate handler
-	l.cfg = newConfig
-
-	// Update server handler if server is running
+	// Update server handler if server is running (AFTER auth is loaded)
 	if l.srv != nil {
 		newHandler := server.CreateHandler(l.cfg, l.appManager, l.basicAuth, l.idleManager)
 		l.srv.Handler = newHandler
-	}
-
-	// Execute server start hooks after configuration reload
-	if err := process.ExecuteServerHooks(newConfig.Hooks.Start, "start"); err != nil {
-		slog.Error("Failed to execute start hooks after reload", "error", err)
 	}
 
 	slog.Info("Configuration reloaded successfully")
