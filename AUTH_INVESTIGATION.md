@@ -130,7 +130,7 @@ No corruption or encoding issues detected.
 
 ## Diagnostic Logging Implemented
 
-**Current logging** (as of this document):
+**Deployed**: 2025-10-16 00:22 UTC
 
 Location: `internal/auth/auth.go`, `CheckAuth()` function
 
@@ -142,19 +142,48 @@ Logs every authentication attempt with:
 - `uri`: Request URI path
 - `method`: HTTP method
 
-**Critical modification**: Function **always returns true** to allow all requests through, enabling correlation analysis between `matched` result and eventual HTTP status code.
+**Critical modification**: Function **always returns true** to allow all requests through, enabling correlation analysis between `matched` result and eventual HTTP status code from Rails.
 
-### Analysis Plan
+### Log Correlation Analysis
 
-1. **Collect logs** with all auth checks logged
-2. **Correlate** `matched: false` with HTTP status codes:
-   - If `matched: false` + `status: 200` → Rails tenant accepted the request (Navigator wrong)
-   - If `matched: false` + `status: 401` → Rails tenant also rejected (both agree)
-   - If `matched: true` + `status: 401` → Navigator passed but Rails rejected (mismatch)
-3. **Compare password_hash** across requests:
-   - Same hash = same password typed
-   - Different hash = user typed different passwords
-4. **Track request_id** to correlate auth check with final HTTP response
+The goal is to compare what Navigator's `Match()` returns vs what Rails ultimately decides.
+
+**Expected Correlation Patterns:**
+
+1. **`matched: true` + `status: 200` + `response_type: proxy`**
+   - Both Navigator and Rails accept the request
+   - **This is correct behavior**
+
+2. **`matched: false` + `status: 401` + `response_type: proxy`**
+   - Navigator would reject, Rails also rejects
+   - **Both agree - wrong password, correct behavior**
+   - Example: User types wrong password
+
+3. **`matched: true` + `status: 401` + `response_type: proxy`**
+   - Navigator accepts, but Rails rejects for other reasons
+   - **This is correct - Rails has additional authorization (e.g., event ownership)**
+   - Example log shows Rails filter: `"Filter chain halted as :authenticate_event_owner"`
+
+4. **`matched: false` + `status: 200` + `response_type: proxy`** ⚠️
+   - **THIS IS THE BUG WE'RE LOOKING FOR**
+   - Navigator would reject, but Rails accepts
+   - Means Navigator's htpasswd check is incorrectly failing for valid credentials
+   - If we see this for cranford/roanoke, it proves go-htpasswd or htpasswd file has an issue
+
+### Analysis Steps
+
+1. **Collect logs** from cranford/roanoke users when they become active
+2. **Extract auth checks**:
+   ```bash
+   grep '"auth check"' logs.json | jq -r '[.username, .matched, .password_hash, .request_id] | @tsv'
+   ```
+3. **Extract HTTP responses**:
+   ```bash
+   grep -E '"status":(200|401)' logs.json | jq -r '[.request_id, .status, .response_type, .remote_user] | @tsv'
+   ```
+4. **Join on request_id** to correlate Navigator's decision with Rails' result
+5. **Look specifically for**: `matched: false` with `status: 200` (Navigator wrong)
+6. **Compare password_hash** for same user to verify password consistency
 
 ## Files Modified
 
@@ -304,11 +333,28 @@ This means authentication is checked BEFORE fly-replay decision, so the Authoriz
 
 ## Summary
 
-The investigation has identified two potential root causes:
+The investigation has progressed through multiple hypotheses:
 
-1. **Fly-Replay Header Loss** (FIX DEPLOYED): Authorization header not preserved during fly-replay
-2. **Authentication Timing** (NEEDS INVESTIGATION): Navigator enforcing auth before fly-replay may interact poorly with cross-region requests
+1. **Concurrency Bug** (DISPROVEN): Added mutex protection, problem persisted
+2. **Fly-Replay Header Loss** (FIX DEPLOYED): Authorization header now preserved during fly-replay
+3. **Navigator vs Rails Mismatch** (CURRENTLY TESTING): Comprehensive logging deployed to compare Navigator's htpasswd check with Rails' final decision
 
-The comprehensive logging now deployed will allow correlation of authentication results with HTTP status codes to determine which hypothesis is correct.
+### Current Investigation Strategy
 
-**Status**: Awaiting affected user activity to collect diagnostic data.
+The logging now deployed (2025-10-16 00:22 UTC) allows direct comparison:
+- Navigator logs what `Match()` returns (`matched: true/false`)
+- Navigator always returns `true` to bypass enforcement
+- Rails performs its own authentication
+- We correlate Navigator's result with Rails' HTTP status code
+
+**The smoking gun we're looking for**: `matched: false` + `status: 200`
+- This would prove Navigator incorrectly rejects credentials that Rails accepts
+- Would indicate go-htpasswd library bug or htpasswd file corruption
+
+**Status**: Awaiting cranford/roanoke user activity to collect diagnostic data.
+
+### Important Context
+
+User observation: "replay requests that were reverse proxied to a tenant worked with authentication, it is when I asked for navigator to enforce authentication that this started showing up"
+
+This suggests the issue is specifically with Navigator's htpasswd authentication check, not with the fly-replay mechanism itself. The correlation logging will definitively prove whether Navigator's `Match()` function is producing incorrect results.
