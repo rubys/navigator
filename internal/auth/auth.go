@@ -60,6 +60,9 @@ func (a *BasicAuth) CheckAuth(r *http.Request) bool {
 		return false
 	}
 
+	// Trim whitespace from username to handle malformed htpasswd entries
+	username = strings.TrimSpace(username)
+
 	// Use go-htpasswd library to match the password
 	matched := a.File.Match(username, password)
 
