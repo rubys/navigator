@@ -2,13 +2,14 @@ package server
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/logging"
+	"github.com/rubys/navigator/internal/utils"
 )
 
 // HandleStickySession handles sticky session routing using Fly-Replay
@@ -34,7 +35,7 @@ func HandleStickySession(w http.ResponseWriter, r *http.Request, config *config.
 	appName := os.Getenv("FLY_APP_NAME")
 
 	if currentMachineID == "" || appName == "" {
-		slog.Debug("Sticky sessions require FLY_MACHINE_ID and FLY_APP_NAME")
+		logging.LogStickySessionsDisabled()
 		return false
 	}
 
@@ -43,7 +44,7 @@ func HandleStickySession(w http.ResponseWriter, r *http.Request, config *config.
 	cookie, err := r.Cookie(config.StickySession.CookieName)
 	if err == nil {
 		targetMachine = cookie.Value
-		slog.Debug("Found sticky session cookie", "machine", targetMachine, "currentMachine", currentMachineID)
+		logging.LogStickySessionFound(targetMachine, currentMachineID)
 	}
 
 	// If no cookie or current machine, set cookie and continue
@@ -54,9 +55,7 @@ func HandleStickySession(w http.ResponseWriter, r *http.Request, config *config.
 
 	// Check for retry header indicating target machine is down
 	if r.Header.Get("X-Navigator-Retry") == "true" {
-		slog.Info("Sticky session target machine unavailable, serving from current",
-			"targetMachine", targetMachine,
-			"currentMachine", currentMachineID)
+		logging.LogStickySessionUnavailable(targetMachine, currentMachineID)
 		SetStickySessionCookie(w, currentMachineID, config)
 		ServeMaintenancePage(w, r, config)
 		return true
@@ -78,9 +77,8 @@ func HandleStickySession(w http.ResponseWriter, r *http.Request, config *config.
 func SetStickySessionCookie(w http.ResponseWriter, machineID string, config *config.Config) {
 	maxAge := 3600 // Default 1 hour
 	if config.StickySession.CookieMaxAge != "" {
-		if duration, err := time.ParseDuration(config.StickySession.CookieMaxAge); err == nil {
-			maxAge = int(duration.Seconds())
-		}
+		duration := utils.ParseDurationWithDefault(config.StickySession.CookieMaxAge, time.Hour)
+		maxAge = int(duration.Seconds())
 	}
 
 	cookiePath := config.StickySession.CookiePath
@@ -110,5 +108,5 @@ func SetStickySessionCookie(w http.ResponseWriter, machineID string, config *con
 	}
 
 	http.SetCookie(w, cookie)
-	slog.Debug("Set sticky session cookie", "machine", machineID, "maxAge", maxAge)
+	logging.LogStickySessionSet(machineID, maxAge)
 }

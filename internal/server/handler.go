@@ -3,7 +3,6 @@ package server
 import (
 	"bufio"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/rubys/navigator/internal/auth"
 	"github.com/rubys/navigator/internal/config"
 	"github.com/rubys/navigator/internal/idle"
+	"github.com/rubys/navigator/internal/logging"
 	"github.com/rubys/navigator/internal/process"
 	"github.com/rubys/navigator/internal/proxy"
 	"github.com/rubys/navigator/internal/utils"
@@ -68,10 +68,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	recorder.StartTracking()
 
 	// Log request start
-	slog.Debug("Request received",
-		"method", r.Method,
-		"path", r.URL.Path,
-		"request_id", requestID)
+	logging.LogRequest(r.Method, r.URL.Path, requestID)
 
 	// Handle health check endpoint
 	if r.URL.Path == "/up" {
@@ -196,25 +193,21 @@ func (h *Handler) handleRewrites(w http.ResponseWriter, r *http.Request) bool {
 func (h *Handler) getStartupTimeout(tenant *config.Tenant) time.Duration {
 	// 1. Check tenant-specific override
 	if tenant != nil && tenant.StartupTimeout != "" {
-		timeout, err := time.ParseDuration(tenant.StartupTimeout)
-		if err == nil {
+		timeout := utils.ParseDurationWithContext(tenant.StartupTimeout, 0, map[string]interface{}{
+			"tenant": tenant.Name,
+			"type":   "startup_timeout",
+		})
+		if timeout > 0 {
 			return timeout
 		}
-		slog.Warn("Invalid tenant startup_timeout, using default",
-			"tenant", tenant.Name,
-			"value", tenant.StartupTimeout,
-			"error", err)
 	}
 
 	// 2. Check global applications config
 	if h.config.Applications.StartupTimeout != "" {
-		timeout, err := time.ParseDuration(h.config.Applications.StartupTimeout)
-		if err == nil {
+		timeout := utils.ParseDurationWithDefault(h.config.Applications.StartupTimeout, 0)
+		if timeout > 0 {
 			return timeout
 		}
-		slog.Warn("Invalid global startup_timeout, using default",
-			"value", h.config.Applications.StartupTimeout,
-			"error", err)
 	}
 
 	// 3. Use default
@@ -246,7 +239,7 @@ func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request) {
 	// Extract tenant name from path
 	tenantName, found := h.extractTenantFromPath(r.URL.Path)
 
-	slog.Debug("Tenant extraction result", "tenantName", tenantName, "found", found, "path", r.URL.Path)
+	logging.LogTenantExtraction(tenantName, found, r.URL.Path)
 
 	if !found {
 		http.NotFound(w, r)
@@ -279,9 +272,7 @@ func (h *Handler) handleWebAppProxy(w http.ResponseWriter, r *http.Request) {
 		// Client still connected, continue with proxy
 	case <-time.After(startupTimeout):
 		// Timeout waiting for app to be ready, serve maintenance page
-		slog.Info("App still starting after timeout, serving maintenance page",
-			"tenant", tenantName,
-			"timeout", startupTimeout)
+		logging.LogAppStartupTimeout(tenantName, startupTimeout)
 		recorder.SetMetadata("tenant", tenantName)
 		recorder.SetMetadata("response_type", "maintenance")
 		ServeMaintenancePage(w, r, h.config)
@@ -359,7 +350,7 @@ func (r *ResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		if err == nil {
 			// WebSocket connection hijacked successfully
 			// Finish tracking the HTTP request since it's now handled by WebSocket
-			slog.Debug("WebSocket hijacked, finishing HTTP request tracking")
+			logging.LogWebSocketHijacked()
 			r.finishTracking()
 		}
 		return conn, rw, err

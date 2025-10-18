@@ -2,14 +2,14 @@ package server
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/logging"
+	"github.com/rubys/navigator/internal/utils"
 )
 
 // StaticFileHandler handles serving static files
@@ -48,17 +48,13 @@ func (s *StaticFileHandler) stripRootPath(path string) string {
 func (s *StaticFileHandler) ServeStatic(w http.ResponseWriter, r *http.Request) bool {
 	path := r.URL.Path
 
-	slog.Debug("Checking static file",
-		"path", path,
-		"publicDir", s.config.Server.Static.PublicDir,
-		"rootPath", s.config.Server.RootPath)
+	logging.LogStaticFileCheck(r.Method, path)
 
 	// Strip the root path if configured (e.g., "/showcase" prefix)
 	strippedPath := s.stripRootPath(path)
 	if strippedPath != path {
-		slog.Debug("Stripping root path", "originalPath", path, "rootPath", s.config.Server.RootPath)
+		logging.LogStaticFileStripRoot(path, s.config.Server.RootPath, strippedPath)
 		path = strippedPath
-		slog.Debug("Path after stripping", "newPath", path)
 	}
 
 	// Check if file has a static extension
@@ -70,9 +66,9 @@ func (s *StaticFileHandler) ServeStatic(w http.ResponseWriter, r *http.Request) 
 	fsPath := filepath.Join(s.getPublicDir(), path)
 
 	// Check if file exists
-	slog.Debug("Checking file existence", "fsPath", fsPath, "originalPath", path)
+	logging.LogStaticFileExistenceCheck(fsPath, path)
 	if info, err := os.Stat(fsPath); os.IsNotExist(err) || info.IsDir() {
-		slog.Debug("File not found or is directory", "fsPath", fsPath, "err", err)
+		logging.LogStaticFileNotFound(fsPath, err)
 		return false
 	}
 
@@ -88,7 +84,7 @@ func (s *StaticFileHandler) ServeStatic(w http.ResponseWriter, r *http.Request) 
 
 	// Serve the file
 	http.ServeFile(w, r, fsPath)
-	slog.Debug("Serving static file", "path", path, "fsPath", fsPath)
+	logging.LogStaticFileServe(path, fsPath)
 	return true
 }
 
@@ -117,18 +113,18 @@ func (s *StaticFileHandler) hasStaticExtension(path string) bool {
 func (s *StaticFileHandler) TryFiles(w http.ResponseWriter, r *http.Request) bool {
 	path := r.URL.Path
 
-	slog.Debug("tryFiles checking", "path", path)
+	logging.LogTryFilesCheck(path)
 
 	// Only try files for paths that don't already have an extension
 	if filepath.Ext(path) != "" {
-		slog.Debug("tryFiles skipping - path has extension")
+		logging.LogTryFilesSkipExtension()
 		return false
 	}
 
 	// Get try_files extensions
 	extensions := s.getTryFileExtensions()
 	if len(extensions) == 0 {
-		slog.Debug("tryFiles disabled - no suffixes configured")
+		logging.LogTryFilesDisabled()
 		return false
 	}
 
@@ -136,7 +132,7 @@ func (s *StaticFileHandler) TryFiles(w http.ResponseWriter, r *http.Request) boo
 	// (those should be handled by web app proxy, not public directory fallback)
 	for _, tenant := range s.config.Applications.Tenants {
 		if strings.HasPrefix(path, tenant.Path) {
-			slog.Debug("tryFiles skipping - matches tenant path", "tenantPath", tenant.Path)
+			logging.LogTryFilesSkipTenant(tenant.Path)
 			return false
 		}
 	}
@@ -152,7 +148,7 @@ func (s *StaticFileHandler) getTryFileExtensions() []string {
 
 // tryPublicDirFiles attempts to serve files from the public directory
 func (s *StaticFileHandler) tryPublicDirFiles(w http.ResponseWriter, r *http.Request, extensions []string, path string) bool {
-	slog.Debug("Trying files in public directory", "path", path)
+	logging.LogTryFilesSearching(path)
 
 	publicDir := s.getPublicDir()
 	strippedPath := s.stripRootPath(path)
@@ -160,7 +156,7 @@ func (s *StaticFileHandler) tryPublicDirFiles(w http.ResponseWriter, r *http.Req
 	// Try each extension
 	for _, ext := range extensions {
 		fsPath := filepath.Join(publicDir, strippedPath+ext)
-		slog.Debug("tryFiles checking", "fsPath", fsPath)
+		logging.LogTryFilesCheckingPath(fsPath)
 		if info, err := os.Stat(fsPath); err == nil && !info.IsDir() {
 			return s.serveFile(w, r, fsPath, strippedPath+ext)
 		}
@@ -185,7 +181,7 @@ func (s *StaticFileHandler) serveFile(w http.ResponseWriter, r *http.Request, fs
 
 	// Serve the file
 	http.ServeFile(w, r, fsPath)
-	slog.Info("Serving file via tryFiles", "requestPath", requestPath, "fsPath", fsPath)
+	logging.LogTryFilesServe(requestPath, fsPath)
 	return true
 }
 
@@ -210,7 +206,8 @@ func (s *StaticFileHandler) setCacheControl(w http.ResponseWriter, path string) 
 	// Set Cache-Control header if configured
 	if maxAge != "" && maxAge != "0" && maxAge != "0s" {
 		// Parse duration and convert to seconds
-		if duration, err := time.ParseDuration(maxAge); err == nil {
+		duration := utils.ParseDurationWithDefault(maxAge, 0)
+		if duration > 0 {
 			seconds := int(duration.Seconds())
 			w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", seconds))
 		} else {

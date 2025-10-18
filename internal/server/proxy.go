@@ -1,7 +1,6 @@
 package server
 
 import (
-	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/logging"
 )
 
 var upgrader = websocket.Upgrader{
@@ -60,10 +60,7 @@ func (h *Handler) handleReverseProxies(w http.ResponseWriter, r *http.Request) b
 			continue
 		}
 
-		slog.Debug("Matched reverse proxy route",
-			"path", r.URL.Path,
-			"target", proxy.Target,
-			"websocket", proxy.WebSocket)
+		logging.LogProxyMatch(r.URL.Path, proxy.Target, proxy.WebSocket)
 
 		// Handle the proxy
 		if proxy.WebSocket && isWebSocketRequest(r) {
@@ -100,7 +97,7 @@ func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route 
 
 	targetURL, err := url.Parse(targetTemplate)
 	if err != nil {
-		slog.Error("Invalid proxy target URL", "target", targetTemplate, "error", err)
+		logging.LogProxyInvalidURL(targetTemplate, err)
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
 	}
@@ -162,15 +159,12 @@ func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route 
 			req.Header.Set(key, headerValue)
 		}
 
-		slog.Debug("Proxying HTTP request",
-			"method", req.Method,
-			"original_path", r.URL.Path,
-			"target_url", req.URL.String())
+		logging.LogProxyHTTPRequest(req.Method, r.URL.Path, req.URL.String())
 	}
 
 	// Handle errors
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		slog.Error("Proxy error", "error", err, "target", route.Target)
+		logging.LogProxyError(route.Target, err)
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 	}
 
@@ -200,7 +194,7 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 
 	targetURL, err := url.Parse(targetTemplate)
 	if err != nil {
-		slog.Error("Invalid WebSocket target URL", "target", targetTemplate, "error", err)
+		logging.LogProxyInvalidURL(targetTemplate, err)
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
 	}
@@ -232,9 +226,7 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 	targetURL.Path = finalPath
 	targetURL.RawQuery = r.URL.RawQuery
 
-	slog.Debug("Proxying WebSocket connection",
-		"original_path", r.URL.Path,
-		"target_url", targetURL.String())
+	logging.LogWebSocketProxyStart(r.RemoteAddr, targetURL.String(), r.URL.Path)
 
 	// Connect to backend WebSocket server
 	backendHeader := http.Header{}
@@ -263,11 +255,9 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 
 	backendConn, backendResp, err := websocket.DefaultDialer.Dial(targetURL.String(), backendHeader)
 	if err != nil {
-		slog.Error("Failed to connect to backend WebSocket",
-			"target", targetURL.String(),
-			"error", err)
+		logging.LogWebSocketBackendConnectError(targetURL.String(), err)
 		if backendResp != nil {
-			slog.Debug("Backend response", "status", backendResp.StatusCode)
+			logging.LogWebSocketBackendResponse(backendResp.StatusCode)
 		}
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
@@ -282,14 +272,12 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 
 	clientConn, err := upgrader.Upgrade(w, r, responseHeader)
 	if err != nil {
-		slog.Error("Failed to upgrade client connection", "error", err)
+		logging.LogWebSocketUpgradeError(err)
 		return
 	}
 	defer clientConn.Close()
 
-	slog.Info("WebSocket proxy established",
-		"client", getClientIP(r),
-		"target", targetURL.String())
+	logging.LogWebSocketProxyEstablished(r.RemoteAddr, targetURL.String(), r.URL.Path)
 
 	// Proxy messages between client and backend
 	errc := make(chan error, 2)
@@ -327,9 +315,9 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 	// Wait for error or connection close
 	err = <-errc
 	if err != nil && !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-		slog.Debug("WebSocket proxy ended with error", "error", err)
+		logging.LogWebSocketProxyEnded(err)
 	} else {
-		slog.Debug("WebSocket proxy closed normally")
+		logging.LogWebSocketProxyEnded(nil)
 	}
 }
 

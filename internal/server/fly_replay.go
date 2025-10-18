@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/logging"
 	"github.com/rubys/navigator/internal/proxy"
 )
 
@@ -25,9 +25,7 @@ const (
 func ShouldUseFlyReplay(r *http.Request) bool {
 	// If Content-Length is explicitly set and >= 1MB, use reverse proxy
 	if r.ContentLength >= MaxFlyReplaySize {
-		slog.Debug("Using reverse proxy due to large content length",
-			"method", r.Method,
-			"contentLength", r.ContentLength)
+		logging.LogFlyReplayLargeContent(r.ContentLength, r.Method)
 		return false
 	}
 
@@ -37,8 +35,7 @@ func ShouldUseFlyReplay(r *http.Request) bool {
 		methodsRequiringContent := []string{"POST", "PUT", "PATCH"}
 		for _, method := range methodsRequiringContent {
 			if r.Method == method {
-				slog.Debug("Using reverse proxy due to missing content length on body method",
-					"method", r.Method)
+				logging.LogFlyReplayMissingContentLength(r.Method)
 				return false
 			}
 		}
@@ -55,12 +52,7 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 		// Check if this is a retry
 		if r.Header.Get("X-Navigator-Retry") == "true" {
 			// Retry detected, serve maintenance page
-			slog.Info("Retry detected, serving maintenance page",
-				"path", r.URL.Path,
-				"target", target,
-				"method", r.Method,
-				"navigatorRetry", r.Header.Get("X-Navigator-Retry"))
-
+			logging.LogFlyReplayRetryDetected(r.Header.Get("Fly-Replay-Src"), target)
 			ServeMaintenancePage(w, r, config)
 			return true
 		}
@@ -146,7 +138,7 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return true
 		}
-		slog.Debug("Fly replay response body", "body", string(responseBodyBytes))
+		logging.LogFlyReplayResponseBody(responseBodyBytes)
 		_, _ = w.Write(responseBodyBytes)
 
 		// Set metadata for fly-replay response
@@ -170,7 +162,7 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 func HandleFlyReplayFallback(w http.ResponseWriter, r *http.Request, target string, config *config.Config) bool {
 	flyAppName := os.Getenv("FLY_APP_NAME")
 	if flyAppName == "" {
-		slog.Debug("FLY_APP_NAME not set, cannot construct fallback proxy URL")
+		logging.LogFlyReplayNoAppName()
 		return false
 	}
 
@@ -194,7 +186,7 @@ func HandleFlyReplayFallback(w http.ResponseWriter, r *http.Request, target stri
 			appName := parts[1]
 			targetURL = fmt.Sprintf("http://%s.vm.%s.internal:%d%s", machineID, appName, listenPort, r.URL.Path)
 		} else {
-			slog.Debug("Invalid machine target format", "target", target)
+			logging.LogFlyReplayInvalidMachineTarget(target)
 			return false
 		}
 	} else if strings.HasPrefix(target, "app=") {
@@ -208,21 +200,14 @@ func HandleFlyReplayFallback(w http.ResponseWriter, r *http.Request, target stri
 
 	_, err := url.Parse(targetURL)
 	if err != nil {
-		slog.Error("Failed to parse fly-replay fallback URL",
-			"url", targetURL,
-			"error", err)
+		logging.LogFlyReplayFallbackURLError(targetURL, err)
 		return false
 	}
 
 	// Set forwarding headers
 	r.Header.Set("X-Forwarded-Host", r.Host)
 
-	slog.Info("Using automatic reverse proxy fallback for fly-replay",
-		"originalPath", r.URL.Path,
-		"targetURL", targetURL,
-		"target", target,
-		"method", r.Method,
-		"contentLength", r.ContentLength)
+	logging.LogFlyReplayFallbackProxy(target, targetURL)
 
 	// Use the existing retry proxy logic
 	proxy.HandleProxyWithRetry(w, r, targetURL, 3*time.Second)

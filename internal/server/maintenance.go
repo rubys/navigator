@@ -2,12 +2,12 @@ package server
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/logging"
 )
 
 // ServeMaintenancePage serves a maintenance/503 page
@@ -40,7 +40,7 @@ func ServeMaintenancePage(w http.ResponseWriter, r *http.Request, config *config
 		w.Header().Set("Expires", "0")
 		w.WriteHeader(503) // http.StatusServiceUnavailable
 		_, _ = w.Write(content)
-		slog.Debug("Served custom maintenance page", "file", maintenancePage)
+		logging.LogMaintenancePageCustom(maintenancePage)
 		return
 	}
 
@@ -109,5 +109,5 @@ func ServeMaintenancePage(w http.ResponseWriter, r *http.Request, config *config
 </html>`
 
 	_, _ = w.Write([]byte(fallbackHTML))
-	slog.Debug("Served fallback maintenance page")
+	logging.LogMaintenancePageFallback()
 }

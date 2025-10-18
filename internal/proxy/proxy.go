@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/rubys/navigator/internal/config"
+	"github.com/rubys/navigator/internal/logging"
 )
 
 // MetadataSetter is an interface for response writers that support metadata
@@ -29,7 +29,7 @@ func createProxyErrorHandler(targetURL string) func(http.ResponseWriter, *http.R
 		// Check if client disconnected during the request
 		if r.Context().Err() == context.Canceled {
 			// Client closed connection (similar to nginx 499)
-			slog.Debug("Client disconnected during proxy", "target", targetURL, "error", err)
+			logging.LogProxyClientDisconnected(targetURL, err)
 
 			// Update metadata if ResponseWriter supports it
 			if recorder, ok := w.(MetadataSetter); ok {
@@ -40,7 +40,7 @@ func createProxyErrorHandler(targetURL string) func(http.ResponseWriter, *http.R
 			return
 		}
 		// Actual proxy error
-		slog.Error("Proxy error", "target", targetURL, "error", err)
+		logging.LogProxyError(targetURL, err)
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 	}
 }
@@ -118,9 +118,7 @@ func HandleProxyWithRetry(w http.ResponseWriter, r *http.Request, targetURL stri
 		if canRetry && attempt > 1 && retryWriter != nil {
 			// If buffer limit was hit, disable further retries for this request
 			if retryWriter.bufferLimitHit {
-				slog.Debug("Disabling retry due to large response size",
-					"target", targetURL,
-					"attempt", attempt)
+				logging.LogProxyResponseBufferDisabled(int64(retryWriter.body.Len()))
 				http.Error(w, "Bad Gateway", http.StatusBadGateway)
 				return
 			}
@@ -145,10 +143,7 @@ func HandleProxyWithRetry(w http.ResponseWriter, r *http.Request, targetURL stri
 
 		// Check if we've exceeded max retry duration
 		if time.Since(startTime) >= maxRetryDuration {
-			slog.Error("Proxy failed after max retry duration",
-				"target", targetURL,
-				"attempts", attempt,
-				"duration", time.Since(startTime))
+			logging.LogProxyRetryExhausted(targetURL, attempt, time.Since(startTime))
 			http.Error(w, "Bad Gateway", http.StatusBadGateway)
 			return
 		}
@@ -159,10 +154,7 @@ func HandleProxyWithRetry(w http.ResponseWriter, r *http.Request, targetURL stri
 			delay = maxDelay
 		}
 
-		slog.Debug("Proxy retry",
-			"target", targetURL,
-			"attempt", attempt,
-			"delay", delay)
+		logging.LogProxyRetry(targetURL, attempt, delay)
 
 		time.Sleep(delay)
 	}
@@ -251,7 +243,7 @@ func (w *WebSocketTracker) cleanup() {
 	if !w.Cleaned && w.ActiveWebSockets != nil {
 		atomic.AddInt32(w.ActiveWebSockets, -1)
 		w.Cleaned = true
-		slog.Debug("WebSocket connection ended", "activeWebSockets", atomic.LoadInt32(w.ActiveWebSockets))
+		logging.LogWebSocketConnectionEnded(atomic.LoadInt32(w.ActiveWebSockets))
 	}
 }
 
@@ -266,7 +258,7 @@ func (c *webSocketConn) Close() error {
 	if !c.Cleaned && c.ActiveWebSockets != nil {
 		atomic.AddInt32(c.ActiveWebSockets, -1)
 		c.Cleaned = true
-		slog.Debug("WebSocket connection closed", "activeWebSockets", atomic.LoadInt32(c.ActiveWebSockets))
+		logging.LogWebSocketConnectionClosed(atomic.LoadInt32(c.ActiveWebSockets))
 	}
 	return c.Conn.Close()
 }
@@ -305,7 +297,7 @@ func ProxyWithWebSocketSupport(w http.ResponseWriter, r *http.Request, targetURL
 	if IsWebSocketRequest(r) && activeWebSockets != nil {
 		// Track WebSocket connection
 		atomic.AddInt32(activeWebSockets, 1)
-		slog.Debug("WebSocket connection started", "activeWebSockets", atomic.LoadInt32(activeWebSockets))
+		logging.LogWebSocketConnectionStarted(atomic.LoadInt32(activeWebSockets))
 
 		// Wrap the response writer to detect when WebSocket closes
 		w = &WebSocketTracker{
