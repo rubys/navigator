@@ -23,7 +23,18 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 3. Sticky Session Routing (Fly.io)                  │
+│ 3. Authentication Check ⚡ EARLY ENFORCEMENT         │
+│    - Check if path is public (auth exclusions)      │
+│    - Validate Basic Auth credentials                │
+│    → FAILED: Return 401 Unauthorized                │
+│    → PASSED: Continue                               │
+│                                                      │
+│    ⚠️  SECURITY: Authentication happens BEFORE all  │
+│        routing decisions to prevent bypass holes    │
+└───────────────────┬─────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────────┐
+│ 4. Sticky Session Routing (Fly.io)                  │
 │    - Check sticky_sessions.enabled                  │
 │    - Match against configured paths                 │
 │    → MATCHED: Route to specific machine             │
@@ -31,7 +42,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 4. Rewrite Rules                                    │
+│ 5. Rewrite Rules                                    │
 │    - Check server.rewrite_rules                     │
 │    - Match path patterns and methods                │
 │    → REDIRECT: Return 302 with new location         │
@@ -41,20 +52,12 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 5. Reverse Proxies (Standalone Services)            │
+│ 6. Reverse Proxies (Standalone Services)            │
 │    - Check routes.reverse_proxies                   │
 │    - Match path/prefix patterns                     │
 │    → WEBSOCKET: Establish WebSocket proxy           │
 │    → HTTP: Proxy to external service                │
 │    → NO MATCH: Continue                             │
-└───────────────────┬─────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────────────┐
-│ 6. Authentication Check                             │
-│    - Check if path is public (auth exclusions)      │
-│    - Validate Basic Auth credentials                │
-│    → FAILED: Return 401 Unauthorized                │
-│    → PASSED: Continue                               │
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
@@ -284,11 +287,14 @@ The proxy maintains two separate WebSocket connections:
 
 This allows Navigator to monitor, log, and handle errors for each connection independently.
 
-### 6. Authentication Check
+### 3. Authentication Check ⚡ EARLY ENFORCEMENT
 
-**File:** `internal/auth/auth.go:42` (`CheckAuth`)
+**File:** `internal/server/handler.go:82` (happens immediately after health check)
+**Implementation:** `internal/auth/auth.go:46` (`CheckAuth`)
 
-Navigator supports HTTP Basic Authentication using htpasswd files.
+Navigator supports HTTP Basic Authentication using htpasswd files. **IMPORTANT:** Authentication is enforced **early** in the request flow, immediately after the health check and **before** all routing decisions. This prevents authentication bypass via reverse proxies, fly-replay, redirects, or WebSocket endpoints.
+
+**Security Note:** Prior to October 2025, authentication happened later in the flow, which created bypass holes where reverse proxy routes (including Action Cable WebSocket) and fly-replay rewrites could be accessed without authentication. This has been fixed by moving auth enforcement to happen early.
 
 **Configuration:**
 ```yaml

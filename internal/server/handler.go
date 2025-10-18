@@ -79,6 +79,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check authentication EARLY - before any routing decisions
+	// This prevents authentication bypass via reverse proxies, fly-replay, etc.
+	isPublic := auth.ShouldExcludeFromAuth(r.URL.Path, h.config)
+	needsAuth := h.auth.IsEnabled() && !isPublic
+
+	if needsAuth && !h.auth.CheckAuth(r) {
+		recorder.SetMetadata("response_type", "auth-failure")
+		h.auth.RequireAuth(recorder)
+		return
+	}
+
 	// Handle sticky sessions (for Fly.io)
 	if h.handleStickySession(recorder, r) {
 		return
@@ -91,16 +102,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Handle reverse proxies (including WebSockets)
 	if h.handleReverseProxies(recorder, r) {
-		return
-	}
-
-	// Check authentication
-	isPublic := auth.ShouldExcludeFromAuth(r.URL.Path, h.config)
-	needsAuth := h.auth.IsEnabled() && !isPublic
-
-	if needsAuth && !h.auth.CheckAuth(r) {
-		recorder.SetMetadata("response_type", "auth-failure")
-		h.auth.RequireAuth(recorder)
 		return
 	}
 
