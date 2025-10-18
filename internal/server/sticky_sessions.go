@@ -83,10 +83,15 @@ func SetStickySessionCookie(w http.ResponseWriter, machineID string, config *con
 		}
 	}
 
+	cookiePath := config.StickySession.CookiePath
+	if cookiePath == "" {
+		cookiePath = "/" // Default to root path
+	}
+
 	cookie := &http.Cookie{
 		Name:     config.StickySession.CookieName,
 		Value:    machineID,
-		Path:     "/",
+		Path:     cookiePath,
 		MaxAge:   maxAge,
 		HttpOnly: config.StickySession.CookieHTTPOnly,
 		Secure:   config.StickySession.CookieSecure,

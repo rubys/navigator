@@ -181,6 +181,23 @@ routes:
       cookie_samesite: "Strict"
 ```
 
+### `cookie_path`
+**Type**: String
+**Default**: `"/"`
+**Description**: Set the cookie path to restrict where the cookie is sent. Useful for tenant-specific or path-specific sticky sessions.
+
+**Use cases**:
+- `/` - Cookie sent with all requests (default)
+- `/app` - Cookie only sent for `/app/*` paths
+- `/2025/boston` - Cookie scoped to specific tenant path
+
+```yaml
+routes:
+  fly:
+    sticky_sessions:
+      cookie_path: "/app"
+```
+
 ### `paths`
 **Type**: Array of Strings
 **Default**: `[]` (all paths)

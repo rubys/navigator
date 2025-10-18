@@ -132,27 +132,7 @@ func (h *Handler) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 
 // handleStickySession handles sticky session routing for Fly.io
 func (h *Handler) handleStickySession(w http.ResponseWriter, r *http.Request) bool {
-	if !h.config.StickySession.Enabled {
-		return false
-	}
-
-	// Check if path matches sticky session paths
-	matched := false
-	for _, path := range h.config.StickySession.Paths {
-		if strings.HasPrefix(r.URL.Path, path) {
-			matched = true
-			break
-		}
-	}
-
-	if !matched && len(h.config.StickySession.Paths) > 0 {
-		return false
-	}
-
-	// Implementation would check for sticky session cookie
-	// and handle Fly-Replay if needed
-	// This is a simplified version
-	return false
+	return HandleStickySession(w, r, h.config)
 }
 
 // handleRewrites processes rewrite rules

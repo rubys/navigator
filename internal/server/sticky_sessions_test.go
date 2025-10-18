@@ -310,6 +310,55 @@ func TestSetStickySessionCookie(t *testing.T) {
 	}
 }
 
+func TestSetStickySessionCookie_CustomPath(t *testing.T) {
+	tests := []struct {
+		name         string
+		cookiePath   string
+		expectedPath string
+	}{
+		{
+			name:         "Default path when not set",
+			cookiePath:   "",
+			expectedPath: "/",
+		},
+		{
+			name:         "Custom path /app",
+			cookiePath:   "/app",
+			expectedPath: "/app",
+		},
+		{
+			name:         "Custom path /2025/boston",
+			cookiePath:   "/2025/boston",
+			expectedPath: "/2025/boston",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.StickySession.CookieName = "_navigator_machine"
+			cfg.StickySession.CookiePath = tt.cookiePath
+
+			recorder := httptest.NewRecorder()
+
+			SetStickySessionCookie(recorder, "test-machine", cfg)
+
+			// Get the cookie
+			cookies := recorder.Result().Cookies()
+			if len(cookies) == 0 {
+				t.Fatal("No cookies were set")
+			}
+
+			cookie := cookies[0]
+
+			// Verify path is set correctly
+			if cookie.Path != tt.expectedPath {
+				t.Errorf("Cookie path = %q, expected %q", cookie.Path, tt.expectedPath)
+			}
+		})
+	}
+}
+
 func TestHandleStickySession_PathMatching(t *testing.T) {
 	// Set up environment for all tests
 	os.Setenv("FLY_MACHINE_ID", "machine123")
