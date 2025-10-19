@@ -128,8 +128,15 @@ func (s *StaticFileHandler) TryFiles(w http.ResponseWriter, r *http.Request) boo
 		return false
 	}
 
-	// Skip paths that match tenant paths
-	// (those should be handled by web app proxy, not public directory fallback)
+	// Try files in public directory FIRST
+	// This allows prerendered HTML files to be served statically even when
+	// their paths match tenant prefixes (e.g., /showcase/studios/millbrae.html)
+	if s.tryPublicDirFiles(w, r, extensions, path) {
+		return true // Found and served static file
+	}
+
+	// No static file found - skip if this is a tenant path
+	// (let tenant handle dynamic requests)
 	for _, tenant := range s.config.Applications.Tenants {
 		if strings.HasPrefix(path, tenant.Path) {
 			logging.LogTryFilesSkipTenant(tenant.Path)
@@ -137,8 +144,7 @@ func (s *StaticFileHandler) TryFiles(w http.ResponseWriter, r *http.Request) boo
 		}
 	}
 
-	// Try files in public directory
-	return s.tryPublicDirFiles(w, r, extensions, path)
+	return false
 }
 
 // getTryFileExtensions returns the configured try_files extensions

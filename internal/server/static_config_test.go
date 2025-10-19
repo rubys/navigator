@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rubys/navigator/internal/config"
@@ -428,5 +429,59 @@ func TestServerTryFilesDisabled(t *testing.T) {
 
 	if !served2 {
 		t.Error("Expected ServeStatic to serve exact file match even when try_files is disabled")
+	}
+}
+
+// TestServerTryFilesWithTenantPaths tests that prerendered HTML files
+// are served even when the path matches a tenant prefix
+func TestServerTryFilesWithTenantPaths(t *testing.T) {
+	// Create temp directory with prerendered studio page
+	tempDir, err := os.MkdirTemp("", "navigator-tryfiles-tenant-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create studios/millbrae.html
+	studiosDir := filepath.Join(tempDir, "studios")
+	if err := os.MkdirAll(studiosDir, 0755); err != nil {
+		t.Fatalf("Failed to create studios dir: %v", err)
+	}
+	htmlContent := "<html><body>Millbrae Studio</body></html>"
+	if err := os.WriteFile(filepath.Join(studiosDir, "millbrae.html"), []byte(htmlContent), 0644); err != nil {
+		t.Fatalf("Failed to write millbrae.html: %v", err)
+	}
+
+	cfg := &config.Config{}
+	cfg.Server.RootPath = "/showcase"
+	cfg.Server.Static.PublicDir = tempDir
+	cfg.Server.Static.TryFiles = []string{".html"}
+	cfg.Server.Static.AllowedExtensions = []string{"html"}
+
+	// Configure index tenant that matches /showcase/
+	cfg.Applications.Tenants = []config.Tenant{
+		{Name: "index", Path: "/showcase/"},
+	}
+
+	handler := NewStaticFileHandler(cfg)
+
+	// Request /showcase/studios/millbrae should serve millbrae.html
+	// even though it matches the index tenant path
+	req := httptest.NewRequest(http.MethodGet, "/showcase/studios/millbrae", nil)
+	recorder := httptest.NewRecorder()
+	respRecorder := NewResponseRecorder(recorder, nil)
+
+	served := handler.TryFiles(respRecorder, req)
+
+	if !served {
+		t.Error("Expected TryFiles to serve prerendered HTML file even though path matches tenant")
+	}
+
+	if recorder.Code != 200 {
+		t.Errorf("Expected 200 OK, got %d", recorder.Code)
+	}
+
+	if !strings.Contains(recorder.Body.String(), "Millbrae Studio") {
+		t.Error("Response body doesn't contain expected content")
 	}
 }

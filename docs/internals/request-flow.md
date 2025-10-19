@@ -457,7 +457,7 @@ For applications mounted under a prefix (e.g., `/showcase`), Navigator automatic
 
 **File:** `internal/server/static.go:117` (`TryFiles`)
 
-Try Files allows serving files with different extensions than the requested path, useful for static sites and SPAs.
+Try Files allows serving prerendered files with different extensions than the requested path, useful for static sites and SPAs.
 
 **Configuration:**
 ```yaml
@@ -469,18 +469,23 @@ server:
 **Try Files Flow:**
 
 1. **Check Path:** Only process paths without extensions
-2. **Skip Tenant Paths:** Don't interfere with web app routing
-3. **Try Extensions:** Attempt each suffix in order
-   - `/studios/boston` → `/studios/boston.html`
+2. **Try Extensions:** Attempt each suffix in order
+   - `/studios/millbrae` → `/studios/millbrae.html`
    - `/docs/guide` → `/docs/guide/index.html`
-4. **Serve First Match:** Return first existing file
+3. **Serve First Match:** Return first existing file
+4. **Check Tenant Paths:** If no static file found, skip paths matching tenant routes
+
+**Important:** Try Files now checks for static files FIRST before tenant matching. This allows prerendered HTML files (from rake prerender) to be served statically even when their paths match tenant prefixes.
+
+**Behavior Change (October 2025):**
+- **Before:** Tenant paths blocked static file serving
+- **After:** Static files served if they exist, tenant apps only handle dynamic requests
 
 **Use Cases:**
 - Static site generators (Jekyll, Hugo)
+- Prerendered HTML pages (Rails prerender task)
 - Single-page applications (React, Vue)
 - Clean URLs without extensions
-
-**Important:** Try Files only applies to public paths (paths that don't match tenant routes). This prevents conflicts with dynamic application routing.
 
 ### 9. Web Application Proxy
 
