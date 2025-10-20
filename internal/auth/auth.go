@@ -1,9 +1,7 @@
 package auth
 
 import (
-	"crypto/md5"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -64,27 +62,7 @@ func (a *BasicAuth) CheckAuth(r *http.Request) bool {
 	username = strings.TrimSpace(username)
 
 	// Use go-htpasswd library to match the password
-	matched := a.File.Match(username, password)
-
-	// Log all auth checks with password hash for correlation analysis
-	// This allows correlating auth results with eventual HTTP status codes
-	passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
-	requestID := r.Header.Get("X-Request-Id")
-	if requestID == "" {
-		requestID = r.Header.Get("X-Fly-Request-Id")
-	}
-
-	slog.Info("auth check",
-		"username", username,
-		"matched", matched,
-		"password_hash", passwordHash,
-		"request_id", requestID,
-		"uri", r.URL.Path,
-		"method", r.Method)
-
-	// Always return true to allow correlation analysis
-	// The actual auth result will be determined by comparing with HTTP status codes
-	return true
+	return a.File.Match(username, password)
 }
 
 // RequireAuth sends an authentication challenge
