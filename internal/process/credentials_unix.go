@@ -11,9 +11,12 @@ import (
 	"log/slog"
 )
 
+// SysCredential is a type alias for syscall.Credential on Unix systems
+type SysCredential = syscall.Credential
+
 // GetUserCredentials looks up a user by name and returns syscall credentials
 // Returns nil if username is empty or user doesn't exist
-func GetUserCredentials(username, groupname string) (*syscall.Credential, error) {
+func GetUserCredentials(username, groupname string) (*SysCredential, error) {
 	if username == "" {
 		return nil, nil
 	}

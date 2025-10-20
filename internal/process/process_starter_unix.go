@@ -8,7 +8,7 @@ import (
 )
 
 // setProcessCredentials sets the user and group for the process (Unix only)
-func (ps *ProcessStarter) setProcessCredentials(cmd *exec.Cmd, cred *syscall.Credential) {
+func (ps *ProcessStarter) setProcessCredentials(cmd *exec.Cmd, cred *SysCredential) {
 	if cmd.SysProcAttr == nil {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
