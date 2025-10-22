@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -50,11 +51,15 @@ func (a *BasicAuth) CheckAuth(r *http.Request) bool {
 	}
 
 	if a == nil || a.File == nil {
+		slog.Debug("Auth check: no auth configured",
+			"path", r.URL.Path)
 		return true // No auth configured
 	}
 
 	username, password, ok := r.BasicAuth()
 	if !ok {
+		slog.Debug("Auth check: no basic auth credentials",
+			"path", r.URL.Path)
 		return false
 	}
 
@@ -62,7 +67,14 @@ func (a *BasicAuth) CheckAuth(r *http.Request) bool {
 	username = strings.TrimSpace(username)
 
 	// Use go-htpasswd library to match the password
-	return a.File.Match(username, password)
+	matched := a.File.Match(username, password)
+
+	slog.Debug("Auth check result",
+		"path", r.URL.Path,
+		"username", username,
+		"matched", matched)
+
+	return matched
 }
 
 // RequireAuth sends an authentication challenge
@@ -87,22 +99,34 @@ func ShouldExcludeFromAuth(path string, cfg *config.Config) bool {
 		// Handle glob patterns like *.css
 		if strings.HasPrefix(excludePath, "*") {
 			if strings.HasSuffix(path, excludePath[1:]) {
+				slog.Debug("Auth exclusion: glob pattern match",
+					"path", path,
+					"pattern", excludePath)
 				return true
 			}
 		} else if strings.Contains(excludePath, "*") {
 			// Handle patterns like /path/*.ext
 			if matched, _ := filepath.Match(excludePath, path); matched {
+				slog.Debug("Auth exclusion: filepath pattern match",
+					"path", path,
+					"pattern", excludePath)
 				return true
 			}
 		} else {
 			// Check for prefix match (paths ending with /)
 			if strings.HasSuffix(excludePath, "/") {
 				if strings.HasPrefix(path, excludePath) {
+					slog.Debug("Auth exclusion: prefix match",
+						"path", path,
+						"prefix", excludePath)
 					return true
 				}
 			} else {
 				// Exact match
 				if path == excludePath {
+					slog.Debug("Auth exclusion: exact match",
+						"path", path,
+						"match", excludePath)
 					return true
 				}
 			}
@@ -112,12 +136,18 @@ func ShouldExcludeFromAuth(path string, cfg *config.Config) bool {
 	// Check regex auth patterns from the config file
 	for _, authPattern := range cfg.Auth.AuthPatterns {
 		if authPattern.Pattern.MatchString(path) && authPattern.Action == "off" {
+			slog.Debug("Auth exclusion: regex pattern match",
+				"path", path,
+				"pattern", authPattern.Pattern.String(),
+				"action", authPattern.Action)
 			return true
 		}
 	}
 
 	// Location-specific auth patterns removed - use Routes.ReverseProxies instead
 
+	slog.Debug("Auth required: no exclusion matched",
+		"path", path)
 	return false
 }
 
