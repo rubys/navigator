@@ -186,55 +186,7 @@ See [websockets-example.yml](https://github.com/rubys/navigator/blob/main/exampl
 
 ---
 
-## Use Case 4: Sticky Sessions
-
-**Challenge**: Maintain session affinity so requests from the same client route to the same machine, crucial for WebSocket connections or locally stored data.
-
-**Solution**: Navigator provides built-in sticky session support using HTTP cookies.
-
-### Features
-
-- **Cookie-based routing**: Stores machine ID in HTTP-only cookie
-- **Cross-region support**: Works across all Fly.io regions
-- **Automatic failover**: Serves maintenance page if target machine unavailable
-- **Large request handling**: Falls back to reverse proxy for requests >1MB
-- **Path-specific sessions**: Optional configuration for specific URL paths
-- **Configurable duration**: Session lifetime using Go duration format
-
-### Configuration Example
-
-```yaml
-routes:
-  fly:
-    sticky_sessions:
-      enabled: true
-      cookie_name: "_navigator_machine"
-      cookie_max_age: "2h"
-      cookie_secure: true
-      cookie_httponly: true
-      paths:
-        - "/app/*"
-        - "/dashboard/*"
-
-applications:
-  tenants:
-    - name: myapp
-      path: /
-      working_dir: /app
-```
-
-### How it works
-
-- Same user always routes to same machine
-- Maintains long-lived WebSocket connections
-- Enables machine-specific cached data
-- No external session store required
-
-See [sticky-sessions-example.yml](https://github.com/rubys/navigator/blob/main/examples/sticky-sessions-example.yml) and [Sticky Sessions feature page](features/sticky-sessions.md) for more details.
-
----
-
-## Use Case 5: Dynamic Routing with Fly-Replay
+## Use Case 4: Dynamic Routing with Fly-Replay
 
 **Challenge**: Route requests to specific regions, apps, or machines while handling failures gracefully.
 
@@ -398,8 +350,7 @@ These ideas represent potential evolution paths as usage patterns and requiremen
 | Multiple customers with separate DBs | Multi-Tenant (#1) | Process isolation, template variables |
 | Global deployment on Fly.io | Auto-Suspend (#2) | Cost optimization, lifecycle hooks |
 | Rails 8 with Solid Cable | WebSockets (#3) | Process management, routing |
-| Stateful sessions across regions | Sticky Sessions (#4) | Cookie-based affinity |
-| Multi-region deployment | Dynamic Routing (#5) | Fly-Replay, maintenance pages |
+| Multi-region deployment | Dynamic Routing (#4) | Fly-Replay, maintenance pages |
 
 ## See Also
 

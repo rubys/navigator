@@ -104,7 +104,6 @@ nav:
     - Memory Limits: features/memory-limits.md
     - Try Files: features/try-files.md
     - Fly-Replay: features/fly-replay.md
-    - Sticky Sessions: features/sticky-sessions.md
     - Hot Reload: features/hot-reload.md
     - Machine Suspend: features/machine-suspend.md
     - WebSocket Support: features/websocket-support.md

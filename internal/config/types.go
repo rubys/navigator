@@ -88,19 +88,6 @@ type TenantHooks struct {
 	Stop  []HookConfig `yaml:"stop"`
 }
 
-// StickySessionConfig represents sticky session configuration
-type StickySessionConfig struct {
-	Enabled        bool     `yaml:"enabled"`
-	CookieName     string   `yaml:"cookie_name"`
-	CookieMaxAge   string   `yaml:"cookie_max_age"` // Duration format: "1h", "30m", etc.
-	CookieSecure   bool     `yaml:"cookie_secure"`
-	CookieHTTPOnly bool     `yaml:"cookie_httponly"`
-	CookieSameSite string   `yaml:"cookie_samesite"`
-	CookiePath     string   `yaml:"cookie_path"`
-	Paths          []string `yaml:"paths"`
-	cookieMaxAge   time.Duration
-}
-
 // RoutesConfig represents routes configuration
 type RoutesConfig struct {
 	Redirects []struct {
@@ -113,8 +100,7 @@ type RoutesConfig struct {
 	} `yaml:"rewrites"`
 	ReverseProxies []ProxyRoute `yaml:"reverse_proxies"`
 	Fly            struct {
-		StickySession StickySessionConfig `yaml:"sticky_sessions"`
-		Replay        []struct {
+		Replay []struct {
 			Path   string `yaml:"path"`
 			App    string `yaml:"app"`
 			Region string `yaml:"region"`
@@ -172,7 +158,6 @@ type Config struct {
 	} `yaml:"server"`
 	Auth                AuthConfig
 	Routes              RoutesConfig           `yaml:"routes"`
-	StickySession       StickySessionConfig    // Moved from Server to top level for easier access
 	Applications        Applications           `yaml:"applications"`
 	ManagedProcesses    []ManagedProcessConfig `yaml:"managed_processes"`
 	Logging             LogConfig              `yaml:"logging"`

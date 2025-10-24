@@ -89,14 +89,6 @@ Navigator provides a comprehensive set of features for multi-tenant web applicat
 
 [Learn more about Machine Suspension](machine-suspend.md)
 
-### :cookie: Sticky Sessions
-- **Cookie-based affinity** - Route users to the same machine
-- **Cross-region support** - Works across all Fly.io regions
-- **Automatic failover** - Graceful handling of unavailable machines
-- **Path-specific sessions** - Configure sticky sessions for specific paths
-
-[Learn more about Sticky Sessions](sticky-sessions.md)
-
 ### :link: Try Files Behavior
 - **Flexible resolution** - Try multiple file paths and extensions
 - **Multiple suffixes** - Try different file extensions

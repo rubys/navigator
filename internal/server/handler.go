@@ -87,11 +87,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle sticky sessions (for Fly.io)
-	if h.handleStickySession(recorder, r) {
-		return
-	}
-
 	// Handle rewrites and redirects
 	if h.handleRewrites(recorder, r) {
 		return
@@ -126,11 +121,6 @@ func (h *Handler) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
-}
-
-// handleStickySession handles sticky session routing for Fly.io
-func (h *Handler) handleStickySession(w http.ResponseWriter, r *http.Request) bool {
-	return HandleStickySession(w, r, h.config)
 }
 
 // handleRewrites processes rewrite rules

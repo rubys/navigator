@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 )
 
 // normalizePathWithTrailingSlash ensures a path has a trailing slash
@@ -62,7 +61,6 @@ func (p *ConfigParser) Parse() (*Config, error) {
 	p.parseServerConfig()
 	p.parseAuthConfig()
 	p.parseRoutesConfig()
-	p.parseStickySessionConfig()
 	p.parseApplicationConfig()
 	p.parseManagedProcesses()
 	p.parseLoggingConfig()
@@ -142,28 +140,6 @@ func (p *ConfigParser) parseAuthConfig() {
 // parseMaintenanceConfig parses maintenance page configuration
 func (p *ConfigParser) parseMaintenanceConfig() {
 	p.config.Maintenance.Page = p.yamlConfig.Maintenance.Page
-}
-
-// parseStickySessionConfig parses sticky session configuration
-func (p *ConfigParser) parseStickySessionConfig() {
-	ss := &p.config.StickySession
-	yamlSS := &p.yamlConfig.Routes.Fly.StickySession
-
-	ss.Enabled = yamlSS.Enabled
-	ss.CookieName = yamlSS.CookieName
-	ss.CookieMaxAge = yamlSS.CookieMaxAge
-	ss.CookieSecure = yamlSS.CookieSecure
-	ss.CookieHTTPOnly = yamlSS.CookieHTTPOnly
-	ss.CookieSameSite = yamlSS.CookieSameSite
-	ss.CookiePath = yamlSS.CookiePath
-	ss.Paths = yamlSS.Paths
-
-	// Parse sticky session max age duration
-	if ss.CookieMaxAge != "" {
-		if duration, err := time.ParseDuration(ss.CookieMaxAge); err == nil {
-			ss.cookieMaxAge = duration
-		}
-	}
 }
 
 // parseApplicationConfig parses application pool and tenant configuration

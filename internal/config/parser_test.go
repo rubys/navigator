@@ -321,50 +321,6 @@ func TestConfigParser_ParseFlyReplayRoutes(t *testing.T) {
 	}
 }
 
-func TestConfigParser_ParseStickySessionConfig(t *testing.T) {
-	yamlConfig := func() YAMLConfig {
-		cfg := YAMLConfig{}
-		cfg.Routes.Fly.StickySession.Enabled = true
-		cfg.Routes.Fly.StickySession.CookieName = "_nav_session"
-		cfg.Routes.Fly.StickySession.CookieMaxAge = "2h"
-		cfg.Routes.Fly.StickySession.CookieSecure = true
-		cfg.Routes.Fly.StickySession.CookieHTTPOnly = true
-		cfg.Routes.Fly.StickySession.CookieSameSite = "Lax"
-		cfg.Routes.Fly.StickySession.CookiePath = "/"
-		cfg.Routes.Fly.StickySession.Paths = []string{"/app/*"}
-		return cfg
-	}()
-
-	parser := NewConfigParser(&yamlConfig)
-	config, err := parser.Parse()
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-
-	ss := config.StickySession
-	if !ss.Enabled {
-		t.Error("Expected sticky sessions to be enabled")
-	}
-	if ss.CookieName != "_nav_session" {
-		t.Errorf("CookieName = %v, want _nav_session", ss.CookieName)
-	}
-	if ss.CookieMaxAge != "2h" {
-		t.Errorf("CookieMaxAge = %v, want 2h", ss.CookieMaxAge)
-	}
-	if !ss.CookieSecure {
-		t.Error("Expected CookieSecure to be true")
-	}
-	if !ss.CookieHTTPOnly {
-		t.Error("Expected CookieHTTPOnly to be true")
-	}
-	if ss.CookieSameSite != "Lax" {
-		t.Errorf("CookieSameSite = %v, want Lax", ss.CookieSameSite)
-	}
-	if len(ss.Paths) != 1 || ss.Paths[0] != "/app/*" {
-		t.Errorf("Paths = %v, want [/app/*]", ss.Paths)
-	}
-}
-
 func TestConfigParser_ParseCompleteConfig(t *testing.T) {
 	yamlConfig := `
 server:
@@ -390,10 +346,6 @@ routes:
       - path: "^/admin"
         region: "lax"
         status: 307
-    sticky_sessions:
-      enabled: true
-      cookie_name: "_navigator_session"
-      cookie_max_age: "1h"
 
 applications:
   pools:

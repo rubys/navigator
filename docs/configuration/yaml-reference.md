@@ -44,7 +44,6 @@ routes:                    # URL routing and rewriting
   rewrites: [...]
   reverse_proxies: [...]
   fly:                     # Fly.io-specific routing
-    sticky_sessions: {...}
     replay: [...]
 
 hooks:                     # Lifecycle hooks
@@ -205,7 +204,6 @@ maintenance:
 Navigator automatically serves a maintenance page when:
 - An application is starting and exceeds the `startup_timeout`
 - A Fly-Replay target is unavailable
-- Sticky session routing fails to find the target machine
 
 The maintenance page is served from `{server.static.public_dir}/{maintenance.page}` (e.g., `public/503.html`). If this file doesn't exist, Navigator serves a default maintenance page.
 
@@ -459,17 +457,6 @@ routes:
         X-Forwarded-Host: "$host"
 
   fly:                           # Fly.io-specific routing
-    sticky_sessions:             # Cookie-based session affinity
-      enabled: true
-      cookie_name: "_navigator_machine"
-      cookie_max_age: "2h"
-      cookie_secure: true
-      cookie_httponly: true
-      cookie_samesite: "Lax"
-      cookie_path: "/"
-      paths:                     # Optional: specific paths for sticky sessions
-        - "/app/*"
-
     replay:                      # Fly-Replay routing
       - path: "^/api/"           # URL pattern
         region: "syd"            # Target region
@@ -527,21 +514,6 @@ Request `/users/123` → Proxies to `https://api.example.com/v1/user/123`
 ### routes.fly
 
 Fly.io-specific routing configuration.
-
-#### routes.fly.sticky_sessions
-
-Cookie-based session affinity for routing requests to the same machine.
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Enable sticky sessions |
-| `cookie_name` | string | `"_navigator"` | Name of the session cookie |
-| `cookie_max_age` | string | `"24h"` | Cookie lifetime (duration format) |
-| `cookie_secure` | boolean | `true` | Set Secure flag (HTTPS only) |
-| `cookie_httponly` | boolean | `true` | Set HttpOnly flag |
-| `cookie_samesite` | string | `"Lax"` | SameSite attribute: "Strict", "Lax", "None" |
-| `cookie_path` | string | `"/"` | Cookie path |
-| `paths` | array | `[]` | Specific URL patterns for sticky sessions |
 
 #### routes.fly.replay
 
@@ -929,6 +901,5 @@ logging:
 - [Authentication](authentication.md)
 - [Lifecycle Hooks](../features/lifecycle-hooks.md)
 - [Machine Suspend](../features/machine-suspend.md)
-- [Sticky Sessions](../features/sticky-sessions.md)
 - [Logging](../features/logging.md)
 - [Examples](../examples/index.md)

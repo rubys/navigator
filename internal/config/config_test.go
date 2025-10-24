@@ -559,11 +559,7 @@ server:
 
 routes:
   fly:
-    sticky_sessions:
-      enabled: true
-      cookie_name: "_navigator_session"
-      cookie_max_age: "2h"
-      cookie_secure: true
+    replay: []
 
 applications:
   pools:

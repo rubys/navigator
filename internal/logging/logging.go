@@ -400,34 +400,6 @@ func LogMaintenancePageFallback() {
 	slog.Debug("Served fallback maintenance page")
 }
 
-// Sticky session logging helpers
-
-// LogStickySessionsDisabled logs sticky sessions disabled
-func LogStickySessionsDisabled() {
-	slog.Debug("Sticky sessions require FLY_MACHINE_ID and FLY_APP_NAME")
-}
-
-// LogStickySessionFound logs sticky session cookie found
-func LogStickySessionFound(targetMachine, currentMachine string) {
-	slog.Debug("Found sticky session cookie",
-		"machine", targetMachine,
-		"currentMachine", currentMachine)
-}
-
-// LogStickySessionUnavailable logs sticky session target unavailable
-func LogStickySessionUnavailable(targetMachine, currentMachine string) {
-	slog.Info("Sticky session target machine unavailable, serving from current",
-		"targetMachine", targetMachine,
-		"currentMachine", currentMachine)
-}
-
-// LogStickySessionSet logs sticky session cookie set
-func LogStickySessionSet(machineID string, maxAge interface{}) {
-	slog.Debug("Set sticky session cookie",
-		"machine", machineID,
-		"maxAge", maxAge)
-}
-
 // Fly replay logging helpers
 
 // LogFlyReplayLargeContent logs fly-replay fallback due to large content
