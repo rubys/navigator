@@ -533,8 +533,22 @@ func TestWebAppPortAllocation(t *testing.T) {
 		t.Errorf("Port2 %d out of range", port2)
 	}
 
-	// Should get different ports (most of the time)
-	// Note: This test might occasionally have the same port due to timing
+	// With proper port tracking, ports must always be unique
+	if port1 == port2 {
+		t.Errorf("Expected different ports, got port1=%d, port2=%d", port1, port2)
+	}
+
+	// Test port release
+	allocator.ReleasePort(port1)
+	port3, err := allocator.AllocatePort()
+	if err != nil {
+		t.Fatalf("Failed to allocate port after release: %v", err)
+	}
+
+	// After releasing port1, we should be able to get it again
+	if port3 != port1 {
+		t.Errorf("Expected released port %d to be reused, got %d", port1, port3)
+	}
 }
 
 func TestExecuteHooksTimeout(t *testing.T) {

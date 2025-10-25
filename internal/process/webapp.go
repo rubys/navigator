@@ -267,6 +267,9 @@ func (m *AppManager) monitorAppIdleTimeout(tenantName string) {
 				app.cancel()
 			}
 
+			// Release the port back to the allocator
+			m.portAllocator.ReleasePort(app.Port)
+
 			// Remove from registry only after fully stopped
 			m.mutex.Lock()
 			delete(m.apps, tenantName)
@@ -367,6 +370,9 @@ func (m *AppManager) CleanupWithContext(ctx context.Context) {
 			if app.cancel != nil {
 				app.cancel()
 			}
+
+			// Release the port back to the allocator
+			m.portAllocator.ReleasePort(app.Port)
 
 			// Log memory statistics and cleanup cgroup on shutdown (Linux only)
 			if app.CgroupPath != "" {
