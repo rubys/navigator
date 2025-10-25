@@ -34,15 +34,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 4. Sticky Session Routing (Fly.io)                  │
-│    - Check sticky_sessions.enabled                  │
-│    - Match against configured paths                 │
-│    → MATCHED: Route to specific machine             │
-│    → NO MATCH: Continue                             │
-└───────────────────┬─────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────────────┐
-│ 5. Rewrite Rules                                    │
+│ 4. Rewrite Rules                                    │
 │    - Check server.rewrite_rules                     │
 │    - Match path patterns and methods                │
 │    → REDIRECT: Return 302 with new location         │
@@ -52,7 +44,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 6. Reverse Proxies (Standalone Services)            │
+│ 5. Reverse Proxies (Standalone Services)            │
 │    - Check routes.reverse_proxies                   │
 │    - Match path/prefix patterns                     │
 │    → WEBSOCKET: Establish WebSocket proxy           │
@@ -61,7 +53,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 7. Static File Serving                              │
+│ 6. Static File Serving                              │
 │    - Check for static file extensions               │
 │    - Look in configured public_dir                  │
 │    → FOUND: Serve file with cache headers           │
@@ -69,7 +61,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 8. Try Files (Public Paths Only)                    │
+│ 7. Try Files (Public Paths Only)                    │
 │    - Only for paths without extensions              │
 │    - Try configured suffixes (.html, etc.)          │
 │    → FOUND: Serve file                              │
@@ -77,7 +69,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 9. Web Application Proxy                            │
+│ 8. Web Application Proxy                            │
 │    - Extract tenant from path                       │
 │    - Start or get existing app process              │
 │    - Wait for app readiness (with timeout)          │
@@ -88,7 +80,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 10. Response Completion                             │
+│ 9. Response Completion                              │
 │     - Stop idle tracking                            │
 │     - Log request details                           │
 │     - Return to client                              │
@@ -134,35 +126,6 @@ The `/up` endpoint provides a simple health check for load balancers and monitor
 - No logging overhead
 
 This is the fastest exit path from the request handler.
-
-### 3. Sticky Session Routing
-
-**File:** `internal/server/handler.go:134` (`handleStickySession`)
-
-For Fly.io deployments with sticky sessions enabled, Navigator checks for session cookies that bind users to specific machines.
-
-**Configuration:**
-```yaml
-sticky_sessions:
-  enabled: true
-  cookie_name: "_navigator_machine"
-  cookie_max_age: "2h"
-  paths:
-    - "/app/*"
-    - "/dashboard/*"
-```
-
-**Behavior:**
-- Checks if request path matches configured sticky session paths
-- Looks for existing session cookie
-- If cookie references unavailable machine, serves maintenance page
-- If no cookie, allows request to proceed normally
-- Sets cookie after successful routing
-
-**Use Cases:**
-- WebSocket connections requiring same backend
-- Session state stored in memory
-- Multi-region deployments with user affinity
 
 ### 4. Rewrite Rules
 
@@ -690,7 +653,6 @@ Navigator serves maintenance pages in several scenarios:
 
 1. **App Startup Timeout:** App not ready within configured timeout
 2. **Fly-Replay Retry:** Target machine unavailable (retry detected)
-3. **Sticky Session Failure:** Cookie references unavailable machine
 
 **Maintenance Page Locations:**
 1. `public/maintenance.html` (preferred)

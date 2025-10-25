@@ -2,12 +2,12 @@
 
 A lightweight web server for multi-tenant applications with on-demand process management. Deploy multiple customers or projects from a single configuration file.
 
-!!! success "Latest Release: v0.12.0"
-    **Configuration Modernization Release** - Reorganized configuration structure for better clarity and discoverability.
+!!! success "Latest Release: v0.15.0"
+    **Reliability and Maintenance Improvements** - Fixed critical port allocation race condition and added hook-based config reload.
 
-    ⚠️ **Breaking Changes**: Configuration files must be updated to new format.
+    ⚠️ **Breaking Changes**: Sticky sessions feature removed - use Fly.io native support instead.
 
-    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v0.12.0) | [Migration Guide](configuration/yaml-reference.md)
+    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v0.15.0) | [Migration Guide](https://community.fly.io/t/session-based-replay-caching-read-sticky-sessions/26299)
 
 ## Features
 
@@ -79,11 +79,8 @@ applications:
 - Standalone Action Cable with Rails 8
   [View example →](use-cases.md#use-case-3-websocket-support)
 
-- Sticky sessions for stateful applications
-  [Read guide →](use-cases.md#use-case-4-sticky-sessions)
-
 - Regional routing with Fly-Replay
-  [See example →](use-cases.md#use-case-5-dynamic-routing-with-fly-replay)
+  [See example →](use-cases.md#use-case-4-dynamic-routing-with-fly-replay)
 
 ## Learn More
 

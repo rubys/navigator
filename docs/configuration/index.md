@@ -55,7 +55,6 @@ routes:
   rewrites: []
   fly:
     replay: []
-    sticky_sessions: {}
 
 # Maintenance page
 maintenance:
@@ -121,7 +120,7 @@ applications:
 | [auth](authentication.md) | Authentication setup | | htpasswd support |
 | [applications](applications.md) | Rails applications | ✓ | Tenants, pools, environment |
 | [managed_processes](processes.md) | External processes | | Redis, Sidekiq, etc. |
-| [routes](routing.md) | URL routing rules | | Rewrites, Fly-Replay, sticky sessions |
+| [routes](routing.md) | URL routing rules | | Rewrites, Fly-Replay |
 | [maintenance](maintenance.md) | Maintenance pages | | Custom 503 pages |
 
 ## Environment Variables

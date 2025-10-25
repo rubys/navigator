@@ -837,17 +837,6 @@ routes:
       strip_path: true
 
   fly:
-    sticky_sessions:
-      enabled: true
-      cookie_name: "_navigator_machine"
-      cookie_max_age: "2h"
-      cookie_secure: true
-      cookie_httponly: true
-      cookie_samesite: "Lax"
-      paths:
-        - "/app/*"
-        - "/dashboard/*"
-
     replay:
       - path: "^/regions/syd/"
         region: syd

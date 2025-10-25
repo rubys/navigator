@@ -2,12 +2,12 @@
 
 Navigator provides a comprehensive set of features for multi-tenant web applications, from basic process management to advanced regional routing.
 
-!!! tip "What's New in v0.13.0"
-    - **Dynamic Version Reporting**: `--version` flag shows build information
-    - **Automatic Trailing Slash Handling**: Normalize URLs with redirects
-    - **Enhanced Proxy Handlers**: Fixed regex capture group substitution
-    - **WebSocket Improvements**: Fixed subprotocol negotiation for Action Cable
-    - **Path Stripping Fix**: Correct strip_path behavior with target paths
+!!! tip "What's New in v0.15.0"
+    - **Fixed Critical Port Allocation Race**: Thread-safe port tracking prevents duplicate assignments
+    - **Hook-Based Config Reload**: Ready hooks can trigger automatic config reload for maintenance mode patterns
+    - **Removed Sticky Sessions**: Use Fly.io's native sticky session support instead
+    - **Debug Auth Logging**: Added structured debug logging to authentication flow
+    - **Windows Build Fix**: Platform-specific type handling for cross-platform compatibility
 
 ## Core Features
 
