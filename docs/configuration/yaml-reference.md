@@ -592,6 +592,7 @@ Each hook entry supports:
 | `command` | string | ✓ | Command to execute |
 | `args` | array | | Command arguments (supports ${var} substitution) |
 | `timeout` | string | | Max execution time (duration: "30s", "5m") |
+| `reload_config` | string | | Config file to reload after hook succeeds (server hooks only) |
 
 **Environment**:
 - Server hooks receive Navigator's environment

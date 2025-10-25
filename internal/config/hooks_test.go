@@ -84,3 +84,59 @@ applications:
 		t.Errorf("Expected tenant stop hook timeout '2m', got '%s'", cfg.Applications.Hooks.Stop[0].Timeout)
 	}
 }
+
+func TestHooksReloadConfig(t *testing.T) {
+	yamlContent := `
+server:
+  listen: 3000
+
+hooks:
+  server:
+    ready:
+      - command: /bin/init.sh
+        timeout: 5m
+        reload_config: config/navigator.yml
+`
+
+	cfg, err := config.ParseYAML([]byte(yamlContent))
+	if err != nil {
+		t.Fatalf("Failed to parse YAML: %v", err)
+	}
+
+	// Verify ready hook has reload_config set
+	if len(cfg.Hooks.Ready) != 1 {
+		t.Fatalf("Expected 1 ready hook, got %d", len(cfg.Hooks.Ready))
+	}
+
+	hook := cfg.Hooks.Ready[0]
+	if hook.ReloadConfig != "config/navigator.yml" {
+		t.Errorf("Expected reload_config 'config/navigator.yml', got '%s'", hook.ReloadConfig)
+	}
+}
+
+func TestHooksReloadConfigOptional(t *testing.T) {
+	yamlContent := `
+server:
+  listen: 3000
+
+hooks:
+  server:
+    ready:
+      - command: /bin/ready.sh
+`
+
+	cfg, err := config.ParseYAML([]byte(yamlContent))
+	if err != nil {
+		t.Fatalf("Failed to parse YAML: %v", err)
+	}
+
+	// Verify ready hook without reload_config works
+	if len(cfg.Hooks.Ready) != 1 {
+		t.Fatalf("Expected 1 ready hook, got %d", len(cfg.Hooks.Ready))
+	}
+
+	hook := cfg.Hooks.Ready[0]
+	if hook.ReloadConfig != "" {
+		t.Errorf("Expected empty reload_config, got '%s'", hook.ReloadConfig)
+	}
+}

@@ -69,9 +69,10 @@ type LogConfig struct {
 
 // HookConfig represents a hook command configuration
 type HookConfig struct {
-	Command string   `yaml:"command"`
-	Args    []string `yaml:"args"`
-	Timeout string   `yaml:"timeout"` // Duration string like "30s", "5m", 0 for no timeout
+	Command      string   `yaml:"command"`
+	Args         []string `yaml:"args"`
+	Timeout      string   `yaml:"timeout"`       // Duration string like "30s", "5m", 0 for no timeout
+	ReloadConfig string   `yaml:"reload_config"` // Config file to reload after successful hook execution
 }
 
 // ServerHooks represents server lifecycle hooks

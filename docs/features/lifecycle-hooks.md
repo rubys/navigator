@@ -138,6 +138,7 @@ Each hook entry supports these fields:
 | `command` | string | ✓ | Command to execute (full path or PATH executable) |
 | `args` | array | | Command arguments |
 | `timeout` | string | | Maximum execution time (duration format: "30s", "5m") |
+| `reload_config` | string | | Config file to reload after successful hook execution (server hooks only) |
 
 ### Variable Substitution
 
@@ -332,6 +333,44 @@ hooks:
         args: ["exec", "rails", "runner", "AppState.checkpoint!"]
         timeout: 30s
 ```
+
+### 6. Maintenance Mode with Config Switching
+
+Start Navigator with a minimal maintenance configuration, run initialization tasks, then switch to full configuration:
+
+```yaml
+# config/navigator-maintenance.yml
+server:
+  listen: 3000
+  static:
+    public_dir: public
+    allowed_extensions: [html, css]
+
+# Maintenance page configuration
+maintenance:
+  page: /503.html
+
+hooks:
+  server:
+    ready:
+      - command: ruby
+        args: ["script/initialization.rb"]
+        timeout: 5m
+        reload_config: config/navigator.yml  # Switch to full config after init
+```
+
+**How it works:**
+1. Navigator starts with `config/navigator-maintenance.yml`
+2. Shows maintenance page (503.html) to all requests
+3. Ready hook executes `script/initialization.rb` (database sync, cache warm, etc.)
+4. After successful hook execution, Navigator automatically reloads with `config/navigator.yml`
+5. Full application becomes available with all tenants and features
+
+**Benefits:**
+- Eliminates need for wrapper scripts
+- Reduces memory footprint (no persistent Ruby process)
+- Provides user-friendly maintenance page during initialization
+- Automatic transition to full configuration
 
 ## Debugging Hooks
 
