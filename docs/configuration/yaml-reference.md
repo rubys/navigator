@@ -345,11 +345,13 @@ Process pool management for tenant applications.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `max_size` | integer | `10` | Maximum number of app processes |
-| `timeout` | string | `"5m"` | Idle timeout (duration: "5m", "10m") |
+| `timeout` | string | `"5m"` | Idle timeout before stopping processes (duration: "5m", "10m"). Also controls automatic cleanup of deleted tenants after config reload. |
 | `start_port` | integer | `4000` | Starting port for dynamic allocation |
 | `default_memory_limit` | string | `""` | Default memory limit (e.g., "512M", "1G") - Linux only, requires root |
 | `user` | string | `""` | Default user to run tenant processes as - Unix only |
 | `group` | string | `""` | Default group to run tenant processes as - Unix only |
+
+> **Note**: The `timeout` setting controls both resource management (stopping idle processes) and configuration reload cleanup (automatically removing deleted tenants). See [Configuration Hot Reload - Tenant Lifecycle](../features/hot-reload.md#tenant-lifecycle-during-reload) for details on tenant behavior during config reload.
 
 **Memory Limits (Linux only)**:
 - Requires running Navigator as root on Linux with cgroups v2

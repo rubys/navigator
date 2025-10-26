@@ -12,6 +12,8 @@ Navigator manages web applications as separate processes, providing:
 4. **Idle timeout** - Stops unused processes to save resources
 5. **Graceful shutdown** - Clean termination with proper cleanup
 
+> **Note**: Idle timeout also controls automatic cleanup of deleted tenants during configuration reload. See [Configuration Hot Reload - Tenant Lifecycle](hot-reload.md#tenant-lifecycle-during-reload) for details.
+
 ## Process Lifecycle
 
 ### Startup Sequence
@@ -86,6 +88,12 @@ applications:
 | `max_processes` | Inherits `max_size` | Per-application limit |
 | `min_instances` | 0 | Minimum processes to keep running |
 | `idle_timeout` | 300 | Seconds before stopping idle process |
+
+> **Important**: The `idle_timeout` setting has dual purposes:
+> 1. **Resource management**: Stops idle processes to free memory
+> 2. **Config reload cleanup**: Automatically removes deleted tenants after configuration reload
+>
+> When you remove a tenant from configuration and reload, the orphaned process will automatically stop after `idle_timeout` seconds. See [Deleted Tenants](hot-reload.md#deleted-tenants-removed-from-config) for details.
 
 ## Port Management
 
