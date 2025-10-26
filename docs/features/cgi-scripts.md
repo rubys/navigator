@@ -41,6 +41,7 @@ server:
 | `method` | string | No | HTTP method restriction (GET, POST, etc.). Empty = all methods |
 | `user` | string | No | Unix user to run script as (empty = current user) |
 | `group` | string | No | Unix group to run script as (empty = user's primary group) |
+| `allowed_users` | list | No | Usernames allowed to access this script. Empty = all authenticated users |
 | `env` | map | No | Additional environment variables to set |
 | `reload_config` | string | No | Config file to reload after successful execution |
 | `timeout` | string | No | Execution timeout (e.g., "30s", "5m"). Zero = no timeout |
@@ -286,7 +287,7 @@ cgi_scripts:
 
 ### Authentication
 
-CGI scripts respect Navigator's authentication:
+CGI scripts respect Navigator's authentication and support fine-grained access control:
 
 ```yaml
 auth:
@@ -297,11 +298,54 @@ auth:
     - /health
 
 cgi_scripts:
+  # Restricted to specific users
   - path: /admin/sync
-    script: /opt/sync.rb  # Requires authentication
+    script: /opt/sync.rb
+    allowed_users:
+      - admin
+      - operator
 
-  - path: /public/status
-    script: /opt/status.rb  # No authentication (public)
+  # Available to all authenticated users
+  - path: /admin/status
+    script: /opt/status.rb
+
+  # Public endpoint (no authentication required)
+  - path: /public/health
+    script: /opt/health.sh
+```
+
+**Access Control Behavior:**
+
+- **With `allowed_users`**: Only specified usernames can access the script (returns 403 Forbidden for other authenticated users)
+- **Without `allowed_users`**: All authenticated users can access the script
+- **Public paths**: Scripts on paths listed in `public_paths` can be accessed without authentication
+
+**Example: Multi-level access control**
+
+```yaml
+auth:
+  enabled: true
+  htpasswd: /etc/navigator/htpasswd
+
+cgi_scripts:
+  # Admin-only: Database operations
+  - path: /admin/db_sync
+    script: /opt/scripts/sync_db.rb
+    allowed_users:
+      - admin
+
+  # Operators can restart services
+  - path: /admin/restart
+    script: /opt/scripts/restart_service.sh
+    allowed_users:
+      - admin
+      - operator
+      - oncall
+
+  # All authenticated users can check status
+  - path: /admin/status
+    script: /opt/scripts/check_status.sh
+    # No allowed_users = all authenticated users
 ```
 
 ## Performance

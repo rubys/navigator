@@ -82,6 +82,7 @@ type CGIScriptConfig struct {
 	Method       string            `yaml:"method"`        // HTTP method (GET, POST, etc.) - empty means all methods
 	User         string            `yaml:"user"`          // Unix user to run script as (empty = current user)
 	Group        string            `yaml:"group"`         // Unix group to run script as (empty = user's primary group)
+	AllowedUsers []string          `yaml:"allowed_users"` // Usernames allowed to access this script (empty = all authenticated users)
 	Env          map[string]string `yaml:"env"`           // Additional environment variables
 	ReloadConfig string            `yaml:"reload_config"` // Config file to reload after successful script execution
 	Timeout      string            `yaml:"timeout"`       // Execution timeout (e.g., "30s", "5m") - 0 means no timeout

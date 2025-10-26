@@ -24,6 +24,7 @@ type Handler struct {
 	Script          string
 	User            string
 	Group           string
+	AllowedUsers    []string
 	Env             map[string]string
 	ReloadConfig    string
 	Timeout         time.Duration
@@ -60,6 +61,7 @@ func NewHandler(cfg *config.CGIScriptConfig, currentConfigFn func() string, trig
 		Script:          cfg.Script,
 		User:            cfg.User,
 		Group:           cfg.Group,
+		AllowedUsers:    cfg.AllowedUsers,
 		Env:             cfg.Env,
 		ReloadConfig:    cfg.ReloadConfig,
 		Timeout:         timeout,
@@ -68,9 +70,56 @@ func NewHandler(cfg *config.CGIScriptConfig, currentConfigFn func() string, trig
 	}, nil
 }
 
+// IsUserAllowed checks if the authenticated user is allowed to access this CGI script
+func (h *Handler) IsUserAllowed(username string) bool {
+	// If no allowed_users list is configured, all authenticated users are allowed
+	if len(h.AllowedUsers) == 0 {
+		return true
+	}
+
+	// Check if the username is in the allowed list
+	for _, allowedUser := range h.AllowedUsers {
+		if username == allowedUser {
+			return true
+		}
+	}
+
+	return false
+}
+
 // ServeHTTP implements the http.Handler interface
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
+
+	// Check user authorization if allowed_users list is configured
+	if len(h.AllowedUsers) > 0 {
+		username, _, ok := r.BasicAuth()
+		if !ok {
+			// No credentials provided - should have been caught by auth middleware
+			// but we check here for defense in depth
+			slog.Warn("CGI access denied: no credentials",
+				"script", h.Script,
+				"path", r.URL.Path)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		username = strings.TrimSpace(username)
+		if !h.IsUserAllowed(username) {
+			slog.Warn("CGI access denied: user not in allowed list",
+				"script", h.Script,
+				"path", r.URL.Path,
+				"username", username,
+				"allowed_users", h.AllowedUsers)
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		slog.Debug("CGI access granted",
+			"script", h.Script,
+			"path", r.URL.Path,
+			"username", username)
+	}
 
 	slog.Info("Executing CGI script",
 		"script", h.Script,

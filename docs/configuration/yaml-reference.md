@@ -159,6 +159,9 @@ server:
       method: POST                 # HTTP method (optional, empty = all methods)
       user: appuser               # Unix user (optional, requires root)
       group: appgroup             # Unix group (optional)
+      allowed_users:              # Access control (optional)
+        - admin
+        - operator
       timeout: 5m                 # Execution timeout (optional)
       reload_config: config/navigator.yml  # Reload config after execution (optional)
       env:                        # Additional environment variables
@@ -173,9 +176,12 @@ server:
 | `method` | string | No | HTTP method restriction (GET, POST, etc.). Empty = all methods |
 | `user` | string | No | Unix user to run script as (requires Navigator running as root) |
 | `group` | string | No | Unix group to run script as |
+| `allowed_users` | array | No | Usernames allowed to access this script. Empty = all authenticated users |
 | `env` | map | No | Additional environment variables |
 | `reload_config` | string | No | Config file to reload after successful execution |
 | `timeout` | string | No | Execution timeout (e.g., "30s", "5m"). Zero = no timeout |
+
+**Access Control**: When `allowed_users` is specified, only those usernames can access the script (returns 403 Forbidden for other authenticated users). If `allowed_users` is empty or not specified, all authenticated users can access the script. Scripts on paths listed in `auth.public_paths` can be accessed without authentication.
 
 **See Also**: [CGI Scripts Documentation](../features/cgi-scripts.md) for detailed usage examples.
 

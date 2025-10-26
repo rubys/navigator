@@ -224,3 +224,198 @@ echo "Config updated"
 		t.Errorf("Reload config path = %q, want %q", reloadConfigPath, configPath)
 	}
 }
+
+func TestHandler_AccessControl(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a simple CGI script
+	scriptPath := filepath.Join(tmpDir, "test.cgi")
+	scriptContent := `#!/bin/sh
+echo "Content-Type: text/plain"
+echo ""
+echo "Access granted"
+`
+	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
+		t.Fatalf("Failed to create test script: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		allowedUsers   []string
+		username       string
+		password       string
+		provideAuth    bool
+		wantStatus     int
+		wantBodyPrefix string
+	}{
+		{
+			name:           "No allowed_users list - all authenticated users allowed",
+			allowedUsers:   nil,
+			username:       "testuser",
+			password:       "testpass",
+			provideAuth:    true,
+			wantStatus:     200,
+			wantBodyPrefix: "Access granted",
+		},
+		{
+			name:           "Empty allowed_users list - all authenticated users allowed",
+			allowedUsers:   []string{},
+			username:       "testuser",
+			password:       "testpass",
+			provideAuth:    true,
+			wantStatus:     200,
+			wantBodyPrefix: "Access granted",
+		},
+		{
+			name:           "User in allowed list - access granted",
+			allowedUsers:   []string{"alice", "bob", "charlie"},
+			username:       "bob",
+			password:       "testpass",
+			provideAuth:    true,
+			wantStatus:     200,
+			wantBodyPrefix: "Access granted",
+		},
+		{
+			name:           "User not in allowed list - access denied",
+			allowedUsers:   []string{"alice", "bob"},
+			username:       "charlie",
+			password:       "testpass",
+			provideAuth:    true,
+			wantStatus:     403,
+			wantBodyPrefix: "Forbidden",
+		},
+		{
+			name:           "No credentials with allowed_users - unauthorized",
+			allowedUsers:   []string{"alice"},
+			username:       "",
+			password:       "",
+			provideAuth:    false,
+			wantStatus:     401,
+			wantBodyPrefix: "Unauthorized",
+		},
+		{
+			name:           "First user in list allowed",
+			allowedUsers:   []string{"alice", "bob"},
+			username:       "alice",
+			password:       "testpass",
+			provideAuth:    true,
+			wantStatus:     200,
+			wantBodyPrefix: "Access granted",
+		},
+		{
+			name:           "Last user in list allowed",
+			allowedUsers:   []string{"alice", "bob", "charlie"},
+			username:       "charlie",
+			password:       "testpass",
+			provideAuth:    true,
+			wantStatus:     200,
+			wantBodyPrefix: "Access granted",
+		},
+		{
+			name:           "Case sensitive username check - denied",
+			allowedUsers:   []string{"alice"},
+			username:       "Alice",
+			password:       "testpass",
+			provideAuth:    true,
+			wantStatus:     403,
+			wantBodyPrefix: "Forbidden",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.CGIScriptConfig{
+				Path:         "/test",
+				Script:       scriptPath,
+				AllowedUsers: tt.allowedUsers,
+			}
+
+			handler, err := NewHandler(cfg, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to create handler: %v", err)
+			}
+
+			req := httptest.NewRequest("GET", "/test", nil)
+			if tt.provideAuth {
+				req.SetBasicAuth(tt.username, tt.password)
+			}
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("Status = %d, want %d", rec.Code, tt.wantStatus)
+			}
+
+			body := strings.TrimSpace(rec.Body.String())
+			if !strings.HasPrefix(body, tt.wantBodyPrefix) {
+				t.Errorf("Body = %q, want prefix %q", body, tt.wantBodyPrefix)
+			}
+		})
+	}
+}
+
+func TestHandler_IsUserAllowed(t *testing.T) {
+	tests := []struct {
+		name         string
+		allowedUsers []string
+		username     string
+		wantAllowed  bool
+	}{
+		{
+			name:         "No allowed_users list",
+			allowedUsers: nil,
+			username:     "anyone",
+			wantAllowed:  true,
+		},
+		{
+			name:         "Empty allowed_users list",
+			allowedUsers: []string{},
+			username:     "anyone",
+			wantAllowed:  true,
+		},
+		{
+			name:         "User in allowed list",
+			allowedUsers: []string{"alice", "bob"},
+			username:     "alice",
+			wantAllowed:  true,
+		},
+		{
+			name:         "User not in allowed list",
+			allowedUsers: []string{"alice", "bob"},
+			username:     "charlie",
+			wantAllowed:  false,
+		},
+		{
+			name:         "Single user allowed list - match",
+			allowedUsers: []string{"alice"},
+			username:     "alice",
+			wantAllowed:  true,
+		},
+		{
+			name:         "Single user allowed list - no match",
+			allowedUsers: []string{"alice"},
+			username:     "bob",
+			wantAllowed:  false,
+		},
+		{
+			name:         "Case sensitive check",
+			allowedUsers: []string{"alice"},
+			username:     "Alice",
+			wantAllowed:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := &Handler{
+				AllowedUsers: tt.allowedUsers,
+			}
+
+			got := h.IsUserAllowed(tt.username)
+			if got != tt.wantAllowed {
+				t.Errorf("IsUserAllowed(%q) = %v, want %v", tt.username, got, tt.wantAllowed)
+			}
+		})
+	}
+}
