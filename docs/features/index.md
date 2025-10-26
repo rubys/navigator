@@ -71,6 +71,15 @@ Navigator provides a comprehensive set of features for multi-tenant web applicat
 
 [Learn more about Lifecycle Hooks](lifecycle-hooks.md)
 
+### :computer: CGI Script Support
+- **Standalone execution** - Run scripts without starting web applications
+- **User switching** - Execute scripts as different Unix users (requires root)
+- **Environment variables** - Pass custom environment to scripts
+- **Config reload** - Automatically reload configuration after script execution
+- **Timeout control** - Set execution time limits for safety
+
+[Learn more about CGI Scripts](cgi-scripts.md)
+
 ## Advanced Features
 
 ### :globe_with_meridians: Fly-Replay Routing

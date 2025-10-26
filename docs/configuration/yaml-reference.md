@@ -147,6 +147,38 @@ Machine auto-suspend/stop configuration (Fly.io only).
 | `action` | string | `""` | Action to take: "suspend" or "stop" |
 | `timeout` | string | `""` | Idle duration before action (e.g., "20m", "1h") |
 
+### server.cgi_scripts
+
+CGI script configuration for executing standalone scripts directly.
+
+```yaml
+server:
+  cgi_scripts:
+    - path: /admin/sync           # URL path (exact match)
+      script: /opt/scripts/sync.rb # Path to executable script
+      method: POST                 # HTTP method (optional, empty = all methods)
+      user: appuser               # Unix user (optional, requires root)
+      group: appgroup             # Unix group (optional)
+      timeout: 5m                 # Execution timeout (optional)
+      reload_config: config/navigator.yml  # Reload config after execution (optional)
+      env:                        # Additional environment variables
+        RAILS_DB_VOLUME: /mnt/db
+        RAILS_ENV: production
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `path` | string | Yes | URL path for exact matching |
+| `script` | string | Yes | Absolute path to executable CGI script |
+| `method` | string | No | HTTP method restriction (GET, POST, etc.). Empty = all methods |
+| `user` | string | No | Unix user to run script as (requires Navigator running as root) |
+| `group` | string | No | Unix group to run script as |
+| `env` | map | No | Additional environment variables |
+| `reload_config` | string | No | Config file to reload after successful execution |
+| `timeout` | string | No | Execution timeout (e.g., "30s", "5m"). Zero = no timeout |
+
+**See Also**: [CGI Scripts Documentation](../features/cgi-scripts.md) for detailed usage examples.
+
 ## auth
 
 Authentication configuration using htpasswd files.
@@ -592,7 +624,16 @@ Each hook entry supports:
 | `command` | string | ✓ | Command to execute |
 | `args` | array | | Command arguments (supports ${var} substitution) |
 | `timeout` | string | | Max execution time (duration: "30s", "5m") |
-| `reload_config` | string | | Config file to reload after hook succeeds (server hooks only) |
+| `reload_config` | string | | Config file to reload after hook succeeds (server hooks only). Only reloads if path differs OR file modified during execution. |
+
+**Reload Logic**:
+
+The `reload_config` field triggers smart configuration reload:
+- Reloads if config file path differs from current config
+- Reloads if config file was modified during hook execution
+- Skips reload if nothing changed (improves performance)
+
+See [Lifecycle Hooks](../features/lifecycle-hooks.md#configuration-reload) for details.
 
 **Environment**:
 - Server hooks receive Navigator's environment

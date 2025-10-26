@@ -21,7 +21,7 @@ Navigator's architecture is built on these core principles:
 
 **Key Components**:
 
-- `handler.go` (343 LOC) - Main HTTP handler and routing logic
+- `handler.go` (450 LOC) - Main HTTP handler and routing logic
 - `static.go` (263 LOC) - Static file serving with try_files behavior
 - `mime.go` (30 LOC) - MIME type detection
 - `access_log.go` (119 LOC) - Structured access logging
@@ -30,10 +30,31 @@ Navigator's architecture is built on these core principles:
 
 - Request routing and dispatching
 - Static file serving with caching
+- CGI script routing
 - WebSocket connection upgrades
 - Access logging with metadata
 
 **Test Coverage**: 84.5%
+
+#### `internal/cgi/`
+**Purpose**: CGI script execution with user isolation
+
+**Key Components**:
+
+- `handler.go` (330 LOC) - CGI/1.1 protocol implementation
+- `credentials_unix.go` (17 LOC) - Unix user/group switching
+- `credentials_windows.go` (13 LOC) - Windows no-op implementation
+
+**Responsibilities**:
+
+- Execute standalone scripts without web apps
+- Set CGI environment variables (RFC 3875)
+- Parse CGI response headers
+- User/group credential switching (Unix)
+- Timeout control and error handling
+- Config reload triggering
+
+**Test Coverage**: 100%
 
 ---
 
@@ -211,11 +232,16 @@ logging.LogServerReady(host, port)
 **Components**:
 
 - Duration parsing with automatic error logging
+- Config reload decision logic
 - Environment variable handling
 - Fly.io context detection
 - Time utilities
 
 **Key Functions**:
+
+- `ShouldReloadConfig()` - Shared reload logic for hooks and CGI scripts
+- `ParseDurationWithDefault()` - Duration parsing with fallback
+- `ParseDurationWithContext()` - Duration parsing with contextual logging
 ```go
 ParseDurationWithDefault(input, defaultDuration)
 ParseDurationWithContext(input, default, context)

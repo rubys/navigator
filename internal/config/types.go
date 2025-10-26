@@ -75,6 +75,18 @@ type HookConfig struct {
 	ReloadConfig string   `yaml:"reload_config"` // Config file to reload after successful hook execution
 }
 
+// CGIScriptConfig represents a CGI script configuration
+type CGIScriptConfig struct {
+	Path         string            `yaml:"path"`          // URL path to match (e.g., "/showcase/index_update")
+	Script       string            `yaml:"script"`        // Path to CGI script executable
+	Method       string            `yaml:"method"`        // HTTP method (GET, POST, etc.) - empty means all methods
+	User         string            `yaml:"user"`          // Unix user to run script as (empty = current user)
+	Group        string            `yaml:"group"`         // Unix group to run script as (empty = user's primary group)
+	Env          map[string]string `yaml:"env"`           // Additional environment variables
+	ReloadConfig string            `yaml:"reload_config"` // Config file to reload after successful script execution
+	Timeout      string            `yaml:"timeout"`       // Execution timeout (e.g., "30s", "5m") - 0 means no timeout
+}
+
 // ServerHooks represents server lifecycle hooks
 type ServerHooks struct {
 	Start  []HookConfig `yaml:"start"`
@@ -152,6 +164,7 @@ type Config struct {
 		RootPath     string `yaml:"root_path"`
 		RewriteRules []RewriteRule
 		Static       StaticConfig
+		CGIScripts   []CGIScriptConfig `yaml:"cgi_scripts"`
 		Idle         struct {
 			Action  string `yaml:"action"`  // "suspend" or "stop"
 			Timeout string `yaml:"timeout"` // Duration string like "30s", "5m"

@@ -34,6 +34,7 @@ Navigator is a Go-based web server for multi-tenant web applications. It provide
 ✅ **Simple Configuration**: Flexible variable substitution system for multi-tenant apps
 ✅ **Structured Logging**: Source-identified output with configurable JSON format for all processes
 ✅ **Lifecycle Hooks**: Server and tenant hooks for custom integration and automation
+✅ **CGI Script Support**: Execute standalone scripts with user switching and config reload
 ✅ **Comprehensive Documentation**: Complete documentation site at https://rubys.github.io/navigator/
 
 ## Architecture

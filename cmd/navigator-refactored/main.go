@@ -207,12 +207,23 @@ type ServerLifecycle struct {
 	basicAuth      *auth.BasicAuth
 	idleManager    *idle.Manager
 	srv            *http.Server
+	reloadChan     chan string // Channel for triggering config reload from CGI scripts
 }
 
 // Run starts the server and handles signals until shutdown
 func (l *ServerLifecycle) Run() error {
-	// Create HTTP handler
-	handler := server.CreateHandler(l.cfg, l.appManager, l.basicAuth, l.idleManager)
+	// Create reload channel for CGI scripts
+	l.reloadChan = make(chan string, 1)
+
+	// Create HTTP handler with CGI reload support
+	handler := server.CreateHandler(
+		l.cfg,
+		l.appManager,
+		l.basicAuth,
+		l.idleManager,
+		func() string { return l.configFile }, // Get current config file
+		func(path string) { l.reloadChan <- path }, // Trigger reload
+	)
 
 	// Create HTTP server
 	addr := fmt.Sprintf(":%s", l.cfg.Server.Listen)
@@ -227,25 +238,20 @@ func (l *ServerLifecycle) Run() error {
 
 	// Start server in goroutine
 	serverErrors := make(chan error, 1)
-	reloadChan := make(chan bool, 1)
+	hookReloadChan := make(chan bool, 1)
 	go func() {
 		slog.Info("Navigator starting", "version", version, "address", addr)
 
-		// Execute server ready hooks and check if we should reload with a new config
-		if err := process.ExecuteServerHooks(l.cfg.Hooks.Ready, "ready"); err != nil {
-			slog.Error("Failed to execute ready hooks", "error", err)
-		} else {
-			// Check if any hook specified a config file to reload
-			newConfigFile := l.getReloadConfigFromHooks(l.cfg.Hooks.Ready)
-			if newConfigFile != "" {
-				slog.Info("Ready hook specified new config file, triggering reload", "newConfig", newConfigFile)
-				l.configFile = newConfigFile
-				reloadChan <- true
-			} else if l.configFileChanged() {
-				// Fallback: check if current config file was modified
-				slog.Info("Configuration file changed after ready hook, triggering reload")
-				reloadChan <- true
-			}
+		// Execute server ready hooks with reload check
+		result := process.ExecuteServerHooksWithReload(l.cfg.Hooks.Ready, "ready", l.configFile)
+		if result.Error != nil {
+			slog.Error("Failed to execute ready hooks", "error", result.Error)
+		} else if result.ReloadDecision.ShouldReload {
+			slog.Info("Ready hook triggered config reload",
+				"reason", result.ReloadDecision.Reason,
+				"configFile", result.ReloadDecision.NewConfigFile)
+			l.configFile = result.ReloadDecision.NewConfigFile
+			hookReloadChan <- true
 		}
 
 		serverErrors <- l.srv.ListenAndServe()
@@ -261,7 +267,14 @@ func (l *ServerLifecycle) Run() error {
 			}
 			return nil
 
-		case <-reloadChan:
+		case <-hookReloadChan:
+			l.handleReload()
+
+		case configPath := <-l.reloadChan:
+			// CGI script triggered reload
+			if configPath != l.configFile {
+				l.configFile = configPath
+			}
 			l.handleReload()
 
 		case sig := <-sigChan:
@@ -327,7 +340,14 @@ func (l *ServerLifecycle) handleReload() {
 
 	// Update server handler if server is running (AFTER auth is loaded)
 	if l.srv != nil {
-		newHandler := server.CreateHandler(l.cfg, l.appManager, l.basicAuth, l.idleManager)
+		newHandler := server.CreateHandler(
+			l.cfg,
+			l.appManager,
+			l.basicAuth,
+			l.idleManager,
+			func() string { return l.configFile }, // Get current config file
+			func(path string) { l.reloadChan <- path }, // Trigger reload
+		)
 		l.srv.Handler = newHandler
 	}
 
@@ -358,34 +378,4 @@ func (l *ServerLifecycle) handleShutdown(sig os.Signal) error {
 
 	slog.Info("Navigator shutdown complete")
 	return nil
-}
-
-// configFileChanged checks if the configuration file was modified after Navigator started
-func (l *ServerLifecycle) configFileChanged() bool {
-	// Get current config file info
-	info, err := os.Stat(l.configFile)
-	if err != nil {
-		slog.Debug("Could not stat config file", "file", l.configFile, "error", err)
-		return false
-	}
-
-	// Check if file was modified recently (within last 10 seconds)
-	// This handles the case where the ready hook just generated a new config
-	timeSinceModification := time.Since(info.ModTime())
-	if timeSinceModification < 10*time.Second {
-		slog.Debug("Config file was recently modified", "file", l.configFile, "modTime", info.ModTime())
-		return true
-	}
-
-	return false
-}
-
-// getReloadConfigFromHooks checks if any hook specifies a reload_config
-func (l *ServerLifecycle) getReloadConfigFromHooks(hooks []config.HookConfig) string {
-	for _, hook := range hooks {
-		if hook.ReloadConfig != "" {
-			return hook.ReloadConfig
-		}
-	}
-	return ""
 }

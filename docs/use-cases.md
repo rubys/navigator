@@ -236,6 +236,73 @@ See [routing-example.yml](https://github.com/rubys/navigator/blob/main/examples/
 
 ---
 
+## Use Case 5: Lightweight Admin Endpoints with CGI
+
+**Challenge**: Execute administrative scripts (database sync, user management, status checks) without starting a full web application process.
+
+**Solution**: Navigator's CGI support allows running standalone scripts directly, with user isolation and automatic config reload.
+
+### Benefits
+
+- **No app startup overhead**: Scripts run immediately without starting Rails
+- **Lower memory footprint**: No persistent Rails process needed
+- **Security**: Run scripts as different Unix users (privilege separation)
+- **Smart config reload**: Automatically reload Navigator config after script execution
+
+### Configuration Example
+
+```yaml
+server:
+  listen: 3000
+  cgi_scripts:
+    # Database synchronization endpoint
+    - path: /admin/sync
+      script: /opt/scripts/sync_databases_s3.rb
+      method: POST
+      user: rails
+      group: rails
+      timeout: 10m
+      reload_config: config/navigator.yml
+      env:
+        RAILS_DB_VOLUME: /mnt/db
+        RAILS_ENV: production
+
+    # Lightweight status check
+    - path: /admin/status
+      script: /opt/scripts/check_status.sh
+      method: GET
+      user: rails
+      timeout: 5s
+      env:
+        DB_PATH: /mnt/db
+
+auth:
+  enabled: true
+  htpasswd: /etc/navigator/htpasswd
+  # CGI endpoints still require authentication
+```
+
+### Use Cases for CGI Scripts
+
+- **Database operations**: Sync, backup, migration without Rails overhead
+- **User management**: Update htpasswd files with automatic config reload
+- **Health checks**: Lightweight status endpoints
+- **Webhooks**: Handle incoming webhooks from external services
+- **Administrative tasks**: One-off scripts that don't justify a full web app
+
+### How it Works
+
+1. Request arrives at `/admin/sync`
+2. Navigator matches path to CGI configuration
+3. Script executes as configured user (e.g., `rails`)
+4. Standard CGI environment variables are set
+5. Script output returned to client
+6. If `reload_config` is specified and file changed, Navigator reloads automatically
+
+See [CGI Scripts Documentation](features/cgi-scripts.md) for detailed information and examples.
+
+---
+
 ## Future Use Case Ideas
 
 While Navigator currently focuses on the use cases above, there are several interesting directions worth exploring based on production usage patterns and community feedback.

@@ -138,7 +138,50 @@ Each hook entry supports these fields:
 | `command` | string | ✓ | Command to execute (full path or PATH executable) |
 | `args` | array | | Command arguments |
 | `timeout` | string | | Maximum execution time (duration format: "30s", "5m") |
-| `reload_config` | string | | Config file to reload after successful hook execution (server hooks only) |
+| `reload_config` | string | | Config file to reload after successful hook execution (server hooks only). Only reloads if file path differs OR file was modified during hook execution. |
+
+### Configuration Reload
+
+The `reload_config` field allows hooks to trigger Navigator configuration reload after successful execution. This is useful when hooks modify configuration files or related resources (like htpasswd files).
+
+**Smart Reload Logic:**
+
+Navigator only reloads configuration when necessary:
+
+1. **Different config file**: If `reload_config` specifies a different path than currently loaded
+2. **File modified during execution**: If the config file's modification time changed during hook execution
+
+This avoids unnecessary reloads when nothing has changed, improving performance and reducing overhead.
+
+**Example - Update htpasswd and reload:**
+
+```yaml
+hooks:
+  server:
+    ready:
+      - command: /usr/local/bin/update-users.sh
+        timeout: 30s
+        reload_config: config/navigator.yml  # Reload to pick up htpasswd changes
+```
+
+**How it works:**
+
+1. Navigator records start time before executing hook
+2. Hook runs (e.g., updates `/etc/navigator/htpasswd`)
+3. After successful completion, Navigator checks:
+   - Is `reload_config` path different from current config? → Reload
+   - Was config file modified after start time? → Reload
+   - Otherwise → Skip reload (no changes detected)
+4. If reload triggered, Navigator loads new config and updates all managers
+
+**Common use cases:**
+
+- Update htpasswd file and reload auth configuration
+- Modify tenant list and reload tenant routing
+- Update managed processes and restart/stop them
+- Change static file configuration
+
+**Note**: Only applies to **server hooks** (`start`, `ready`, `idle`, `resume`). Tenant hooks do not support `reload_config`.
 
 ### Variable Substitution
 
@@ -216,6 +259,7 @@ applications:
 - **Non-blocking**: Hook failures don't stop Navigator
 - **Timeout**: Hooks exceeding timeout are terminated
 - **Sequential**: Multiple hooks run in order; failures don't skip subsequent hooks
+- **Reload on success only**: `reload_config` only triggers if hook exits with status 0
 
 ### Exit Codes
 
@@ -334,7 +378,43 @@ hooks:
         timeout: 30s
 ```
 
-### 6. Maintenance Mode with Config Switching
+### 6. Dynamic User Management with Reload
+
+Update htpasswd file and automatically reload authentication:
+
+```yaml
+# Script: /usr/local/bin/add-user.sh
+#!/bin/bash
+# Add user to htpasswd file
+htpasswd -b /etc/navigator/htpasswd "$1" "$2"
+
+# Touch config file to trigger reload
+touch config/navigator.yml
+
+hooks:
+  server:
+    ready:
+      - command: /usr/local/bin/add-user.sh
+        args: ["newuser", "password123"]
+        timeout: 5s
+        reload_config: config/navigator.yml  # Reload to pick up new user
+```
+
+**How it works:**
+
+1. Hook executes script that updates htpasswd file
+2. Script touches config file to update modification time
+3. After successful execution, Navigator detects config file was modified
+4. Navigator reloads configuration (including htpasswd file)
+5. New user can authenticate immediately
+
+**Smart reload behavior:**
+
+- If config file not modified: No reload (efficient)
+- If config file modified during hook: Reload triggered
+- If reload_config path differs: Always reload
+
+### 7. Maintenance Mode with Config Switching
 
 Start Navigator with a minimal maintenance configuration, run initialization tasks, then switch to full configuration:
 
@@ -363,7 +443,9 @@ hooks:
 1. Navigator starts with `config/navigator-maintenance.yml`
 2. Shows maintenance page (503.html) to all requests
 3. Ready hook executes `script/initialization.rb` (database sync, cache warm, etc.)
-4. After successful hook execution, Navigator automatically reloads with `config/navigator.yml`
+4. After successful hook execution, Navigator checks if reload needed:
+   - Config path `config/navigator.yml` differs from current → Reload triggered
+   - Navigator loads full configuration and starts all tenants
 5. Full application becomes available with all tenants and features
 
 **Benefits:**
@@ -371,6 +453,7 @@ hooks:
 - Reduces memory footprint (no persistent Ruby process)
 - Provides user-friendly maintenance page during initialization
 - Automatic transition to full configuration
+- Smart reload only when config path differs or file changes
 
 ## Debugging Hooks
 
@@ -427,6 +510,7 @@ level=INFO msg="Hook output" type=tenant.stop.default output="Synced 3 databases
 ## See Also
 
 - [YAML Configuration Reference](../configuration/yaml-reference.md#hooks) - Complete hooks syntax
+- [CGI Scripts](cgi-scripts.md) - Similar reload_config behavior for CGI scripts
 - [Machine Suspend](machine-suspend.md) - Auto-suspend configuration
 - [Use Cases: Machine Auto-Suspend](../use-cases.md#use-case-2-machine-auto-suspend-flyio) - Real-world examples
 - [Examples: Suspend/Stop](../../examples/suspend-stop-example.yml) - Working configuration

@@ -12,6 +12,7 @@ A lightweight web server for multi-tenant applications with on-demand process ma
 ## Features
 
 - Serve multiple tenants with isolated processes and databases
+- Execute standalone CGI scripts without starting web apps
 - Automatic machine suspension when idle (Fly.io)
 - Built-in WebSocket support for Rails Action Cable
 - Regional routing with automatic fallback

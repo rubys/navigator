@@ -3,12 +3,14 @@ package server
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/rubys/navigator/internal/auth"
+	"github.com/rubys/navigator/internal/cgi"
 	"github.com/rubys/navigator/internal/config"
 	"github.com/rubys/navigator/internal/idle"
 	"github.com/rubys/navigator/internal/logging"
@@ -18,19 +20,21 @@ import (
 )
 
 // CreateHandler creates the main HTTP handler for Navigator
-func CreateHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager) http.Handler {
-	return &Handler{
+func CreateHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager, currentConfigFn func() string, triggerReloadFn func(string)) http.Handler {
+	h := &Handler{
 		config:        cfg,
 		appManager:    appManager,
 		auth:          basicAuth,
 		idleManager:   idleManager,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
+	h.setupCGIHandlers(currentConfigFn, triggerReloadFn)
+	return h
 }
 
 // CreateTestHandler creates a handler with logging disabled for tests
 func CreateTestHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager) http.Handler {
-	return &Handler{
+	h := &Handler{
 		config:        cfg,
 		appManager:    appManager,
 		auth:          basicAuth,
@@ -38,6 +42,8 @@ func CreateTestHandler(cfg *config.Config, appManager *process.AppManager, basic
 		staticHandler: NewStaticFileHandler(cfg),
 		disableLog:    true,
 	}
+	h.setupCGIHandlers(nil, nil) // No reload support in tests
+	return h
 }
 
 // Handler is the main HTTP handler for Navigator
@@ -47,7 +53,14 @@ type Handler struct {
 	auth          *auth.BasicAuth
 	idleManager   *idle.Manager
 	staticHandler *StaticFileHandler
-	disableLog    bool // When true, suppresses access log output (for tests)
+	cgiHandlers   map[string]*cgiRoute // Path -> CGI handler mapping
+	disableLog    bool                 // When true, suppresses access log output (for tests)
+}
+
+// cgiRoute represents a CGI route with method filtering
+type cgiRoute struct {
+	handler *cgi.Handler
+	method  string // Empty string means all methods
 }
 
 // ServeHTTP handles all incoming HTTP requests
@@ -89,6 +102,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Handle rewrites and redirects
 	if h.handleRewrites(recorder, r) {
+		return
+	}
+
+	// Handle CGI scripts
+	if h.handleCGI(recorder, r) {
 		return
 	}
 
@@ -371,4 +389,62 @@ func (r *ResponseRecorder) Finish(req *http.Request) {
 
 	// Log the request using the access logging module
 	LogRequest(req, r.statusCode, r.size, r.startTime, r.metadata, r.disableLog)
+}
+
+// setupCGIHandlers initializes CGI handlers from configuration
+func (h *Handler) setupCGIHandlers(currentConfigFn func() string, triggerReloadFn func(string)) {
+	if len(h.config.Server.CGIScripts) == 0 {
+		return
+	}
+
+	h.cgiHandlers = make(map[string]*cgiRoute)
+
+	for i, scriptCfg := range h.config.Server.CGIScripts {
+		handler, err := cgi.NewHandler(&scriptCfg, currentConfigFn, triggerReloadFn)
+		if err != nil {
+			slog.Error("Failed to create CGI handler",
+				"index", i,
+				"path", scriptCfg.Path,
+				"script", scriptCfg.Script,
+				"error", err)
+			continue
+		}
+
+		h.cgiHandlers[scriptCfg.Path] = &cgiRoute{
+			handler: handler,
+			method:  scriptCfg.Method,
+		}
+
+		slog.Info("Registered CGI script",
+			"path", scriptCfg.Path,
+			"script", scriptCfg.Script,
+			"method", scriptCfg.Method,
+			"user", scriptCfg.User)
+	}
+}
+
+// handleCGI handles CGI script requests
+func (h *Handler) handleCGI(w http.ResponseWriter, r *http.Request) bool {
+	if len(h.cgiHandlers) == 0 {
+		return false
+	}
+
+	route, exists := h.cgiHandlers[r.URL.Path]
+	if !exists {
+		return false
+	}
+
+	// Check method if specified
+	if route.method != "" && !strings.EqualFold(r.Method, route.method) {
+		slog.Debug("CGI method mismatch",
+			"path", r.URL.Path,
+			"expected", route.method,
+			"got", r.Method)
+		return false
+	}
+
+	// Execute CGI script
+	w.(*ResponseRecorder).SetMetadata("response_type", "cgi")
+	route.handler.ServeHTTP(w, r)
+	return true
 }

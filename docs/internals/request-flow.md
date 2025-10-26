@@ -44,7 +44,19 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 5. Reverse Proxies (Standalone Services)            │
+│ 5. CGI Scripts                                      │
+│    - Check server.cgi_scripts                       │
+│    - Match exact paths and methods                  │
+│    → MATCHED: Execute CGI script                    │
+│      • Switch to configured user (Unix only)        │
+│      • Set CGI environment variables                │
+│      • Parse CGI response headers                   │
+│      • Reload config if specified                   │
+│    → NO MATCH: Continue                             │
+└───────────────────┬─────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────────┐
+│ 6. Reverse Proxies (Standalone Services)            │
 │    - Check routes.reverse_proxies                   │
 │    - Match path/prefix patterns                     │
 │    → WEBSOCKET: Establish WebSocket proxy           │
@@ -53,7 +65,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 6. Static File Serving                              │
+│ 7. Static File Serving                              │
 │    - Check for static file extensions               │
 │    - Look in configured public_dir                  │
 │    → FOUND: Serve file with cache headers           │
@@ -61,7 +73,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 7. Try Files (Public Paths Only)                    │
+│ 8. Try Files (Public Paths Only)                    │
 │    - Only for paths without extensions              │
 │    - Try configured suffixes (.html, etc.)          │
 │    → FOUND: Serve file                              │
@@ -69,7 +81,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 8. Web Application Proxy                            │
+│ 9. Web Application Proxy                            │
 │    - Extract tenant from path                       │
 │    - Start or get existing app process              │
 │    - Wait for app readiness (with timeout)          │
@@ -80,7 +92,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 9. Response Completion                              │
+│ 10. Response Completion                             │
 │     - Stop idle tracking                            │
 │     - Log request details                           │
 │     - Return to client                              │
@@ -197,7 +209,81 @@ r.URL.Path = rule.Pattern.ReplaceAllString(r.URL.Path, rule.Replacement)
 // Continue to next handler with modified path
 ```
 
-### 5. Reverse Proxy Routes
+### 5. CGI Scripts
+
+**File:** `internal/cgi/handler.go` / `internal/server/handler.go:109` (`handleCGI`)
+
+CGI (Common Gateway Interface) scripts allow executing standalone scripts directly without starting a full web application. This is ideal for lightweight operations like database synchronization, status checks, or administrative tasks.
+
+**Configuration:**
+```yaml
+server:
+  cgi_scripts:
+    - path: /admin/sync
+      script: /opt/scripts/sync_databases.rb
+      method: POST
+      user: appuser
+      group: appgroup
+      timeout: 5m
+      reload_config: config/navigator.yml
+      env:
+        RAILS_DB_VOLUME: /mnt/db
+```
+
+**CGI Execution Flow:**
+
+1. **Path Matching:** Check if request path exactly matches any configured CGI script path
+2. **Method Filtering:** Verify HTTP method matches (if specified)
+3. **User Switching:** Set process credentials (Unix only, requires root):
+   ```go
+   cred, _ := process.GetUserCredentials(user, group)
+   cmd.SysProcAttr.Credential = cred
+   ```
+4. **Environment Setup:** Set standard CGI environment variables (RFC 3875):
+   - `REQUEST_METHOD`, `QUERY_STRING`, `SCRIPT_NAME`
+   - `CONTENT_TYPE`, `CONTENT_LENGTH`
+   - `HTTP_*` headers as environment variables
+   - Custom environment from configuration
+5. **Script Execution:** Execute script with configured timeout
+6. **Response Parsing:** Parse CGI headers and status code:
+   ```
+   Content-Type: text/plain
+   Status: 200 OK
+
+   Script output here
+   ```
+7. **Config Reload:** After successful execution, check `reload_config`:
+   - Only reload if config file path differs OR file was modified during execution
+   - Avoids unnecessary reloads
+
+**Routing Priority:**
+
+CGI scripts are evaluated **after rewrites** but **before reverse proxies**. This means:
+- Rewrite rules can modify paths before CGI matching
+- CGI scripts take precedence over reverse proxies and web apps
+- Subject to authentication (unless path is in `public_paths`)
+
+**Use Cases:**
+- Database synchronization without starting Rails
+- Administrative tasks (htpasswd updates, configuration changes)
+- Lightweight status checks
+- Webhook handlers
+
+**Performance Characteristics:**
+- Each request starts a new process (fork + exec overhead)
+- Suitable for infrequent operations (not high-traffic endpoints)
+- Lower memory footprint than persistent web apps
+- Scripts execute independently (no shared state)
+
+**Security Features:**
+- Run scripts as different Unix users (privilege separation)
+- Timeout protection prevents runaway scripts
+- Authentication applies to CGI paths (unless excluded)
+- Environment variable isolation
+
+**See Also:** [CGI Scripts Feature Documentation](../features/cgi-scripts.md)
+
+### 6. Reverse Proxy Routes
 
 **File:** `internal/server/proxy.go:37` (`handleReverseProxies`)
 
@@ -747,8 +833,9 @@ kill -HUP $(cat /tmp/navigator.pid)
 Navigator prioritizes fast paths:
 
 1. **Health checks:** Immediate 200 OK response
-2. **Static files:** Direct filesystem serving
-3. **Reverse proxies:** Skip tenant matching
+2. **CGI scripts:** Direct script execution (no app startup)
+3. **Static files:** Direct filesystem serving
+4. **Reverse proxies:** Skip tenant matching
 
 ### Dynamic Port Allocation
 
@@ -856,10 +943,12 @@ The modular design allows each component to be tested independently while mainta
 - **Main Handler:** `internal/server/handler.go`
 - **Static Files:** `internal/server/static.go`
 - **Reverse Proxy:** `internal/server/proxy.go`
+- **CGI Scripts:** `internal/cgi/handler.go`
 - **Fly-Replay:** `internal/server/fly_replay.go`
 - **Authentication:** `internal/auth/auth.go`
 - **Proxy Logic:** `internal/proxy/proxy.go`
 - **Process Management:** `internal/process/app_manager.go`
+- **Reload Logic:** `internal/utils/reload.go`
 - **Server Lifecycle:** `cmd/navigator-refactored/main.go`
 
 ### Related Documentation

@@ -292,7 +292,7 @@ func TestCreateHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := CreateHandler(cfg, appManager, tt.auth, idleManager)
+			handler := CreateTestHandler(cfg, appManager, tt.auth, idleManager)
 
 			if handler == nil {
 				t.Fatal("CreateHandler returned nil")
@@ -325,7 +325,7 @@ func TestCreateHandler(t *testing.T) {
 
 func TestHandler_ServeHTTP_HealthCheck(t *testing.T) {
 	cfg := &config.Config{}
-	handler := CreateHandler(cfg, nil, nil, nil)
+	handler := CreateTestHandler(cfg, nil, nil, nil)
 
 	req := httptest.NewRequest("GET", "/up", nil)
 	recorder := httptest.NewRecorder()
@@ -348,7 +348,7 @@ func TestHandler_ServeHTTP_HealthCheck(t *testing.T) {
 
 func TestHandler_ServeHTTP_RequestID(t *testing.T) {
 	cfg := &config.Config{}
-	handler := CreateHandler(cfg, nil, nil, nil)
+	handler := CreateTestHandler(cfg, nil, nil, nil)
 
 	tests := []struct {
 		name               string
@@ -393,7 +393,7 @@ func TestHandler_ServeHTTP_Authentication(t *testing.T) {
 	basicAuth := &auth.BasicAuth{}
 	// Enable auth by setting some values (simplified)
 
-	handler := CreateHandler(cfg, nil, basicAuth, nil)
+	handler := CreateTestHandler(cfg, nil, basicAuth, nil)
 
 	tests := []struct {
 		name           string
@@ -428,7 +428,7 @@ func TestHandler_ServeHTTP_Authentication(t *testing.T) {
 func TestHandler_ServeHTTP_Routing(t *testing.T) {
 	cfg := &config.Config{}
 
-	handler := CreateHandler(cfg, &process.AppManager{}, nil, nil)
+	handler := CreateTestHandler(cfg, &process.AppManager{}, nil, nil)
 
 	tests := []struct {
 		name         string
@@ -520,7 +520,7 @@ func TestMaintenanceModeHandler(t *testing.T) {
 	}
 
 	// Create handler
-	handler := CreateHandler(cfg, nil, nil, nil)
+	handler := CreateTestHandler(cfg, nil, nil, nil)
 
 	// Test cases
 	tests := []struct {
@@ -925,8 +925,8 @@ func TestJSONAccessLogging(t *testing.T) {
 	cfg.Server.Hostname = "localhost"
 	cfg.Server.Static.PublicDir = "public"
 
-	// Create handler
-	handler := CreateHandler(cfg, nil, nil, nil)
+	// Create handler with logging enabled (not using CreateTestHandler)
+	handler := CreateHandler(cfg, nil, nil, nil, nil, nil)
 
 	// Capture stdout to test JSON log output
 	oldStdout := os.Stdout

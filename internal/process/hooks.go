@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/rubys/navigator/internal/config"
 	"github.com/rubys/navigator/internal/utils"
@@ -70,9 +71,42 @@ func ExecuteHooks(hooks []config.HookConfig, env map[string]string, hookType str
 	return nil
 }
 
+// HookResult contains the result of executing hooks, including reload decision
+type HookResult struct {
+	Error          error
+	ReloadDecision utils.ReloadDecision
+}
+
 // ExecuteServerHooks executes server lifecycle hooks
 func ExecuteServerHooks(hooks []config.HookConfig, hookType string) error {
 	return ExecuteHooks(hooks, nil, fmt.Sprintf("server.%s", hookType))
+}
+
+// ExecuteServerHooksWithReload executes server lifecycle hooks and checks for reload_config
+// Returns HookResult containing any error and reload decision
+func ExecuteServerHooksWithReload(hooks []config.HookConfig, hookType, currentConfigFile string) HookResult {
+	// Record start time before executing hooks
+	startTime := time.Now()
+
+	// Execute all hooks
+	err := ExecuteHooks(hooks, nil, fmt.Sprintf("server.%s", hookType))
+
+	// Check if any hook specified reload_config
+	var reloadConfigPath string
+	for _, hook := range hooks {
+		if hook.ReloadConfig != "" {
+			reloadConfigPath = hook.ReloadConfig
+			break // Use first non-empty reload_config
+		}
+	}
+
+	// Determine if config should be reloaded
+	reloadDecision := utils.ShouldReloadConfig(reloadConfigPath, currentConfigFile, startTime)
+
+	return HookResult{
+		Error:          err,
+		ReloadDecision: reloadDecision,
+	}
 }
 
 // ExecuteTenantHooks executes tenant lifecycle hooks
