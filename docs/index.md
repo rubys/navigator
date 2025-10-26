@@ -2,12 +2,10 @@
 
 A lightweight web server for multi-tenant applications with on-demand process management. Deploy multiple customers or projects from a single configuration file.
 
-!!! success "Latest Release: v0.15.0"
-    **Reliability and Maintenance Improvements** - Fixed critical port allocation race condition and added hook-based config reload.
+!!! success "Latest Release: v0.16.0"
+    **CGI Script Support and Access Control** - Execute standalone scripts with user switching and allowed_users configuration.
 
-    ⚠️ **Breaking Changes**: Sticky sessions feature removed - use Fly.io native support instead.
-
-    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v0.15.0) | [Migration Guide](https://community.fly.io/t/session-based-replay-caching-read-sticky-sessions/26299)
+    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v0.16.0)
 
 ## Features
 

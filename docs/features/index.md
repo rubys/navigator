@@ -2,12 +2,12 @@
 
 Navigator provides a comprehensive set of features for multi-tenant web applications, from basic process management to advanced regional routing.
 
-!!! tip "What's New in v0.15.0"
-    - **Fixed Critical Port Allocation Race**: Thread-safe port tracking prevents duplicate assignments
-    - **Hook-Based Config Reload**: Ready hooks can trigger automatic config reload for maintenance mode patterns
-    - **Removed Sticky Sessions**: Use Fly.io's native sticky session support instead
-    - **Debug Auth Logging**: Added structured debug logging to authentication flow
-    - **Windows Build Fix**: Platform-specific type handling for cross-platform compatibility
+!!! tip "What's New in v0.16.0"
+    - **CGI Script Support**: Execute standalone scripts without starting web applications
+    - **User Switching**: CGI scripts can run as different Unix users (requires root)
+    - **Access Control**: New `allowed_users` configuration to restrict CGI script access
+    - **Config Reload**: Automatic configuration reload after CGI script execution
+    - **Timeout Control**: Set execution time limits for CGI scripts
 
 ## Core Features
 
