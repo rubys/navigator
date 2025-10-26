@@ -580,7 +580,7 @@ hooks:
       - command: /usr/local/bin/init.sh
         args: ["--setup"]
         timeout: 30s
-    ready:                        # Execute when Navigator is ready
+    ready:                        # Execute when Navigator is ready (initial start + config reloads)
       - command: curl
         args: ["-X", "POST", "http://monitoring.example.com/ready"]
         timeout: 5s

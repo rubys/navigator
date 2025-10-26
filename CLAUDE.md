@@ -111,7 +111,8 @@ The refactored navigator uses focused internal packages for maintainability:
    - **Auto-Wake**: Machines wake automatically on incoming requests
 
 6. **Lifecycle Hooks** (`executeHooks`, `executeServerHooks`, `executeTenantHooks`)
-   - **Server Hooks**: Execute at Navigator lifecycle events (start, ready, idle)
+   - **Server Hooks**: Execute at Navigator lifecycle events (start, ready, idle, resume)
+   - **Ready Hooks**: Run after initial start **and after config reloads** (CGI, SIGHUP, resume)
    - **Tenant Hooks**: Execute at tenant lifecycle events (start, stop)
    - **Environment Propagation**: Tenant hooks receive full tenant environment
    - **Sequential Execution**: Hooks run in order with configurable timeouts
@@ -283,7 +284,7 @@ Navigator supports hooks for custom integration at key lifecycle events:
 
 **Server Hooks**:
 - **start**: Executes before Navigator starts accepting requests
-- **ready**: Executes after Navigator is ready and listening
+- **ready**: Executes after Navigator is ready and listening **or after configuration reload**
 - **resume**: Executes once on first request after machine suspension (Fly.io)
 - **idle**: Executes before machine suspension (Fly.io)
 

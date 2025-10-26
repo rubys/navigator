@@ -352,6 +352,15 @@ func (l *ServerLifecycle) handleReload() {
 	}
 
 	slog.Info("Configuration reloaded successfully")
+
+	// Execute ready hooks asynchronously after reload completes
+	// This allows optimizations (prerender, cache warming, etc.) to run
+	// while Navigator continues serving requests with the new configuration
+	go func() {
+		if err := process.ExecuteServerHooks(newConfig.Hooks.Ready, "ready"); err != nil {
+			slog.Error("Failed to execute ready hooks after reload", "error", err)
+		}
+	}()
 }
 
 // handleShutdown performs graceful shutdown with context propagation

@@ -18,7 +18,7 @@ Server hooks execute at key Navigator lifecycle events.
 | Hook | When Executed | Common Use Cases |
 |------|---------------|------------------|
 | `start` | Before Navigator accepts requests | Database migrations, service initialization |
-| `ready` | After Navigator starts listening | Notify monitoring systems, warm caches |
+| `ready` | After Navigator starts listening **or after configuration reload** | Notify monitoring systems, warm caches, prerender content |
 | `idle` | Before machine suspend/stop (Fly.io) | Upload databases to S3, checkpoint state |
 | `resume` | After machine resume (Fly.io) | Download databases from S3, reconnect services |
 
@@ -365,7 +365,40 @@ hooks:
         timeout: 10s
 ```
 
-### 5. State Checkpoint
+### 5. Content Prerendering After Config Updates
+
+Use ready hooks to regenerate static content after configuration reloads:
+
+```yaml
+hooks:
+  server:
+    ready:
+      - command: /rails/script/prerender.sh
+        timeout: 10m
+        # Runs after initial start AND after config reloads
+        # (CGI reload, SIGHUP reload, or resume reload)
+
+server:
+  cgi_scripts:
+    - path: /admin/update_config
+      script: /rails/script/update_configuration.rb
+      reload_config: config/navigator.yml  # Triggers ready hook after reload
+```
+
+**How it works:**
+
+1. CGI script updates configuration files (htpasswd, maps, navigator.yml)
+2. CGI script returns success (fast, <5 seconds)
+3. Navigator detects navigator.yml changed → reloads configuration
+4. **Ready hook executes asynchronously** (prerender runs in background)
+5. Navigator continues serving requests with new config while prerender completes
+
+**Benefits:**
+- Fast config updates (don't wait for prerender)
+- Zero downtime (Navigator serves while optimizations run)
+- Consistent behavior (same hook runs on initial start and reloads)
+
+### 6. State Checkpoint
 
 Checkpoint application state before shutdown:
 
@@ -378,7 +411,7 @@ hooks:
         timeout: 30s
 ```
 
-### 6. Dynamic User Management with Reload
+### 7. Dynamic User Management with Reload
 
 Update htpasswd file and automatically reload authentication:
 
@@ -414,7 +447,7 @@ hooks:
 - If config file modified during hook: Reload triggered
 - If reload_config path differs: Always reload
 
-### 7. Maintenance Mode with Config Switching
+### 8. Maintenance Mode with Config Switching
 
 Start Navigator with a minimal maintenance configuration, run initialization tasks, then switch to full configuration:
 
