@@ -139,6 +139,7 @@ func (p *ConfigParser) parseAuthConfig() {
 
 // parseMaintenanceConfig parses maintenance page configuration
 func (p *ConfigParser) parseMaintenanceConfig() {
+	p.config.Maintenance.Enabled = p.yamlConfig.Maintenance.Enabled
 	p.config.Maintenance.Page = p.yamlConfig.Maintenance.Page
 }
 

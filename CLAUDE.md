@@ -283,8 +283,8 @@ Features:
 Navigator supports hooks for custom integration at key lifecycle events:
 
 **Server Hooks**:
-- **start**: Executes before Navigator starts accepting requests
-- **ready**: Executes after Navigator is ready and listening **or after configuration reload**
+- **start**: Executes before Navigator starts accepting requests (blocks startup)
+- **ready**: Executes asynchronously after Navigator starts listening **or after configuration reload** (doesn't block requests)
 - **resume**: Executes once on first request after machine suspension (Fly.io)
 - **idle**: Executes before machine suspension (Fly.io)
 

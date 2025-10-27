@@ -16,6 +16,7 @@ server:
 
 # Maintenance page configuration
 maintenance:
+  enabled: false  # Set to true to enable maintenance mode (all requests get 503 page)
   page: /503.html
 
 # Intelligent routing with Fly-Replay

@@ -297,9 +297,8 @@ Here's how Navigator handles an incoming HTTP request:
 4. Initialize app manager [internal/process/]
 5. Start managed processes [internal/process/manager.go]
 6. Execute server start hooks
-7. Start HTTP server [internal/server/]
-8. Execute server ready hooks
-9. Begin accepting requests
+7. Start HTTP server [internal/server/] - begins accepting requests
+8. Execute server ready hooks (asynchronously in background)
 ```
 
 ### Shutdown Sequence

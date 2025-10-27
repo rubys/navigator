@@ -54,6 +54,11 @@ func main() {
 		"tenants", len(cfg.Applications.Tenants),
 		"reverseProxies", len(cfg.Routes.ReverseProxies))
 
+	// Log maintenance mode status
+	if cfg.Maintenance.Enabled {
+		slog.Info("Maintenance mode enabled - all requests will receive maintenance page")
+	}
+
 	// Setup logging format based on configuration
 	setupLogging(cfg)
 
@@ -239,8 +244,18 @@ func (l *ServerLifecycle) Run() error {
 	// Start server in goroutine
 	serverErrors := make(chan error, 1)
 	hookReloadChan := make(chan bool, 1)
+
+	// Start HTTP server listener
 	go func() {
 		slog.Info("Navigator starting", "version", version, "address", addr)
+		serverErrors <- l.srv.ListenAndServe()
+	}()
+
+	// Execute ready hooks asynchronously after server starts listening
+	// This allows the server to serve maintenance pages while hooks run
+	go func() {
+		// Give server a moment to start listening
+		time.Sleep(100 * time.Millisecond)
 
 		// Execute server ready hooks with reload check
 		result := process.ExecuteServerHooksWithReload(l.cfg.Hooks.Ready, "ready", l.configFile)
@@ -253,8 +268,6 @@ func (l *ServerLifecycle) Run() error {
 			l.configFile = result.ReloadDecision.NewConfigFile
 			hookReloadChan <- true
 		}
-
-		serverErrors <- l.srv.ListenAndServe()
 	}()
 
 	// Handle signals and server errors

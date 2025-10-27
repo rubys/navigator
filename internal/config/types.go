@@ -154,7 +154,8 @@ type StaticConfig struct {
 
 // MaintenanceConfig represents maintenance page configuration
 type MaintenanceConfig struct {
-	Page string `yaml:"page"`
+	Enabled bool   `yaml:"enabled"` // Enable maintenance mode (serve maintenance page for all requests)
+	Page    string `yaml:"page"`
 }
 
 // Config represents the main configuration
@@ -387,6 +388,7 @@ type YAMLConfig struct {
 		} `yaml:"tenant"`
 	} `yaml:"hooks"`
 	Maintenance struct {
-		Page string `yaml:"page"`
+		Enabled bool   `yaml:"enabled"`
+		Page    string `yaml:"page"`
 	} `yaml:"maintenance"`
 }

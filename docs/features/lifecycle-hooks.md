@@ -18,7 +18,7 @@ Server hooks execute at key Navigator lifecycle events.
 | Hook | When Executed | Common Use Cases |
 |------|---------------|------------------|
 | `start` | Before Navigator accepts requests | Database migrations, service initialization |
-| `ready` | After Navigator starts listening **or after configuration reload** | Notify monitoring systems, warm caches, prerender content |
+| `ready` | Asynchronously after Navigator starts listening **or after configuration reload** | Notify monitoring systems, warm caches, prerender content |
 | `idle` | Before machine suspend/stop (Fly.io) | Upload databases to S3, checkpoint state |
 | `resume` | After machine resume (Fly.io) | Download databases from S3, reconnect services |
 
@@ -394,9 +394,10 @@ server:
 5. Navigator continues serving requests with new config while prerender completes
 
 **Benefits:**
-- Fast config updates (don't wait for prerender)
-- Zero downtime (Navigator serves while optimizations run)
+- Fast cold starts (server listens immediately, initialization runs in background)
+- Zero downtime (Navigator serves requests while hooks execute)
 - Consistent behavior (same hook runs on initial start and reloads)
+- Maintenance page served during initialization
 
 ### 6. State Checkpoint
 
@@ -526,7 +527,7 @@ level=INFO msg="Hook output" type=tenant.stop.default output="Synced 3 databases
 ### Hook Timing
 
 - **start**: Blocks Navigator startup (keep fast)
-- **ready**: Executes after server starts (can be slower)
+- **ready**: Executes asynchronously after server starts listening (doesn't block requests)
 - **idle**: Delays suspension (balance speed vs completeness)
 - **resume**: Blocks request handling (keep fast)
 - **tenant.start**: Delays tenant availability
@@ -534,10 +535,10 @@ level=INFO msg="Hook output" type=tenant.stop.default output="Synced 3 databases
 
 ### Recommendations
 
-1. **Keep start/resume hooks fast** (<5s)
-2. **Use ready for slow initialization** (cache warming, etc.)
+1. **Keep start/resume hooks fast** (<5s) - these block critical startup
+2. **Use ready for slow initialization** - server serves maintenance page while hooks run
 3. **Balance idle hook completeness vs timeout** (users waiting)
-4. **Run long operations asynchronously** (background jobs)
+4. **Run long operations in ready hooks** - they execute asynchronously
 5. **Use conditional logic** (skip if already synced)
 
 ## See Also

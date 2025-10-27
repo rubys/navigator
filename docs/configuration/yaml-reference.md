@@ -228,18 +228,27 @@ See [Authentication](authentication.md) for detailed examples and performance ti
 
 ## maintenance
 
-Maintenance page configuration.
+Maintenance mode configuration.
 
 ```yaml
 maintenance:
+  enabled: false                  # Enable maintenance mode (all requests get maintenance page)
   page: "/503.html"               # Path to maintenance page (within public_dir)
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable maintenance mode - serves maintenance page for all requests (except `/up` health check) |
 | `page` | string | `"/503.html"` | Path to custom maintenance page |
 
-Navigator automatically serves a maintenance page when:
+Navigator serves the maintenance page in these scenarios:
+
+**Explicit Maintenance Mode** (`enabled: true`):
+- All requests receive the maintenance page (except `/up` health check)
+- Useful during startup initialization or planned maintenance
+- Server listens immediately while background tasks complete
+
+**Automatic Error Handling** (`enabled: false`, default):
 - An application is starting and exceeds the `startup_timeout`
 - A Fly-Replay target is unavailable
 
@@ -270,6 +279,38 @@ The maintenance page is served from `{server.static.public_dir}/{maintenance.pag
 ```
 
 The `<meta http-equiv="refresh" content="5">` tag automatically reloads the page every 5 seconds, so users don't need to manually refresh while waiting for the application to become ready.
+
+**Example: Startup Maintenance Mode**
+
+Use maintenance mode during container startup to provide immediate user feedback while initialization completes:
+
+```yaml
+# config/navigator-maintenance.yml - Initial startup config
+server:
+  listen: 3000
+  static:
+    public_dir: public
+
+maintenance:
+  enabled: true  # All requests get 503 page with auto-refresh
+  page: /503.html
+
+hooks:
+  server:
+    ready:
+      - command: /app/script/initialize.sh  # Sync S3, generate config, etc.
+        timeout: 5m
+        reload_config: config/navigator.yml  # Switch to normal operation
+```
+
+**Flow:**
+1. Navigator starts with `navigator-maintenance.yml` (maintenance enabled)
+2. Server listens immediately, serves 503.html to all requests
+3. Ready hook runs asynchronously (initialization tasks)
+4. Hook completes and triggers reload to `navigator.yml` (maintenance disabled)
+5. Normal operation begins
+
+This provides fast cold starts (~1s to first response) while long-running initialization happens in the background.
 
 ## applications
 
@@ -580,7 +621,7 @@ hooks:
       - command: /usr/local/bin/init.sh
         args: ["--setup"]
         timeout: 30s
-    ready:                        # Execute when Navigator is ready (initial start + config reloads)
+    ready:                        # Execute asynchronously after Navigator starts listening (initial start + config reloads)
       - command: curl
         args: ["-X", "POST", "http://monitoring.example.com/ready"]
         timeout: 5s

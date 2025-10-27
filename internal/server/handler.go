@@ -89,6 +89,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if maintenance mode is enabled
+	if h.config.Maintenance.Enabled {
+		recorder.SetMetadata("response_type", "maintenance")
+		ServeMaintenancePage(recorder, r, h.config)
+		return
+	}
+
 	// Check authentication EARLY - before any routing decisions
 	// This prevents authentication bypass via reverse proxies, fly-replay, etc.
 	isPublic := auth.ShouldExcludeFromAuth(r.URL.Path, h.config)
