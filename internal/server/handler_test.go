@@ -106,7 +106,7 @@ func TestHealthCheckHandler(t *testing.T) {
 				Status: http.StatusServiceUnavailable,
 				Body:   "Service Unavailable",
 				Headers: map[string]string{
-					"Content-Type": "application/json",
+					"Content-Type":    "application/json",
 					"X-Custom-Header": "test-value",
 				},
 			},
