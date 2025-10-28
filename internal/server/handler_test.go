@@ -61,27 +61,83 @@ func TestResponseRecorder(t *testing.T) {
 // Reverse proxy routing is now handled via Routes.ReverseProxies configuration
 
 func TestHealthCheckHandler(t *testing.T) {
-	cfg := &config.Config{}
-	handler := &Handler{config: cfg, staticHandler: NewStaticFileHandler(cfg)}
+	t.Run("synthetic response", func(t *testing.T) {
+		// Configure synthetic health check response
+		cfg := &config.Config{}
+		cfg.Server.HealthCheck = config.HealthCheckConfig{
+			Path: "/up",
+			Response: &config.HealthCheckResponse{
+				Status: http.StatusOK,
+				Body:   "OK",
+				Headers: map[string]string{
+					"Content-Type": "text/plain",
+				},
+			},
+		}
 
-	req := httptest.NewRequest("GET", "/up", nil)
-	recorder := httptest.NewRecorder()
+		handler := &Handler{config: cfg, staticHandler: NewStaticFileHandler(cfg)}
 
-	handler.handleHealthCheck(recorder, req)
+		req := httptest.NewRequest("GET", "/up", nil)
+		recorder := httptest.NewRecorder()
 
-	if recorder.Code != http.StatusOK {
-		t.Errorf("Expected status %d, got %d", http.StatusOK, recorder.Code)
-	}
+		handler.handleHealthCheck(recorder, req)
 
-	expectedBody := "OK"
-	if recorder.Body.String() != expectedBody {
-		t.Errorf("Expected body %q, got %q", expectedBody, recorder.Body.String())
-	}
+		if recorder.Code != http.StatusOK {
+			t.Errorf("Expected status %d, got %d", http.StatusOK, recorder.Code)
+		}
 
-	expectedContentType := "text/html"
-	if recorder.Header().Get("Content-Type") != expectedContentType {
-		t.Errorf("Expected Content-Type %q, got %q", expectedContentType, recorder.Header().Get("Content-Type"))
-	}
+		expectedBody := "OK"
+		if recorder.Body.String() != expectedBody {
+			t.Errorf("Expected body %q, got %q", expectedBody, recorder.Body.String())
+		}
+
+		expectedContentType := "text/plain"
+		if recorder.Header().Get("Content-Type") != expectedContentType {
+			t.Errorf("Expected Content-Type %q, got %q", expectedContentType, recorder.Header().Get("Content-Type"))
+		}
+	})
+
+	t.Run("custom synthetic response", func(t *testing.T) {
+		// Configure custom synthetic health check response
+		cfg := &config.Config{}
+		cfg.Server.HealthCheck = config.HealthCheckConfig{
+			Path: "/health",
+			Response: &config.HealthCheckResponse{
+				Status: http.StatusServiceUnavailable,
+				Body:   "Service Unavailable",
+				Headers: map[string]string{
+					"Content-Type": "application/json",
+					"X-Custom-Header": "test-value",
+				},
+			},
+		}
+
+		handler := &Handler{config: cfg, staticHandler: NewStaticFileHandler(cfg)}
+
+		req := httptest.NewRequest("GET", "/health", nil)
+		recorder := httptest.NewRecorder()
+
+		handler.handleHealthCheck(recorder, req)
+
+		if recorder.Code != http.StatusServiceUnavailable {
+			t.Errorf("Expected status %d, got %d", http.StatusServiceUnavailable, recorder.Code)
+		}
+
+		expectedBody := "Service Unavailable"
+		if recorder.Body.String() != expectedBody {
+			t.Errorf("Expected body %q, got %q", expectedBody, recorder.Body.String())
+		}
+
+		expectedContentType := "application/json"
+		if recorder.Header().Get("Content-Type") != expectedContentType {
+			t.Errorf("Expected Content-Type %q, got %q", expectedContentType, recorder.Header().Get("Content-Type"))
+		}
+
+		expectedCustomHeader := "test-value"
+		if recorder.Header().Get("X-Custom-Header") != expectedCustomHeader {
+			t.Errorf("Expected X-Custom-Header %q, got %q", expectedCustomHeader, recorder.Header().Get("X-Custom-Header"))
+		}
+	})
 }
 
 func TestSetContentType(t *testing.T) {
@@ -325,6 +381,16 @@ func TestCreateHandler(t *testing.T) {
 
 func TestHandler_ServeHTTP_HealthCheck(t *testing.T) {
 	cfg := &config.Config{}
+	cfg.Server.HealthCheck = config.HealthCheckConfig{
+		Path: "/up",
+		Response: &config.HealthCheckResponse{
+			Status: http.StatusOK,
+			Body:   "OK",
+			Headers: map[string]string{
+				"Content-Type": "text/plain",
+			},
+		},
+	}
 	handler := CreateTestHandler(cfg, nil, nil, nil)
 
 	req := httptest.NewRequest("GET", "/up", nil)
@@ -341,8 +407,8 @@ func TestHandler_ServeHTTP_HealthCheck(t *testing.T) {
 	}
 
 	contentType := recorder.Header().Get("Content-Type")
-	if contentType != "text/html" {
-		t.Errorf("Health check Content-Type = %q, expected %q", contentType, "text/html")
+	if contentType != "text/plain" {
+		t.Errorf("Health check Content-Type = %q, expected %q", contentType, "text/plain")
 	}
 }
 
@@ -427,6 +493,16 @@ func TestHandler_ServeHTTP_Authentication(t *testing.T) {
 
 func TestHandler_ServeHTTP_Routing(t *testing.T) {
 	cfg := &config.Config{}
+	cfg.Server.HealthCheck = config.HealthCheckConfig{
+		Path: "/up",
+		Response: &config.HealthCheckResponse{
+			Status: http.StatusOK,
+			Body:   "OK",
+			Headers: map[string]string{
+				"Content-Type": "text/plain",
+			},
+		},
+	}
 
 	handler := CreateTestHandler(cfg, &process.AppManager{}, nil, nil)
 
@@ -455,29 +531,6 @@ func TestHandler_ServeHTTP_Routing(t *testing.T) {
 				t.Errorf("Path %s returned %d, expected %d", tt.path, recorder.Code, tt.expectStatus)
 			}
 		})
-	}
-}
-
-func TestHandler_handleHealthCheck(t *testing.T) {
-	cfg := &config.Config{}
-	handler := &Handler{config: cfg, staticHandler: NewStaticFileHandler(cfg)}
-
-	req := httptest.NewRequest("GET", "/up", nil)
-	recorder := httptest.NewRecorder()
-
-	handler.handleHealthCheck(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Errorf("handleHealthCheck returned %d, expected %d", recorder.Code, http.StatusOK)
-	}
-
-	if recorder.Body.String() != "OK" {
-		t.Errorf("handleHealthCheck body = %q, expected %q", recorder.Body.String(), "OK")
-	}
-
-	contentType := recorder.Header().Get("Content-Type")
-	if contentType != "text/html" {
-		t.Errorf("handleHealthCheck Content-Type = %q, expected %q", contentType, "text/html")
 	}
 }
 

@@ -83,8 +83,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Log request start
 	logging.LogRequest(r.Method, r.URL.Path, requestID)
 
-	// Handle health check endpoint
-	if r.URL.Path == "/up" {
+	// Handle health check endpoint (if configured)
+	if h.config.Server.HealthCheck.Path != "" && r.URL.Path == h.config.Server.HealthCheck.Path {
 		h.handleHealthCheck(recorder, r)
 		return
 	}
@@ -142,11 +142,33 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleHealthCheck handles the /up health check endpoint
+// handleHealthCheck handles the health check endpoint
+// If Response is configured, returns a synthetic response.
+// Otherwise, proxies to the web application.
 func (h *Handler) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("OK"))
+	// If synthetic response is configured, use it
+	if h.config.Server.HealthCheck.Response != nil {
+		resp := h.config.Server.HealthCheck.Response
+
+		// Set custom headers
+		for key, value := range resp.Headers {
+			w.Header().Set(key, value)
+		}
+
+		// Set default content type if not specified
+		if w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", "text/plain")
+		}
+
+		// Write status and body
+		w.WriteHeader(resp.Status)
+		_, _ = w.Write([]byte(resp.Body))
+		return
+	}
+
+	// No synthetic response configured - proxy to application
+	// Fall through to normal request handling
+	h.handleWebAppProxy(w, r)
 }
 
 // handleRewrites processes rewrite rules

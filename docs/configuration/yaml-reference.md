@@ -66,6 +66,15 @@ server:
   hostname: "localhost"           # Hostname for requests (optional)
   root_path: "/showcase"          # Root URL path prefix (optional)
 
+  # Health check configuration
+  health_check:
+    path: "/up"                   # Health check endpoint path (optional)
+    response:                     # Synthetic response (optional)
+      status: 200                 # HTTP status code
+      body: "OK"                  # Response body
+      headers:                    # Response headers
+        Content-Type: "text/plain"
+
   # Static file configuration
   static:
     public_dir: "./public"        # Directory for static files (optional)
@@ -96,6 +105,54 @@ server:
 | `listen` | integer/string | `3000` | Port to bind HTTP server |
 | `hostname` | string | `""` | Hostname for Host header matching |
 | `root_path` | string | `""` | Root URL path prefix (e.g., "/showcase") |
+
+### server.health_check
+
+Health check endpoint configuration with optional synthetic response support.
+
+```yaml
+server:
+  health_check:
+    path: "/up"
+    response:                      # Optional - omit to proxy to application
+      status: 200
+      body: "OK"
+      headers:
+        Content-Type: "text/plain"
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `path` | string | `""` | Health check endpoint path (e.g., "/up") |
+| `response` | object | `nil` | Optional synthetic response configuration |
+| `response.status` | integer | - | HTTP status code (e.g., 200, 503) |
+| `response.body` | string | - | Response body text |
+| `response.headers` | map | `{}` | Response headers (e.g., Content-Type) |
+
+**Synthetic Response Mode**: When `response` is configured, Navigator returns the synthetic response directly without proxying to your application. This provides:
+
+- Fast response time (< 1ms)
+- Works even if applications are down/starting
+- No application startup required
+- Ideal for load balancers and container orchestration
+
+**Proxy Mode**: When `response` is omitted, health check requests are forwarded to your application, allowing custom health check logic.
+
+**Example - Kubernetes**:
+```yaml
+health_check:
+  path: "/healthz"
+  response:
+    status: 200
+    body: "alive"
+```
+
+**Example - Application Health Check**:
+```yaml
+health_check:
+  path: "/up"
+  # No response - proxies to Rails /up endpoint
+```
 
 ### server.static
 

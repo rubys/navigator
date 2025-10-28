@@ -158,6 +158,19 @@ type MaintenanceConfig struct {
 	Page    string `yaml:"page"`
 }
 
+// HealthCheckConfig represents health check configuration
+type HealthCheckConfig struct {
+	Path     string            `yaml:"path"`     // Health check path (e.g., "/up")
+	Response *HealthCheckResponse `yaml:"response"` // Optional synthetic response (if nil, proxies to app)
+}
+
+// HealthCheckResponse represents a synthetic health check response
+type HealthCheckResponse struct {
+	Status  int               `yaml:"status"`  // HTTP status code (e.g., 200)
+	Body    string            `yaml:"body"`    // Response body
+	Headers map[string]string `yaml:"headers"` // Response headers
+}
+
 // Config represents the main configuration
 type Config struct {
 	Server struct {
@@ -167,6 +180,7 @@ type Config struct {
 		RewriteRules []RewriteRule
 		Static       StaticConfig
 		CGIScripts   []CGIScriptConfig `yaml:"cgi_scripts"`
+		HealthCheck  HealthCheckConfig  `yaml:"health_check"`
 		Idle         struct {
 			Action  string `yaml:"action"`  // "suspend" or "stop"
 			Timeout string `yaml:"timeout"` // Duration string like "30s", "5m"

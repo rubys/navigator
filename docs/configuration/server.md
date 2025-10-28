@@ -93,6 +93,80 @@ server:
 - After root_path processing: `GET /users/123`
 - Useful for deploying behind reverse proxies
 
+### health_check
+
+**Optional**: Health check endpoint configuration with synthetic response support.
+
+```yaml
+server:
+  health_check:
+    path: "/up"                  # Health check path (required)
+    response:                    # Optional synthetic response
+      status: 200                # HTTP status code
+      body: "OK"                 # Response body
+      headers:
+        Content-Type: "text/plain"
+```
+
+**Modes**:
+
+1. **Synthetic Response** (recommended): Navigator returns a direct response without proxying to your application
+
+   ```yaml
+   health_check:
+     path: "/up"
+     response:
+       status: 200
+       body: "OK"
+       headers:
+         Content-Type: "text/plain"
+   ```
+
+   Benefits:
+   - Fast response time (< 1ms)
+   - Works even if applications are down
+   - No application startup required
+   - Ideal for load balancers and container orchestration
+
+2. **Proxy Mode**: Forwards health checks to your application (omit `response` field)
+
+   ```yaml
+   health_check:
+     path: "/up"
+     # No response field - proxies to application
+   ```
+
+   Use when your application needs custom health check logic.
+
+**Common Use Cases**:
+
+```yaml
+# Kubernetes liveness probe
+health_check:
+  path: "/healthz"
+  response:
+    status: 200
+    body: "alive"
+
+# Fly.io health check
+health_check:
+  path: "/up"
+  response:
+    status: 200
+    body: "OK"
+    headers:
+      Content-Type: "text/plain"
+
+# AWS ELB health check with JSON
+health_check:
+  path: "/health"
+  response:
+    status: 200
+    body: '{"status":"healthy"}'
+    headers:
+      Content-Type: "application/json"
+```
+
 ## Environment-Specific Examples
 
 ### Development
