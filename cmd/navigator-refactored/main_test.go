@@ -645,3 +645,94 @@ logging:
 
 	t.Log("Auth reload test passed - demonstrates auth is loaded after file updates")
 }
+func TestCGIScriptsReload(t *testing.T) {
+	// Create a temporary CGI script
+	tempDir := t.TempDir()
+	scriptPath := filepath.Join(tempDir, "test_script.sh")
+
+	scriptContent := `#!/bin/sh
+echo "Content-Type: text/plain"
+echo ""
+echo "Hello from CGI"
+`
+	err := os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		t.Fatalf("Failed to create test script: %v", err)
+	}
+
+	// Create config file with CGI scripts
+	configFile := filepath.Join(tempDir, "test-config.yml")
+	configContent := `
+server:
+  listen: "3000"
+  hostname: "localhost"
+  cgi_scripts:
+    - path: "/test/cgi"
+      script: "` + scriptPath + `"
+      method: "POST"
+applications:
+  tenants: []
+logging:
+  format: "text"
+`
+
+	err = os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	// Create initial config without CGI scripts
+	cfg := &config.Config{}
+	cfg.Server.Listen = "3000"
+	cfg.Server.Hostname = "localhost"
+	cfg.Server.CGIScripts = nil // Start with no CGI scripts
+
+	// Create real managers to avoid nil pointer issues
+	appManager := process.NewAppManager(cfg)
+	processManager := process.NewManager(cfg)
+	idleManager := idle.NewManager(cfg)
+
+	// Create lifecycle with valid config file
+	lifecycle := &ServerLifecycle{
+		configFile:     configFile,
+		cfg:            cfg,
+		appManager:     appManager,
+		processManager: processManager,
+		basicAuth:      nil,
+		idleManager:    idleManager,
+	}
+
+	// Verify initial state has no CGI scripts
+	if len(lifecycle.cfg.Server.CGIScripts) != 0 {
+		t.Errorf("Expected 0 CGI scripts initially, got %d", len(lifecycle.cfg.Server.CGIScripts))
+	}
+
+	// Test reload with config containing CGI scripts
+	lifecycle.handleReload()
+
+	// Verify config was updated
+	if lifecycle.cfg == nil {
+		t.Fatal("Expected non-nil config after reload")
+	}
+
+	// Verify CGI scripts were loaded
+	if len(lifecycle.cfg.Server.CGIScripts) != 1 {
+		t.Fatalf("Expected 1 CGI script after reload, got %d", len(lifecycle.cfg.Server.CGIScripts))
+	}
+
+	// Verify CGI script details
+	cgiScript := lifecycle.cfg.Server.CGIScripts[0]
+	if cgiScript.Path != "/test/cgi" {
+		t.Errorf("Expected CGI path '/test/cgi', got '%s'", cgiScript.Path)
+	}
+
+	if cgiScript.Script != scriptPath {
+		t.Errorf("Expected CGI script '%s', got '%s'", scriptPath, cgiScript.Script)
+	}
+
+	if cgiScript.Method != "POST" {
+		t.Errorf("Expected CGI method 'POST', got '%s'", cgiScript.Method)
+	}
+
+	t.Log("CGI scripts reload test passed")
+}

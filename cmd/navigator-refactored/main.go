@@ -52,7 +52,8 @@ func main() {
 	}
 	slog.Info("Loaded configuration",
 		"tenants", len(cfg.Applications.Tenants),
-		"reverseProxies", len(cfg.Routes.ReverseProxies))
+		"reverseProxies", len(cfg.Routes.ReverseProxies),
+		"cgiScripts", len(cfg.Server.CGIScripts))
 
 	// Log maintenance mode status
 	if cfg.Maintenance.Enabled {

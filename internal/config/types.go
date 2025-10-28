@@ -274,10 +274,11 @@ type YAMLConfig struct {
 		} `yaml:"auth_patterns"`
 	} `yaml:"auth"`
 	Server struct {
-		Listen   interface{} `yaml:"listen"`
-		Hostname string      `yaml:"hostname"`
-		RootPath string      `yaml:"root_path"`
-		Static   struct {
+		Listen     interface{}       `yaml:"listen"`
+		Hostname   string            `yaml:"hostname"`
+		RootPath   string            `yaml:"root_path"`
+		CGIScripts []CGIScriptConfig `yaml:"cgi_scripts"`
+		Static     struct {
 			PublicDir         string   `yaml:"public_dir"`
 			AllowedExtensions []string `yaml:"allowed_extensions"`
 			TryFiles          []string `yaml:"try_files"`

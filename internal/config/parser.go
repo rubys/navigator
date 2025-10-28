@@ -106,6 +106,9 @@ func (p *ConfigParser) parseServerConfig() {
 	// Set idle configuration
 	p.config.Server.Idle.Action = p.yamlConfig.Server.Idle.Action
 	p.config.Server.Idle.Timeout = p.yamlConfig.Server.Idle.Timeout
+
+	// Copy CGI scripts configuration
+	p.config.Server.CGIScripts = p.yamlConfig.Server.CGIScripts
 }
 
 // parseAuthConfig parses authentication configuration
