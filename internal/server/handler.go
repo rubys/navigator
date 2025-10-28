@@ -89,13 +89,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if maintenance mode is enabled
-	if h.config.Maintenance.Enabled {
-		recorder.SetMetadata("response_type", "maintenance")
-		ServeMaintenancePage(recorder, r, h.config)
-		return
-	}
-
 	// Check authentication EARLY - before any routing decisions
 	// This prevents authentication bypass via reverse proxies, fly-replay, etc.
 	isPublic := auth.ShouldExcludeFromAuth(r.URL.Path, h.config)
@@ -122,13 +115,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Try to serve static files
+	// Try to serve static files (even during maintenance mode)
 	if h.staticHandler.ServeStatic(recorder, r) {
 		return
 	}
 
-	// Try files for public paths
+	// Try files for public paths (even during maintenance mode)
 	if isPublic && h.staticHandler.TryFiles(recorder, r) {
+		return
+	}
+
+	// Check if maintenance mode is enabled
+	// Static files are served above, so only dynamic requests reach here
+	if h.config.Maintenance.Enabled {
+		recorder.SetMetadata("response_type", "maintenance")
+		ServeMaintenancePage(recorder, r, h.config)
 		return
 	}
 
@@ -136,7 +137,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(h.config.Applications.Tenants) > 0 {
 		h.handleWebAppProxy(recorder, r)
 	} else {
-		// No tenants configured - check for static fallback (maintenance mode)
+		// No tenants configured - check for static fallback
 		h.staticHandler.ServeFallback(recorder, r)
 	}
 }

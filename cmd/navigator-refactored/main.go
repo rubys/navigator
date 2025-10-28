@@ -57,7 +57,7 @@ func main() {
 
 	// Log maintenance mode status
 	if cfg.Maintenance.Enabled {
-		slog.Info("Maintenance mode enabled - all requests will receive maintenance page")
+		slog.Info("Maintenance mode enabled - static files will be served, dynamic requests will receive maintenance page")
 	}
 
 	// Setup logging format based on configuration

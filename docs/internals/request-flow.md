@@ -81,7 +81,17 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 9. Web Application Proxy                            │
+│ 9. Maintenance Mode Check                           │
+│    - Check if maintenance.enabled is true           │
+│    → YES: Serve maintenance page (503)              │
+│    → NO: Continue                                   │
+│                                                      │
+│    ℹ️  NOTE: Static files (steps 7-8) are served   │
+│        even in maintenance mode                     │
+└───────────────────┬─────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────────┐
+│ 10. Web Application Proxy                           │
 │    - Extract tenant from path                       │
 │    - Start or get existing app process              │
 │    - Wait for app readiness (with timeout)          │
@@ -92,7 +102,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 10. Response Completion                             │
+│ 11. Response Completion                             │
 │     - Stop idle tracking                            │
 │     - Log request details                           │
 │     - Return to client                              │

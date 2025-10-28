@@ -651,6 +651,137 @@ func TestStaticFallbackWithNoTenants(t *testing.T) {
 	}
 }
 
+func TestMaintenanceModeWithStaticFiles(t *testing.T) {
+	// Create a temporary directory for test files
+	tempDir, err := os.MkdirTemp("", "navigator-maintenance-static-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a static HTML file
+	staticHTML := `<!DOCTYPE html>
+<html>
+<head><title>Static Page</title></head>
+<body><h1>This is a static page</h1></body>
+</html>`
+
+	staticPath := filepath.Join(tempDir, "static.html")
+	if err := os.WriteFile(staticPath, []byte(staticHTML), 0644); err != nil {
+		t.Fatalf("Failed to create static file: %v", err)
+	}
+
+	// Create a maintenance page
+	maintenanceHTML := `<!DOCTYPE html>
+<html>
+<head><title>Maintenance</title></head>
+<body><h1>Site Under Maintenance</h1></body>
+</html>`
+
+	maintenancePath := filepath.Join(tempDir, "503.html")
+	if err := os.WriteFile(maintenancePath, []byte(maintenanceHTML), 0644); err != nil {
+		t.Fatalf("Failed to create maintenance file: %v", err)
+	}
+
+	// Create CSS file to test static extensions
+	cssContent := "body { color: blue; }"
+	cssPath := filepath.Join(tempDir, "style.css")
+	if err := os.WriteFile(cssPath, []byte(cssContent), 0644); err != nil {
+		t.Fatalf("Failed to create CSS file: %v", err)
+	}
+
+	// Create test configuration with maintenance mode enabled
+	cfg := &config.Config{
+		Applications: config.Applications{
+			Tenants: []config.Tenant{
+				{
+					Path: "/app/",
+					Var:  map[string]interface{}{},
+				},
+			},
+		},
+	}
+	cfg.Server.Static.PublicDir = tempDir
+	cfg.Server.Static.AllowedExtensions = []string{"html", "css", "js", "png", "jpg"}
+	cfg.Maintenance.Enabled = true
+	cfg.Maintenance.Page = "/503.html"
+
+	// Create handler
+	handler := CreateTestHandler(cfg, nil, nil, nil)
+
+	// Test cases
+	tests := []struct {
+		name           string
+		path           string
+		expectedStatus int
+		expectedBody   string
+		description    string
+	}{
+		{
+			name:           "Static HTML file served during maintenance",
+			path:           "/static.html",
+			expectedStatus: http.StatusOK,
+			expectedBody:   "This is a static page",
+			description:    "Static files should be served even in maintenance mode",
+		},
+		{
+			name:           "Static CSS file served during maintenance",
+			path:           "/style.css",
+			expectedStatus: http.StatusOK,
+			expectedBody:   "body { color: blue; }",
+			description:    "Static CSS files should be served even in maintenance mode",
+		},
+		{
+			name:           "Dynamic request gets maintenance page",
+			path:           "/app/dashboard",
+			expectedStatus: http.StatusServiceUnavailable,
+			expectedBody:   "Site Under Maintenance",
+			description:    "Dynamic requests should get the maintenance page",
+		},
+		{
+			name:           "Root path gets maintenance page",
+			path:           "/",
+			expectedStatus: http.StatusServiceUnavailable,
+			expectedBody:   "Site Under Maintenance",
+			description:    "Root path should get the maintenance page when no static file exists",
+		},
+		{
+			name:           "Non-existent path gets maintenance page",
+			path:           "/nonexistent",
+			expectedStatus: http.StatusServiceUnavailable,
+			expectedBody:   "Site Under Maintenance",
+			description:    "Non-existent paths should get the maintenance page",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create request
+			req, err := http.NewRequest("GET", tt.path, nil)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+
+			// Create response recorder
+			rr := httptest.NewRecorder()
+
+			// Serve the request
+			handler.ServeHTTP(rr, req)
+
+			// Check status code
+			if rr.Code != tt.expectedStatus {
+				t.Errorf("Expected status %d, got %d", tt.expectedStatus, rr.Code)
+			}
+
+			// Check response body contains expected text
+			body := rr.Body.String()
+			if tt.expectedBody != "" && !strings.Contains(body, tt.expectedBody) {
+				t.Errorf("Expected body to contain '%s', got: %s", tt.expectedBody, body)
+			}
+		})
+	}
+}
+
 // TestAssetServingIntegration tests the complete HTTP request flow for asset serving
 // with root path stripping functionality. This is an integration test that verifies
 // the full handler chain works correctly for the original 404 asset issue.

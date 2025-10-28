@@ -232,21 +232,34 @@ Maintenance mode configuration.
 
 ```yaml
 maintenance:
-  enabled: false                  # Enable maintenance mode (all requests get maintenance page)
+  enabled: false                  # Enable maintenance mode (dynamic requests get maintenance page)
   page: "/503.html"               # Path to maintenance page (within public_dir)
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Enable maintenance mode - serves maintenance page for all requests (except `/up` health check) |
+| `enabled` | boolean | `false` | Enable maintenance mode - serves maintenance page for dynamic requests (static files still served) |
 | `page` | string | `"/503.html"` | Path to custom maintenance page |
 
 Navigator serves the maintenance page in these scenarios:
 
 **Explicit Maintenance Mode** (`enabled: true`):
-- All requests receive the maintenance page (except `/up` health check)
-- Useful during startup initialization or planned maintenance
-- Server listens immediately while background tasks complete
+
+What **continues working** during maintenance mode:
+- ✅ Health checks (`/up`) - for load balancer monitoring
+- ✅ Authentication - htpasswd rules still enforced
+- ✅ Static files - all files matching `allowed_extensions`
+- ✅ Try files - extensionless URL resolution (e.g., `/page` → `/page.html`)
+- ✅ Redirects - configured URL redirects
+- ✅ Rewrites - URL path modifications
+- ✅ Fly-Replay routes - PDF/XLSX generation, cross-region routing
+- ✅ CGI scripts - configuration update endpoints
+- ✅ Reverse proxies - WebSocket connections, external service proxies
+
+What **shows maintenance page**:
+- ❌ Dynamic web application requests only
+
+This design ensures optimal user experience during maintenance - infrastructure and static content remain accessible while protecting the application during updates.
 
 **Automatic Error Handling** (`enabled: false`, default):
 - An application is starting and exceeds the `startup_timeout`
@@ -292,7 +305,7 @@ server:
     public_dir: public
 
 maintenance:
-  enabled: true  # All requests get 503 page with auto-refresh
+  enabled: true  # Dynamic requests get 503 page with auto-refresh, static files served
   page: /503.html
 
 hooks:
@@ -305,7 +318,7 @@ hooks:
 
 **Flow:**
 1. Navigator starts with `navigator-maintenance.yml` (maintenance enabled)
-2. Server listens immediately, serves 503.html to all requests
+2. Server listens immediately, serves 503.html to dynamic requests (static files still served)
 3. Ready hook runs asynchronously (initialization tasks)
 4. Hook completes and triggers reload to `navigator.yml` (maintenance disabled)
 5. Normal operation begins
