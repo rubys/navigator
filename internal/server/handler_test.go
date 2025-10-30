@@ -558,10 +558,10 @@ func TestHandler_ServeHTTP_HealthCheckCustomHeaders(t *testing.T) {
 			Status: http.StatusOK,
 			Body:   `{"status":"healthy"}`,
 			Headers: map[string]string{
-				"Content-Type":         "application/json",
-				"X-Health-Check":       "synthetic",
-				"Cache-Control":        "no-cache",
-				"X-Response-Time-Ms":   "0",
+				"Content-Type":       "application/json",
+				"X-Health-Check":     "synthetic",
+				"Cache-Control":      "no-cache",
+				"X-Response-Time-Ms": "0",
 			},
 		},
 	}
