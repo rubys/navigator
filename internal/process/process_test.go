@@ -3,6 +3,7 @@ package process
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -572,6 +573,96 @@ func TestExecuteHooksTimeout(t *testing.T) {
 	// Should complete in reasonable time (not wait for full 10 seconds)
 	if duration > 2*time.Second {
 		t.Errorf("Hook took too long: %v", duration)
+	}
+}
+
+func TestExecuteServerHooksWithReload(t *testing.T) {
+	// Create temporary config files
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "test.yml")
+	if err := os.WriteFile(configPath, []byte("test: config\n"), 0644); err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	newConfigPath := filepath.Join(tmpDir, "new.yml")
+	if err := os.WriteFile(newConfigPath, []byte("test: new\n"), 0644); err != nil {
+		t.Fatalf("Failed to create new config: %v", err)
+	}
+
+	tests := []struct {
+		name              string
+		hooks             []config.HookConfig
+		currentConfigFile string
+		wantError         bool
+		wantReload        bool
+		wantReason        string
+	}{
+		{
+			name: "Successful hook with reload to different file",
+			hooks: []config.HookConfig{
+				{
+					Command:      "true", // Always succeeds
+					ReloadConfig: newConfigPath,
+				},
+			},
+			currentConfigFile: configPath,
+			wantError:         false,
+			wantReload:        true,
+			wantReason:        "different config file",
+		},
+		{
+			name: "Failed hook should not trigger reload",
+			hooks: []config.HookConfig{
+				{
+					Command:      "false", // Always fails
+					ReloadConfig: newConfigPath,
+				},
+			},
+			currentConfigFile: configPath,
+			wantError:         true,
+			wantReload:        false,
+		},
+		{
+			name: "Reload to non-existent file should not trigger reload",
+			hooks: []config.HookConfig{
+				{
+					Command:      "true",
+					ReloadConfig: "/nonexistent/config.yml",
+				},
+			},
+			currentConfigFile: configPath,
+			wantError:         false,
+			wantReload:        false,
+		},
+		{
+			name: "Successful hook without reload_config",
+			hooks: []config.HookConfig{
+				{
+					Command: "true",
+				},
+			},
+			currentConfigFile: configPath,
+			wantError:         false,
+			wantReload:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ExecuteServerHooksWithReload(tt.hooks, "test", tt.currentConfigFile)
+
+			if (result.Error != nil) != tt.wantError {
+				t.Errorf("Error = %v, wantError = %v", result.Error, tt.wantError)
+			}
+
+			if result.ReloadDecision.ShouldReload != tt.wantReload {
+				t.Errorf("ShouldReload = %v, want %v", result.ReloadDecision.ShouldReload, tt.wantReload)
+			}
+
+			if tt.wantReload && result.ReloadDecision.Reason != tt.wantReason {
+				t.Errorf("Reason = %q, want %q", result.ReloadDecision.Reason, tt.wantReason)
+			}
+		})
 	}
 }
 

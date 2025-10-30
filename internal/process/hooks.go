@@ -52,20 +52,22 @@ func ExecuteHooks(hooks []config.HookConfig, env map[string]string, hookType str
 
 		// Execute and wait
 		output, err := cmd.CombinedOutput()
+
+		// Always log output at INFO level if present
+		if len(output) > 0 {
+			slog.Info("Hook output",
+				"type", hookType,
+				"command", hook.Command,
+				"output", string(output))
+		}
+
 		if err != nil {
 			slog.Error("Hook execution failed",
 				"type", hookType,
 				"command", hook.Command,
 				"error", err,
-				"output", string(output))
+				"exitCode", cmd.ProcessState.ExitCode())
 			return fmt.Errorf("hook %s failed: %w", hookType, err)
-		}
-
-		if len(output) > 0 {
-			slog.Debug("Hook output",
-				"type", hookType,
-				"command", hook.Command,
-				"output", string(output))
 		}
 	}
 	return nil
@@ -91,17 +93,25 @@ func ExecuteServerHooksWithReload(hooks []config.HookConfig, hookType, currentCo
 	// Execute all hooks
 	err := ExecuteHooks(hooks, nil, fmt.Sprintf("server.%s", hookType))
 
-	// Check if any hook specified reload_config
-	var reloadConfigPath string
-	for _, hook := range hooks {
-		if hook.ReloadConfig != "" {
-			reloadConfigPath = hook.ReloadConfig
-			break // Use first non-empty reload_config
+	// Only check for reload if hooks succeeded
+	var reloadDecision utils.ReloadDecision
+	if err == nil {
+		// Check if any hook specified reload_config
+		var reloadConfigPath string
+		for _, hook := range hooks {
+			if hook.ReloadConfig != "" {
+				reloadConfigPath = hook.ReloadConfig
+				break // Use first non-empty reload_config
+			}
 		}
-	}
 
-	// Determine if config should be reloaded
-	reloadDecision := utils.ShouldReloadConfig(reloadConfigPath, currentConfigFile, startTime)
+		// Determine if config should be reloaded
+		reloadDecision = utils.ShouldReloadConfig(reloadConfigPath, currentConfigFile, startTime)
+	} else {
+		slog.Warn("Skipping config reload due to hook failure",
+			"hookType", hookType,
+			"error", err)
+	}
 
 	return HookResult{
 		Error:          err,

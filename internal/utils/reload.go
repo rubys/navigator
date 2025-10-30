@@ -32,6 +32,14 @@ func ShouldReloadConfig(reloadConfigPath, currentConfigPath string, startTime ti
 
 	// Check if config file path is different from current
 	if reloadConfigPath != currentConfigPath {
+		// Verify the new config file actually exists before attempting reload
+		if _, err := os.Stat(reloadConfigPath); err != nil {
+			slog.Error("Reload config file does not exist",
+				"file", reloadConfigPath,
+				"error", err)
+			return ReloadDecision{ShouldReload: false}
+		}
+
 		slog.Info("Reload config specifies different config file",
 			"current", currentConfigPath,
 			"new", reloadConfigPath)

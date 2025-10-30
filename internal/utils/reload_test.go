@@ -8,11 +8,16 @@ import (
 )
 
 func TestShouldReloadConfig(t *testing.T) {
-	// Create temporary config file
+	// Create temporary config files
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "test.yml")
 	if err := os.WriteFile(configPath, []byte("test: config\n"), 0644); err != nil {
 		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	differentConfigPath := filepath.Join(tmpDir, "different.yml")
+	if err := os.WriteFile(differentConfigPath, []byte("test: different\n"), 0644); err != nil {
+		t.Fatalf("Failed to create different config: %v", err)
 	}
 
 	tests := []struct {
@@ -32,7 +37,7 @@ func TestShouldReloadConfig(t *testing.T) {
 		},
 		{
 			name:              "Different config file",
-			reloadConfigPath:  "/different/config.yml",
+			reloadConfigPath:  differentConfigPath,
 			currentConfigPath: configPath,
 			wantReload:        true,
 			wantReason:        "different config file",
@@ -98,9 +103,9 @@ func TestShouldReloadConfig_NonExistentFile(t *testing.T) {
 	startTime := time.Now()
 	decision := ShouldReloadConfig("/nonexistent/config.yml", "/current/config.yml", startTime)
 
-	// Different file path should trigger reload even if target doesn't exist
-	if !decision.ShouldReload {
-		t.Error("Expected reload for different file path")
+	// Should NOT reload if target file doesn't exist (prevents errors)
+	if decision.ShouldReload {
+		t.Error("Expected NO reload when target config file doesn't exist")
 	}
 }
 

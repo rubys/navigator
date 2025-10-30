@@ -255,17 +255,31 @@ applications:
 
 ### Behavior on Failure
 
-- **Logging**: Failed hooks log detailed error messages
-- **Non-blocking**: Hook failures don't stop Navigator
+- **Logging**: All hook output (stdout and stderr) is logged at INFO level for visibility
+- **Exit codes**: Non-zero exit codes are logged at ERROR level with the specific exit code
+- **Non-blocking**: Hook failures don't stop Navigator (except for start hooks which block startup)
 - **Timeout**: Hooks exceeding timeout are terminated
 - **Sequential**: Multiple hooks run in order; failures don't skip subsequent hooks
 - **Reload on success only**: `reload_config` only triggers if hook exits with status 0
+- **File existence check**: Config files must exist before reload is attempted
 
 ### Exit Codes
 
 Hooks should return standard exit codes:
-- `0` - Success
-- `Non-zero` - Failure (logged but Navigator continues)
+- `0` - Success (allows reload if `reload_config` specified)
+- `Non-zero` - Failure (logged at ERROR level with exit code, reload skipped)
+
+### Config Reload Requirements
+
+For `reload_config` to trigger a configuration reload, all of the following must be true:
+
+1. **Hook succeeded**: Exit code must be 0
+2. **File exists**: The config file specified in `reload_config` must exist
+3. **Change detected**: One of:
+   - Config file path differs from currently loaded config, OR
+   - Config file modification time changed during hook execution
+
+If the hook fails (non-zero exit code) or the target config file doesn't exist, Navigator logs a warning and skips the reload. This prevents errors from attempting to load invalid or missing configuration files.
 
 ### Best Practices
 
@@ -493,16 +507,28 @@ hooks:
 
 ### View Hook Execution
 
-Hooks execution appears in Navigator logs:
+All hook execution details appear in Navigator logs at INFO level for visibility:
+
+**Successful hook execution:**
+```
+level=INFO msg="Executing hook" type=server.idle command=/usr/local/bin/backup.sh args=[--all] timeout=5m0s
+level=INFO msg="Hook output" type=server.idle command=/usr/local/bin/backup.sh output="Uploaded 15 databases to S3"
+```
+
+**Failed hook execution:**
+```
+level=INFO msg="Executing hook" type=tenant.stop.default command=/rails/script/sync.sh args=[db/test.sqlite3] timeout=2m0s
+level=INFO msg="Hook output" type=tenant.stop.default command=/rails/script/sync.sh output="ERROR: S3 bucket not accessible"
+level=ERROR msg="Hook execution failed" type=tenant.stop.default command=/rails/script/sync.sh error="exit status 1" exitCode=1
+```
+
+**Reload decision logging:**
+```
+level=INFO msg="Reload config specifies different config file" current=config/navigator-maintenance.yml new=config/navigator.yml
+```
 
 ```
-level=INFO msg="Executing hook" type=server.idle command=/usr/local/bin/backup.sh
-level=INFO msg="Hook completed" type=server.idle duration=2.3s
-```
-
-```
-level=INFO msg="Executing hook" type=tenant.stop.default command=/rails/script/sync.sh
-level=INFO msg="Hook output" type=tenant.stop.default output="Synced 3 databases"
+level=WARN msg="Skipping config reload due to hook failure" hookType=ready error="hook server.ready failed: exit status 1"
 ```
 
 ### Common Issues
