@@ -107,6 +107,9 @@ func (p *ConfigParser) parseServerConfig() {
 	p.config.Server.Idle.Action = p.yamlConfig.Server.Idle.Action
 	p.config.Server.Idle.Timeout = p.yamlConfig.Server.Idle.Timeout
 
+	// Copy health check configuration
+	p.config.Server.HealthCheck = p.yamlConfig.Server.HealthCheck
+
 	// Copy CGI scripts configuration
 	p.config.Server.CGIScripts = p.yamlConfig.Server.CGIScripts
 }

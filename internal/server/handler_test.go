@@ -412,6 +412,189 @@ func TestHandler_ServeHTTP_HealthCheck(t *testing.T) {
 	}
 }
 
+func TestHandler_ServeHTTP_HealthCheckBeforeAuth(t *testing.T) {
+	// This test verifies the critical fix: health checks must be processed BEFORE authentication
+	cfg := &config.Config{}
+	cfg.Server.HealthCheck = config.HealthCheckConfig{
+		Path: "/up",
+		Response: &config.HealthCheckResponse{
+			Status: http.StatusOK,
+			Body:   "OK",
+			Headers: map[string]string{
+				"Content-Type": "text/plain",
+			},
+		},
+	}
+
+	// Enable authentication
+	cfg.Auth.Enabled = true
+	cfg.Auth.Realm = "Test Realm"
+
+	// Create basic auth (but don't provide credentials)
+	basicAuth := &auth.BasicAuth{}
+
+	handler := CreateTestHandler(cfg, nil, basicAuth, nil)
+
+	req := httptest.NewRequest("GET", "/up", nil)
+	// Deliberately NOT providing auth credentials
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	// Health check should succeed WITHOUT authentication
+	if recorder.Code != http.StatusOK {
+		t.Errorf("Health check with auth enabled returned %d, expected %d (should bypass auth)",
+			recorder.Code, http.StatusOK)
+	}
+
+	if recorder.Body.String() != "OK" {
+		t.Errorf("Health check body = %q, expected %q", recorder.Body.String(), "OK")
+	}
+}
+
+func TestHandler_ServeHTTP_HealthCheckNotConfigured(t *testing.T) {
+	// Test that requests to /up without health check config fall through to normal routing
+	cfg := &config.Config{}
+	// No health check configuration
+	cfg.Server.HealthCheck = config.HealthCheckConfig{
+		Path: "", // Empty path = no health check
+	}
+
+	handler := CreateTestHandler(cfg, nil, nil, nil)
+
+	req := httptest.NewRequest("GET", "/up", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	// Should NOT be handled as health check (will return 404 or fall through to tenants)
+	if recorder.Code == http.StatusOK && recorder.Body.String() == "OK" {
+		t.Error("Request to /up should not be handled as health check when not configured")
+	}
+}
+
+func TestHandler_ServeHTTP_HealthCheckDifferentPaths(t *testing.T) {
+	tests := []struct {
+		name           string
+		configPath     string
+		requestPath    string
+		expectHealthOK bool
+	}{
+		{
+			name:           "Exact match /up",
+			configPath:     "/up",
+			requestPath:    "/up",
+			expectHealthOK: true,
+		},
+		{
+			name:           "Exact match /health",
+			configPath:     "/health",
+			requestPath:    "/health",
+			expectHealthOK: true,
+		},
+		{
+			name:           "Different path should not match",
+			configPath:     "/up",
+			requestPath:    "/health",
+			expectHealthOK: false,
+		},
+		{
+			name:           "Trailing slash should not match",
+			configPath:     "/up",
+			requestPath:    "/up/",
+			expectHealthOK: false,
+		},
+		{
+			name:           "Prefix should not match",
+			configPath:     "/up",
+			requestPath:    "/upstream",
+			expectHealthOK: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.Server.HealthCheck = config.HealthCheckConfig{
+				Path: tt.configPath,
+				Response: &config.HealthCheckResponse{
+					Status: http.StatusOK,
+					Body:   "Healthy",
+					Headers: map[string]string{
+						"Content-Type": "text/plain",
+					},
+				},
+			}
+
+			handler := CreateTestHandler(cfg, nil, nil, nil)
+
+			req := httptest.NewRequest("GET", tt.requestPath, nil)
+			recorder := httptest.NewRecorder()
+
+			handler.ServeHTTP(recorder, req)
+
+			if tt.expectHealthOK {
+				if recorder.Code != http.StatusOK {
+					t.Errorf("Expected health check to succeed with 200, got %d", recorder.Code)
+				}
+				if recorder.Body.String() != "Healthy" {
+					t.Errorf("Expected health check body, got: %s", recorder.Body.String())
+				}
+			} else {
+				// Should NOT return the health check response
+				if recorder.Body.String() == "Healthy" {
+					t.Error("Should not return health check response for non-matching path")
+				}
+			}
+		})
+	}
+}
+
+func TestHandler_ServeHTTP_HealthCheckCustomHeaders(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Server.HealthCheck = config.HealthCheckConfig{
+		Path: "/health",
+		Response: &config.HealthCheckResponse{
+			Status: http.StatusOK,
+			Body:   `{"status":"healthy"}`,
+			Headers: map[string]string{
+				"Content-Type":         "application/json",
+				"X-Health-Check":       "synthetic",
+				"Cache-Control":        "no-cache",
+				"X-Response-Time-Ms":   "0",
+			},
+		},
+	}
+
+	handler := CreateTestHandler(cfg, nil, nil, nil)
+
+	req := httptest.NewRequest("GET", "/health", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	// Verify all custom headers are set
+	expectedHeaders := map[string]string{
+		"Content-Type":       "application/json",
+		"X-Health-Check":     "synthetic",
+		"Cache-Control":      "no-cache",
+		"X-Response-Time-Ms": "0",
+	}
+
+	for key, expected := range expectedHeaders {
+		actual := recorder.Header().Get(key)
+		if actual != expected {
+			t.Errorf("Header %s = %q, expected %q", key, actual, expected)
+		}
+	}
+
+	// Verify body
+	expectedBody := `{"status":"healthy"}`
+	if recorder.Body.String() != expectedBody {
+		t.Errorf("Body = %q, expected %q", recorder.Body.String(), expectedBody)
+	}
+}
+
 func TestHandler_ServeHTTP_RequestID(t *testing.T) {
 	cfg := &config.Config{}
 	handler := CreateTestHandler(cfg, nil, nil, nil)

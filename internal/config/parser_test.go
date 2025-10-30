@@ -7,11 +7,14 @@ import (
 
 func TestConfigParser_ParseServerConfig(t *testing.T) {
 	tests := []struct {
-		name       string
-		yamlConfig YAMLConfig
-		wantListen string
-		wantPublic string
-		wantAuth   string
+		name             string
+		yamlConfig       YAMLConfig
+		wantListen       string
+		wantPublic       string
+		wantAuth         string
+		wantHealthCheck  string
+		wantHealthStatus int
+		wantHealthBody   string
 	}{
 		{
 			name: "basic server config",
@@ -23,9 +26,12 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 				cfg.Auth.HTPasswd = "/etc/htpasswd"
 				return cfg
 			}(),
-			wantListen: "3001",
-			wantPublic: "/var/www/public",
-			wantAuth:   "/etc/htpasswd",
+			wantListen:       "3001",
+			wantPublic:       "/var/www/public",
+			wantAuth:         "/etc/htpasswd",
+			wantHealthCheck:  "",
+			wantHealthStatus: 0,
+			wantHealthBody:   "",
 		},
 		{
 			name: "string listen port",
@@ -34,9 +40,52 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 				cfg.Server.Listen = ":8080"
 				return cfg
 			}(),
-			wantListen: ":8080",
-			wantPublic: "",
-			wantAuth:   "",
+			wantListen:       ":8080",
+			wantPublic:       "",
+			wantAuth:         "",
+			wantHealthCheck:  "",
+			wantHealthStatus: 0,
+			wantHealthBody:   "",
+		},
+		{
+			name: "health check with synthetic response",
+			yamlConfig: func() YAMLConfig {
+				cfg := YAMLConfig{}
+				cfg.Server.Listen = 3000
+				cfg.Server.HealthCheck = HealthCheckConfig{
+					Path: "/up",
+					Response: &HealthCheckResponse{
+						Status:  200,
+						Body:    "OK",
+						Headers: map[string]string{"Content-Type": "text/plain"},
+					},
+				}
+				return cfg
+			}(),
+			wantListen:       "3000",
+			wantPublic:       "",
+			wantAuth:         "",
+			wantHealthCheck:  "/up",
+			wantHealthStatus: 200,
+			wantHealthBody:   "OK",
+		},
+		{
+			name: "health check without synthetic response",
+			yamlConfig: func() YAMLConfig {
+				cfg := YAMLConfig{}
+				cfg.Server.Listen = 3000
+				cfg.Server.HealthCheck = HealthCheckConfig{
+					Path:     "/health",
+					Response: nil,
+				}
+				return cfg
+			}(),
+			wantListen:       "3000",
+			wantPublic:       "",
+			wantAuth:         "",
+			wantHealthCheck:  "/health",
+			wantHealthStatus: 0,
+			wantHealthBody:   "",
 		},
 	}
 
@@ -56,6 +105,29 @@ func TestConfigParser_ParseServerConfig(t *testing.T) {
 			}
 			if config.Auth.HTPasswd != tt.wantAuth {
 				t.Errorf("Authentication = %v, want %v", config.Auth.HTPasswd, tt.wantAuth)
+			}
+
+			// Check health check configuration
+			if config.Server.HealthCheck.Path != tt.wantHealthCheck {
+				t.Errorf("HealthCheck.Path = %v, want %v", config.Server.HealthCheck.Path, tt.wantHealthCheck)
+			}
+
+			if tt.wantHealthStatus > 0 {
+				if config.Server.HealthCheck.Response == nil {
+					t.Error("Expected health check response to be configured, got nil")
+				} else {
+					if config.Server.HealthCheck.Response.Status != tt.wantHealthStatus {
+						t.Errorf("HealthCheck.Response.Status = %v, want %v",
+							config.Server.HealthCheck.Response.Status, tt.wantHealthStatus)
+					}
+					if config.Server.HealthCheck.Response.Body != tt.wantHealthBody {
+						t.Errorf("HealthCheck.Response.Body = %v, want %v",
+							config.Server.HealthCheck.Response.Body, tt.wantHealthBody)
+					}
+				}
+			} else if tt.wantHealthCheck != "" && config.Server.HealthCheck.Response != nil {
+				t.Errorf("Expected health check response to be nil for proxy-only health check, got %+v",
+					config.Server.HealthCheck.Response)
 			}
 		})
 	}

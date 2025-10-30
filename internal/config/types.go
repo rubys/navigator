@@ -308,6 +308,7 @@ type YAMLConfig struct {
 			Action  string `yaml:"action"`  // "suspend" or "stop"
 			Timeout string `yaml:"timeout"` // Duration string like "30s", "5m"
 		} `yaml:"idle"`
+		HealthCheck HealthCheckConfig `yaml:"health_check"`
 	} `yaml:"server"`
 	Routes struct {
 		Redirects []struct {
