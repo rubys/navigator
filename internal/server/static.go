@@ -159,7 +159,33 @@ func (s *StaticFileHandler) tryPublicDirFiles(w http.ResponseWriter, r *http.Req
 	publicDir := s.getPublicDir()
 	strippedPath := s.stripRootPath(path)
 
-	// Try each extension
+	// STEP 1: Check if the path (without trailing slash) is a directory
+	// If normalize_trailing_slashes is enabled, redirect to path WITH trailing slash
+	// This ensures relative paths in the HTML work correctly
+	if s.config.Server.Static.NormalizeTrailingSlashes && !strings.HasSuffix(path, "/") {
+		dirPath := filepath.Join(publicDir, strippedPath)
+		if info, err := os.Stat(dirPath); err == nil && info.IsDir() {
+			// Check if index.html exists in this directory
+			indexPath := filepath.Join(dirPath, "index.html")
+			if _, err := os.Stat(indexPath); err == nil {
+				// Directory has index.html - redirect to path with trailing slash
+				// This ensures relative paths in the HTML work correctly
+				redirectURL := path + "/"
+
+				// Set metadata for logging
+				if recorder, ok := w.(*ResponseRecorder); ok {
+					recorder.SetMetadata("response_type", "redirect")
+					recorder.SetMetadata("destination", redirectURL)
+				}
+
+				http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
+				logging.LogDirectoryRedirect(path, redirectURL)
+				return true
+			}
+		}
+	}
+
+	// STEP 2: Try each extension (for paths that already have trailing slash or aren't directories)
 	for _, ext := range extensions {
 		fsPath := filepath.Join(publicDir, strippedPath+ext)
 		logging.LogTryFilesCheckingPath(fsPath)

@@ -15,6 +15,7 @@ server:                    # HTTP server settings
     public_dir: "./public"
     allowed_extensions: [...]
     try_files: [...]
+    normalize_trailing_slashes: true
     cache_control: {...}
   idle:                    # Fly.io machine idle management
     action: suspend
@@ -88,6 +89,7 @@ server:
       - index.html
       - .html
       - .htm
+    normalize_trailing_slashes: true  # Redirect directories to trailing slash (optional)
     cache_control:
       default: "1h"               # Default cache duration
       overrides:                  # Path-specific cache durations
@@ -164,6 +166,7 @@ server:
     public_dir: "./public"
     allowed_extensions: [html, css, js, png, jpg]
     try_files: [index.html, .html, .htm]
+    normalize_trailing_slashes: true
     cache_control:
       default: "1h"
       overrides:
@@ -178,6 +181,7 @@ server:
 | `public_dir` | string | `"./public"` | Directory for static files |
 | `allowed_extensions` | array | `[]` | File extensions allowed (empty = all allowed) |
 | `try_files` | array | `[]` | Suffixes to try when resolving paths |
+| `normalize_trailing_slashes` | boolean | `false` | Redirect directories to trailing slash URLs |
 | `cache_control` | object | - | Cache header configuration |
 | `cache_control.default` | string | `""` | Default cache duration (e.g., "1h") |
 | `cache_control.overrides` | array | `[]` | Path-specific cache configurations |
@@ -194,6 +198,8 @@ Example: For request `/studios/boston` with `try_files: [index.html, .html, .htm
 3. Try `public/studios/boston.html`
 4. Try `public/studios/boston.htm`
 5. Fall back to application
+
+**Normalize Trailing Slashes**: When enabled, Navigator checks if a path without a trailing slash is a directory containing `index.html`. If found, it issues a `301 Moved Permanently` redirect to the path with a trailing slash. This ensures relative paths in the HTML work correctly (e.g., `<img src="logo.png">` resolves to `/studios/boston/logo.png` instead of `/studios/logo.png`). This matches standard nginx/Apache behavior.
 
 ### server.idle
 

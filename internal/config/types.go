@@ -146,10 +146,11 @@ type AuthConfig struct {
 
 // StaticConfig represents static file serving configuration
 type StaticConfig struct {
-	PublicDir         string   `yaml:"public_dir"`
-	AllowedExtensions []string `yaml:"allowed_extensions"`
-	TryFiles          []string `yaml:"try_files"`
-	CacheControl      CacheControl
+	PublicDir                string   `yaml:"public_dir"`
+	AllowedExtensions        []string `yaml:"allowed_extensions"`
+	TryFiles                 []string `yaml:"try_files"`
+	NormalizeTrailingSlashes bool     `yaml:"normalize_trailing_slashes"` // Automatically redirect paths without trailing slashes to include them
+	CacheControl             CacheControl
 }
 
 // MaintenanceConfig represents maintenance page configuration

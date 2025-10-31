@@ -387,6 +387,13 @@ func LogTryFilesServe(requestPath, fsPath string) {
 		"fsPath", fsPath)
 }
 
+// LogDirectoryRedirect logs when a directory is redirected to include trailing slash
+func LogDirectoryRedirect(path, redirectURL string) {
+	slog.Info("Redirecting directory to trailing slash",
+		"path", path,
+		"redirectURL", redirectURL)
+}
+
 // Maintenance page logging helpers
 
 // LogMaintenancePageCustom logs custom maintenance page served

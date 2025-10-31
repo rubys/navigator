@@ -485,3 +485,142 @@ func TestServerTryFilesWithTenantPaths(t *testing.T) {
 		t.Error("Response body doesn't contain expected content")
 	}
 }
+
+// TestDirectoryRedirect tests that directories with index.html redirect to trailing slash
+func TestDirectoryRedirect(t *testing.T) {
+	// Create temporary directory structure
+	tempDir, err := os.MkdirTemp("", "navigator-directory-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create studios/laval/index.html
+	lavalDir := filepath.Join(tempDir, "studios", "laval")
+	if err := os.MkdirAll(lavalDir, 0755); err != nil {
+		t.Fatalf("Failed to create laval dir: %v", err)
+	}
+
+	indexContent := `<html>
+<head><link rel="stylesheet" href="style.css"></head>
+<body><img src="logo.png">Laval Studio</body>
+</html>`
+	if err := os.WriteFile(filepath.Join(lavalDir, "index.html"), []byte(indexContent), 0644); err != nil {
+		t.Fatalf("Failed to write index.html: %v", err)
+	}
+
+	// Create config with try_files and normalize_trailing_slashes
+	cfg := &config.Config{}
+	cfg.Server.RootPath = "/showcase"
+	cfg.Server.Static.PublicDir = tempDir
+	cfg.Server.Static.TryFiles = []string{"index.html", ".html", ".htm"}
+	cfg.Server.Static.NormalizeTrailingSlashes = true
+
+	handler := NewStaticFileHandler(cfg)
+
+	t.Run("directory without trailing slash redirects", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/showcase/studios/laval", nil)
+		recorder := httptest.NewRecorder()
+		respRecorder := NewResponseRecorder(recorder, nil)
+
+		served := handler.TryFiles(respRecorder, req)
+
+		if !served {
+			t.Error("Expected TryFiles to handle directory redirect")
+		}
+
+		// Should be a 301 redirect
+		if recorder.Code != http.StatusMovedPermanently {
+			t.Errorf("Expected 301 redirect, got %d", recorder.Code)
+		}
+
+		// Should redirect to path with trailing slash
+		location := recorder.Header().Get("Location")
+		expected := "/showcase/studios/laval/"
+		if location != expected {
+			t.Errorf("Expected Location: %s, got %s", expected, location)
+		}
+
+		// Check metadata
+		if respRecorder.metadata["response_type"] != "redirect" {
+			t.Errorf("Expected response_type=redirect, got %v", respRecorder.metadata["response_type"])
+		}
+		if respRecorder.metadata["destination"] != expected {
+			t.Errorf("Expected destination=%s, got %v", expected, respRecorder.metadata["destination"])
+		}
+	})
+
+	t.Run("directory with trailing slash serves index.html", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/showcase/studios/laval/", nil)
+		recorder := httptest.NewRecorder()
+		respRecorder := NewResponseRecorder(recorder, nil)
+
+		served := handler.TryFiles(respRecorder, req)
+
+		if !served {
+			t.Error("Expected TryFiles to serve index.html for directory with trailing slash")
+		}
+
+		// Should be 200 OK
+		if recorder.Code != http.StatusOK {
+			t.Errorf("Expected 200 OK, got %d", recorder.Code)
+		}
+
+		// Should serve the index.html content
+		if !strings.Contains(recorder.Body.String(), "Laval Studio") {
+			t.Error("Response body doesn't contain expected content")
+		}
+
+		// Check metadata
+		if respRecorder.metadata["response_type"] != "static" {
+			t.Errorf("Expected response_type=static, got %v", respRecorder.metadata["response_type"])
+		}
+	})
+
+	t.Run("directory without index.html does not redirect", func(t *testing.T) {
+		// Create empty directory
+		emptyDir := filepath.Join(tempDir, "studios", "empty")
+		if err := os.MkdirAll(emptyDir, 0755); err != nil {
+			t.Fatalf("Failed to create empty dir: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/showcase/studios/empty", nil)
+		recorder := httptest.NewRecorder()
+		respRecorder := NewResponseRecorder(recorder, nil)
+
+		served := handler.TryFiles(respRecorder, req)
+
+		// Should not be served (no redirect, no file)
+		if served {
+			t.Error("Expected TryFiles to return false for directory without index.html")
+		}
+	})
+
+	t.Run("normalize_trailing_slashes disabled does not redirect", func(t *testing.T) {
+		// Create config with normalize_trailing_slashes disabled
+		cfgDisabled := &config.Config{}
+		cfgDisabled.Server.RootPath = "/showcase"
+		cfgDisabled.Server.Static.PublicDir = tempDir
+		cfgDisabled.Server.Static.TryFiles = []string{"index.html", ".html", ".htm"}
+		cfgDisabled.Server.Static.NormalizeTrailingSlashes = false
+
+		handlerDisabled := NewStaticFileHandler(cfgDisabled)
+
+		req := httptest.NewRequest(http.MethodGet, "/showcase/studios/laval", nil)
+		recorder := httptest.NewRecorder()
+		respRecorder := NewResponseRecorder(recorder, nil)
+
+		served := handlerDisabled.TryFiles(respRecorder, req)
+
+		// Should not redirect when feature is disabled
+		// (will fall back to other try_files extensions, but won't find anything)
+		if served {
+			t.Error("Expected TryFiles to return false when normalize_trailing_slashes is disabled")
+		}
+
+		// Should not be a redirect
+		if recorder.Code == http.StatusMovedPermanently {
+			t.Error("Should not redirect when normalize_trailing_slashes is disabled")
+		}
+	})
+}
