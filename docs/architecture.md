@@ -415,7 +415,7 @@ cmd/navigator/main.go (3842 LOC)
 ### After (v0.11.0) - Modular
 
 ```
-cmd/navigator-refactored/main.go (280 LOC)
+cmd/navigator/main.go (280 LOC)
 ├── internal/server/ (84.5% coverage)
 ├── internal/process/ (75.0% coverage)
 ├── internal/proxy/ (88.1% coverage)

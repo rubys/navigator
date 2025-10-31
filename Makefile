@@ -1,6 +1,6 @@
 # Makefile for Navigator - Go web server replacement for nginx + Passenger
 
-.PHONY: all build build-legacy build-refactored clean lint test test-fast test-full test-integration test-stress help
+.PHONY: all build clean lint test test-fast test-full test-integration test-stress help
 
 # Version info for build
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -12,26 +12,17 @@ LDFLAGS := -X 'main.version=$(VERSION)' -X 'main.commit=$(COMMIT)' -X 'main.buil
 # Default target
 all: build
 
-build: build-legacy build-refactored
-
 # Build the navigator executable
-build-legacy:
-	@echo "Building navigator-legacy..."
+build:
+	@echo "Building navigator..."
 	@mkdir -p bin
-	go build -mod=readonly -ldflags="$(LDFLAGS)" -o bin/navigator-legacy cmd/navigator-legacy/main.go
-	@echo "Navigator built successfully at bin/navigator-legacy"
-
-# Build the refactored navigator executable
-build-refactored:
-	@echo "Building navigator-refactored..."
-	@mkdir -p bin
-	go build -mod=readonly -ldflags="$(LDFLAGS)" -o bin/navigator-refactored cmd/navigator-refactored/main.go
-	@echo "Navigator-refactored built successfully at bin/navigator-refactored"
+	go build -mod=readonly -ldflags="$(LDFLAGS)" -o bin/navigator cmd/navigator/main.go
+	@echo "Navigator built successfully at bin/navigator"
 
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	rm -f bin/navigator-legacy bin/navigator-refactored
+	rm -f bin/navigator
 	@echo "Clean complete"
 
 # Run all linting checks (matches CI lint job)
@@ -87,9 +78,7 @@ help:
 	@echo "Navigator Makefile"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  build             Build the navigator executables (default)"
-	@echo "  build-legacy      Build the navigator-legacy executable"
-	@echo "  build-refactored  Build the navigator-refactored executable"
+	@echo "  build             Build the navigator executable (default)"
 	@echo "  clean             Remove build artifacts"
 	@echo "  lint              Run all linting checks (matches CI)"
 	@echo "  test              Run fast tests (default - excludes integration/stress tests)"

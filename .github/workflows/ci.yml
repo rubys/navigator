@@ -121,13 +121,10 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
-    - name: Build legacy navigator
-      run: go build -o navigator-legacy ./cmd/navigator-legacy
+    - name: Build navigator
+      run: go build -o navigator ./cmd/navigator
 
-    - name: Build refactored navigator
-      run: go build -o navigator-refactored ./cmd/navigator-refactored
-
-    - name: Test binaries
+    - name: Test binary
       run: |
         # Create minimal test environment with YAML configuration
         mkdir -p /tmp/test-rails/config
@@ -159,13 +156,9 @@ jobs:
         EOF
         mkdir -p /tmp/test-rails/public
 
-        # Test that original binary starts and exits cleanly with YAML config
-        echo "Testing original navigator..."
-        timeout 5s ./navigator-legacy /tmp/test-rails/config/navigator.yml || [ $? -eq 124 ]
-
-        # Test that refactored binary starts and exits cleanly with YAML config
-        echo "Testing refactored navigator..."
-        timeout 5s ./navigator-refactored /tmp/test-rails/config/navigator.yml || [ $? -eq 124 ]
+        # Test that navigator binary starts and exits cleanly with YAML config
+        echo "Testing navigator..."
+        timeout 5s ./navigator /tmp/test-rails/config/navigator.yml || [ $? -eq 124 ]
 
   build:
     runs-on: ubuntu-latest
@@ -182,31 +175,18 @@ jobs:
 
     - name: Build binaries
       run: |
-        # Legacy Navigator
+        # Navigator
         # Linux AMD64
-        GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o navigator-linux-amd64 ./cmd/navigator-legacy
+        GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o navigator-linux-amd64 ./cmd/navigator
 
         # Linux ARM64
-        GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o navigator-linux-arm64 ./cmd/navigator-legacy
+        GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o navigator-linux-arm64 ./cmd/navigator
 
         # macOS AMD64
-        GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o navigator-darwin-amd64 ./cmd/navigator-legacy
+        GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o navigator-darwin-amd64 ./cmd/navigator
 
         # macOS ARM64
-        GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o navigator-darwin-arm64 ./cmd/navigator-legacy
-
-        # Refactored Navigator
-        # Linux AMD64
-        GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o navigator-refactored-linux-amd64 ./cmd/navigator-refactored
-
-        # Linux ARM64
-        GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o navigator-refactored-linux-arm64 ./cmd/navigator-refactored
-
-        # macOS AMD64
-        GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o navigator-refactored-darwin-amd64 ./cmd/navigator-refactored
-
-        # macOS ARM64
-        GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o navigator-refactored-darwin-arm64 ./cmd/navigator-refactored
+        GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o navigator-darwin-arm64 ./cmd/navigator
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

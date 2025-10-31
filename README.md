@@ -62,10 +62,10 @@ applications:
 
 ```bash
 # With config file
-./bin/navigator-refactored config/navigator.yml
+./bin/navigator config/navigator.yml
 
 # Reload configuration (no restart)
-./bin/navigator-refactored -s reload
+./bin/navigator -s reload
 ```
 
 ## Documentation

@@ -787,7 +787,7 @@ If an app process crashes:
 
 ### Graceful Shutdown
 
-**File:** `cmd/navigator-refactored/main.go:321` (`handleShutdown`)
+**File:** `cmd/navigator/main.go:321` (`handleShutdown`)
 
 When Navigator receives SIGTERM/SIGINT:
 
@@ -801,7 +801,7 @@ All managers receive context for coordinated shutdown.
 
 ## Configuration Reload
 
-**File:** `cmd/navigator-refactored/main.go:264` (`handleReload`)
+**File:** `cmd/navigator/main.go:264` (`handleReload`)
 
 Navigator supports live configuration reload via SIGHUP:
 
@@ -959,7 +959,7 @@ The modular design allows each component to be tested independently while mainta
 - **Proxy Logic:** `internal/proxy/proxy.go`
 - **Process Management:** `internal/process/app_manager.go`
 - **Reload Logic:** `internal/utils/reload.go`
-- **Server Lifecycle:** `cmd/navigator-refactored/main.go`
+- **Server Lifecycle:** `cmd/navigator/main.go`
 
 ### Related Documentation
 

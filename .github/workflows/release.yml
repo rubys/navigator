@@ -49,30 +49,30 @@ jobs:
 
         # Build flags with version info
         BUILD_FLAGS="-s -w -X main.version=${{ env.VERSION }} -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.commit=$(git rev-parse HEAD)"
-        
+
         # Linux AMD64
         echo "Building for Linux AMD64..."
-        GOOS=linux GOARCH=amd64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-linux-amd64 ./cmd/navigator-refactored
+        GOOS=linux GOARCH=amd64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-linux-amd64 ./cmd/navigator
 
         # Linux ARM64
         echo "Building for Linux ARM64..."
-        GOOS=linux GOARCH=arm64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-linux-arm64 ./cmd/navigator-refactored
+        GOOS=linux GOARCH=arm64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-linux-arm64 ./cmd/navigator
 
         # macOS AMD64
         echo "Building for macOS AMD64..."
-        GOOS=darwin GOARCH=amd64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-darwin-amd64 ./cmd/navigator-refactored
+        GOOS=darwin GOARCH=amd64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-darwin-amd64 ./cmd/navigator
 
         # macOS ARM64 (Apple Silicon)
         echo "Building for macOS ARM64..."
-        GOOS=darwin GOARCH=arm64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-darwin-arm64 ./cmd/navigator-refactored
+        GOOS=darwin GOARCH=arm64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-darwin-arm64 ./cmd/navigator
 
         # Windows AMD64
         echo "Building for Windows AMD64..."
-        GOOS=windows GOARCH=amd64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-windows-amd64.exe ./cmd/navigator-refactored
+        GOOS=windows GOARCH=amd64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-windows-amd64.exe ./cmd/navigator
 
         # Windows ARM64
         echo "Building for Windows ARM64..."
-        GOOS=windows GOARCH=arm64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-windows-arm64.exe ./cmd/navigator-refactored
+        GOOS=windows GOARCH=arm64 go build -ldflags "$BUILD_FLAGS" -o dist/navigator-windows-arm64.exe ./cmd/navigator
     
     - name: Create compressed archives
       run: |

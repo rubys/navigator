@@ -81,10 +81,10 @@ cd navigator
 make build
 
 # Or build the refactored version directly (recommended)
-go build -mod=readonly -o bin/navigator cmd/navigator-refactored/main.go
+go build -mod=readonly -o bin/navigator cmd/navigator/main.go
 
 # Install globally (optional)
-sudo cp bin/navigator-refactored /usr/local/bin/navigator
+sudo cp bin/navigator /usr/local/bin/navigator
 ```
 
 ### Docker

@@ -8,17 +8,16 @@ Navigator is a Go-based web server for multi-tenant web applications. It provide
 
 ## Production Status
 
-**IMPORTANT**: The refactored Navigator (`cmd/navigator-refactored/`) is now in production and is the active development target.
+**IMPORTANT**: Navigator is production-ready and actively developed.
 
-- **Active Development**: All new features and bug fixes should target `cmd/navigator-refactored/`
-- **Legacy Reference**: `cmd/navigator-legacy/` is preserved for reference only and should NOT be modified
-- **Transition Period**: The legacy version remains until we have sufficient production experience with the refactored version
-- **Do Not Touch**: Leave `cmd/navigator-legacy/` unchanged - it serves as a reference implementation only
+- **Single Implementation**: All development targets `cmd/navigator/`
+- **Production Proven**: Battle-tested serving 75+ customers across 8 countries
+- **Legacy Retired**: The legacy and refactored split has been unified into a single codebase
 
 ## Current Implementation Status
 
 ✅ **Framework Independence**: Support for Rails, Django, Node.js, and other web frameworks
-✅ **Modular Architecture**: Well-organized internal packages in `cmd/navigator-refactored/`
+✅ **Modular Architecture**: Well-organized internal packages in `cmd/navigator/`
 ✅ **YAML Configuration Support**: Modern YAML-based configuration
 ✅ **Managed Processes**: External process management (Redis, Sidekiq, workers, etc.)
 ✅ **Dynamic Port Allocation**: Finds available ports instead of sequential assignment
@@ -41,19 +40,12 @@ Navigator is a Go-based web server for multi-tenant web applications. It provide
 
 ### Code Organization
 
-Navigator has two implementations:
+Navigator has a single, production-ready implementation:
 
-1. **`cmd/navigator-refactored/`** - **PRODUCTION VERSION** ✅
-   - Modular, well-organized codebase
-   - Uses shared `internal/` packages
-   - **All development happens here**
-   - Currently deployed in production
-
-2. **`cmd/navigator-legacy/`** - **REFERENCE ONLY** 🔒
-   - Original single-file implementation
-   - **DO NOT MODIFY** - frozen for reference
-   - Kept until refactored version proves stable in production
-   - Will be removed once transition is complete
+- **`cmd/navigator/`** - Production version with modular, well-organized codebase
+  - Uses shared `internal/` packages for maintainability
+  - All development happens here
+  - Battle-tested in production
 
 ### Modular Package Structure
 
@@ -181,20 +173,18 @@ applications:
 
 ### Building and Running
 
-**IMPORTANT**: Always work with the refactored navigator (`cmd/navigator-refactored/`).
-
 ```bash
-# Build refactored Navigator (production version)
-go build -o bin/navigator cmd/navigator-refactored
+# Build Navigator
+go build -o bin/navigator cmd/navigator
+
+# Or use make
+make build
 
 # Run with configuration file
 ./bin/navigator config/navigator.yml
 
 # Run with default config (looks for config/navigator.yml)
 ./bin/navigator
-
-# DO NOT build legacy navigator - it is reference only
-# go build cmd/navigator-legacy  ← DO NOT USE
 ```
 
 ### Development Workflow
@@ -208,9 +198,9 @@ go mod tidy
 go fmt ./...
 go vet ./...
 
-# Build for different platforms (always use refactored version)
-GOOS=linux GOARCH=amd64 go build -o navigator-linux cmd/navigator-refactored
-GOOS=darwin GOARCH=arm64 go build -o navigator-darwin-arm64 cmd/navigator-refactored
+# Build for different platforms
+GOOS=linux GOARCH=amd64 go build -o navigator-linux cmd/navigator
+GOOS=darwin GOARCH=arm64 go build -o navigator-darwin-arm64 cmd/navigator
 ```
 
 ## Key Features
@@ -484,8 +474,7 @@ gofmt -s -l . && \
 golangci-lint run && \
 go vet ./... && \
 go test -race -cover -timeout=3m ./... && \
-go build ./cmd/navigator-legacy && \
-go build ./cmd/navigator-refactored && \
+go build ./cmd/navigator && \
 echo "✓ All CI checks passed!"
 ```
 
@@ -661,16 +650,13 @@ delay := utils.ParseDurationWithContext(cfg.Delay, 0, map[string]interface{}{
 
 ## Contributing Guidelines
 
-**CRITICAL**: All development must target `cmd/navigator-refactored/` and its internal packages. Do NOT modify `cmd/navigator-legacy/`.
-
-1. **Target refactored navigator**: All changes go to `cmd/navigator-refactored/` and `internal/` packages
-2. **Leave legacy alone**: `cmd/navigator-legacy/` is frozen - do not modify it under any circumstances
-3. **Modular design**: Place new functionality in appropriate internal packages
-4. **Use utility packages**: Adopt error constructors and logging helpers for consistency
-5. **Minimal dependencies**: Only add essential external packages
-6. **Testing**: Write tests for new functionality, ensure all tests pass
-7. **Documentation**: Update README.md, CLAUDE.md, and docs/ as needed
-8. **Release process**: Use annotated tags for GitHub Actions releases
+1. **Target navigator**: All changes go to `cmd/navigator/` and `internal/` packages
+2. **Modular design**: Place new functionality in appropriate internal packages
+3. **Use utility packages**: Adopt error constructors and logging helpers for consistency
+4. **Minimal dependencies**: Only add essential external packages
+5. **Testing**: Write tests for new functionality, ensure all tests pass
+6. **Documentation**: Update README.md, CLAUDE.md, and docs/ as needed
+7. **Release process**: Use annotated tags for GitHub Actions releases
 
 ## Refactoring Guidelines
 
