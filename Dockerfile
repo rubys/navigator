@@ -25,7 +25,7 @@ RUN go mod download && \
     fi && \
     GOOS=linux GOARCH=amd64 go build -mod=readonly \
         -ldflags="-X 'main.version=$VERSION' -X 'main.commit=$COMMIT' -X 'main.buildTime=$BUILD_TIME'" \
-        -o navigator cmd/navigator-refactored/main.go
+        -o navigator cmd/navigator/main.go
 
 # Final stage - minimal image with just the binary
 FROM scratch
