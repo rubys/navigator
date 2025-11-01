@@ -302,10 +302,11 @@ type YAMLConfig struct {
 		RootPath   string            `yaml:"root_path"`
 		CGIScripts []CGIScriptConfig `yaml:"cgi_scripts"`
 		Static     struct {
-			PublicDir         string   `yaml:"public_dir"`
-			AllowedExtensions []string `yaml:"allowed_extensions"`
-			TryFiles          []string `yaml:"try_files"`
-			CacheControl      struct {
+			PublicDir                string   `yaml:"public_dir"`
+			AllowedExtensions        []string `yaml:"allowed_extensions"`
+			TryFiles                 []string `yaml:"try_files"`
+			NormalizeTrailingSlashes bool     `yaml:"normalize_trailing_slashes"`
+			CacheControl             struct {
 				Default   string `yaml:"default"`
 				Overrides []struct {
 					Path   string `yaml:"path"`

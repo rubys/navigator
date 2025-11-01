@@ -83,6 +83,7 @@ func (p *ConfigParser) parseServerConfig() {
 	p.config.Server.Static.PublicDir = p.yamlConfig.Server.Static.PublicDir
 	p.config.Server.Static.TryFiles = p.yamlConfig.Server.Static.TryFiles
 	p.config.Server.Static.AllowedExtensions = p.yamlConfig.Server.Static.AllowedExtensions
+	p.config.Server.Static.NormalizeTrailingSlashes = p.yamlConfig.Server.Static.NormalizeTrailingSlashes
 
 	// Parse cache control
 	p.config.Server.Static.CacheControl.Default = p.yamlConfig.Server.Static.CacheControl.Default
