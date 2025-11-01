@@ -17,6 +17,9 @@ server:                    # HTTP server settings
     try_files: [...]
     normalize_trailing_slashes: true
     cache_control: {...}
+  bot_detection:           # Bot detection and access control
+    enabled: true
+    action: reject
   idle:                    # Fly.io machine idle management
     action: suspend
     timeout: 20m
@@ -200,6 +203,50 @@ Example: For request `/studios/boston` with `try_files: [index.html, .html, .htm
 5. Fall back to application
 
 **Normalize Trailing Slashes**: When enabled, Navigator checks if a path without a trailing slash is a directory containing `index.html`. If found, it issues a `301 Moved Permanently` redirect to the path with a trailing slash. This ensures relative paths in the HTML work correctly (e.g., `<img src="logo.png">` resolves to `/studios/boston/logo.png` instead of `/studios/logo.png`). This matches standard nginx/Apache behavior.
+
+### server.bot_detection
+
+Bot detection and access control configuration. Uses the [isbot library](https://github.com/zgo-t/isbot) for comprehensive bot identification.
+
+```yaml
+server:
+  bot_detection:
+    enabled: true                 # Enable bot detection (default: false)
+    action: reject                # Action: "reject", "ignore", "static-only"
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable bot detection |
+| `action` | string | `"reject"` | Action to take when bot detected |
+
+**Actions**:
+- `reject`: Block bots with 403 Forbidden (prevents unnecessary application wake-ups)
+- `ignore`: Allow bots through (disables bot blocking)
+- `static-only`: Allow bots to access static files only, block dynamic content
+
+**Per-Tenant Override**: Tenants can override the global bot detection settings:
+
+```yaml
+server:
+  bot_detection:
+    enabled: true
+    action: reject               # Global: block all bots
+
+applications:
+  tenants:
+    - name: production
+      path: /app/
+      # Inherits global config (rejects bots)
+
+    - name: demo
+      path: /demo/
+      bot_detection:
+        enabled: true
+        action: ignore           # Override: allow bots in demo
+```
+
+**Use Case**: The Showcase application uses global bot blocking to prevent unnecessary machine wake-ups from crawlers, but allows bots on the demo tenant for search engine indexing.
 
 ### server.idle
 
@@ -558,6 +605,7 @@ List of tenant applications.
 | `args` | array | | Server arguments override |
 | `health_check` | string | | Health check endpoint override (e.g., "/up") |
 | `track_websockets` | boolean | | Override WebSocket tracking (nil = use global) |
+| `bot_detection` | object | | Override bot detection settings (nil = use global) |
 | `memory_limit` | string | | Memory limit override (e.g., "1G") - Linux only |
 | `user` | string | | User override (runs as this user) - Unix only |
 | `group` | string | | Group override (runs as this group) - Unix only |

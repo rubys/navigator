@@ -394,6 +394,24 @@ func LogDirectoryRedirect(path, redirectURL string) {
 		"redirectURL", redirectURL)
 }
 
+// Bot detection logging helpers
+
+// LogBotBlocked logs when a bot request is blocked
+func LogBotBlocked(path, userAgent, action string) {
+	slog.Info("Bot request blocked",
+		"path", path,
+		"userAgent", userAgent,
+		"action", action)
+}
+
+// LogBotAllowed logs when a bot request is allowed
+func LogBotAllowed(path, userAgent, action string) {
+	slog.Debug("Bot request allowed",
+		"path", path,
+		"userAgent", userAgent,
+		"action", action)
+}
+
 // Maintenance page logging helpers
 
 // LogMaintenancePageCustom logs custom maintenance page served

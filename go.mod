@@ -11,4 +11,5 @@ require (
 	github.com/GehirnInc/crypt v0.0.0-20230320061759-8cc1b52080c5 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
+	zgo.at/isbot v1.0.0 // indirect
 )

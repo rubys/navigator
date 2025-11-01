@@ -17,6 +17,7 @@ import (
 	"github.com/rubys/navigator/internal/process"
 	"github.com/rubys/navigator/internal/proxy"
 	"github.com/rubys/navigator/internal/utils"
+	"zgo.at/isbot"
 )
 
 // CreateHandler creates the main HTTP handler for Navigator
@@ -61,6 +62,63 @@ type Handler struct {
 type cgiRoute struct {
 	handler *cgi.Handler
 	method  string // Empty string means all methods
+}
+
+// shouldBlockBot checks if the request should be blocked based on bot detection config
+// Returns true if the request should be blocked, false otherwise
+func (h *Handler) shouldBlockBot(r *http.Request, tenant *config.Tenant) bool {
+	// Check if bot detection is enabled globally
+	globalConfig := h.config.Server.BotDetection
+
+	// Determine effective bot detection config (tenant override or global)
+	var effectiveConfig *config.BotDetectionConfig
+	if tenant != nil && tenant.BotDetection != nil {
+		// Tenant has explicit override
+		effectiveConfig = tenant.BotDetection
+	} else {
+		// Use global config
+		effectiveConfig = &globalConfig
+	}
+
+	// If bot detection is not enabled, don't block
+	if !effectiveConfig.Enabled {
+		return false
+	}
+
+	// Check if this is a bot using isbot library
+	botResult := isbot.Bot(r)
+	if !isbot.Is(botResult) {
+		// Not a bot, don't block
+		return false
+	}
+
+	// It's a bot - check the action
+	action := effectiveConfig.Action
+	if action == "" {
+		action = "reject" // Default action
+	}
+
+	switch action {
+	case "ignore":
+		// Allow bots
+		logging.LogBotAllowed(r.URL.Path, r.Header.Get("User-Agent"), "ignore")
+		return false
+	case "reject":
+		// Block bots
+		logging.LogBotBlocked(r.URL.Path, r.Header.Get("User-Agent"), "reject")
+		return true
+	case "static-only":
+		// This will be handled by the flow - bots can access static files
+		// but will be blocked when they try to access web apps
+		// For now, we're checking this before web app proxy, so block here
+		logging.LogBotBlocked(r.URL.Path, r.Header.Get("User-Agent"), "static-only")
+		return true
+	default:
+		// Unknown action, default to reject
+		slog.Warn("Unknown bot detection action, defaulting to reject", "action", action)
+		logging.LogBotBlocked(r.URL.Path, r.Header.Get("User-Agent"), action)
+		return true
+	}
 }
 
 // ServeHTTP handles all incoming HTTP requests
@@ -135,6 +193,27 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Handle web application proxy
 	if len(h.config.Applications.Tenants) > 0 {
+		// Check bot detection before proxying to web app
+		// Extract tenant to check for tenant-specific bot detection override
+		tenantName, found := h.extractTenantFromPath(r.URL.Path)
+		var tenant *config.Tenant
+		if found {
+			// Find the tenant config
+			for i := range h.config.Applications.Tenants {
+				if h.config.Applications.Tenants[i].Name == tenantName || h.config.Applications.Tenants[i].Path == tenantName {
+					tenant = &h.config.Applications.Tenants[i]
+					break
+				}
+			}
+		}
+
+		// Check if this bot should be blocked
+		if h.shouldBlockBot(r, tenant) {
+			recorder.SetMetadata("response_type", "bot-blocked")
+			http.Error(w, "Forbidden: Bot access not allowed", http.StatusForbidden)
+			return
+		}
+
 		h.handleWebAppProxy(recorder, r)
 	} else {
 		// No tenants configured - check for static fallback
