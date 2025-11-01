@@ -3,8 +3,10 @@ package auth
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/rubys/navigator/internal/config"
 	"github.com/tg123/go-htpasswd"
@@ -495,4 +497,89 @@ func mustCompileRegex(t *testing.T, pattern string) *regexp.Regexp {
 		t.Fatalf("Failed to compile regex %q: %v", pattern, err)
 	}
 	return compiled
+}
+
+func TestHtpasswdAutoReload(t *testing.T) {
+	// Create a temporary htpasswd file
+	tmpfile, err := os.CreateTemp("", "htpasswd-test-*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	// Write initial htpasswd content with user1:password1
+	// Using bcrypt hash (generated with: htpasswd -nbB user1 password1)
+	initialContent := "user1:$2y$05$HhAkLv4T/hijhH3KQUtfWuuFm15Wwpf4qmdcbZnZILZ0zR3P6bBEG\n"
+	if _, err := tmpfile.WriteString(initialContent); err != nil {
+		t.Fatalf("Failed to write initial content: %v", err)
+	}
+	tmpfile.Close()
+
+	// Load the auth file
+	auth, err := LoadAuthFile(tmpfile.Name(), "Test", []string{})
+	if err != nil {
+		t.Fatalf("Failed to load auth file: %v", err)
+	}
+
+	// Test 1: Verify user1:password1 works initially
+	req1 := httptest.NewRequest("GET", "/", nil)
+	req1.SetBasicAuth("user1", "password1")
+	if !auth.CheckAuth(req1) {
+		t.Error("Initial auth check for user1:password1 should succeed")
+	}
+
+	// Test 2: Verify user2:password2 fails initially
+	req2 := httptest.NewRequest("GET", "/", nil)
+	req2.SetBasicAuth("user2", "password2")
+	if auth.CheckAuth(req2) {
+		t.Error("Auth check for user2:password2 should fail (user doesn't exist yet)")
+	}
+
+	// Sleep briefly to ensure mtime will be different
+	time.Sleep(10 * time.Millisecond)
+
+	// Update the htpasswd file to add user2:password2
+	// Using bcrypt hash (generated with: htpasswd -nbB user2 password2)
+	updatedContent := initialContent + "user2:$2y$05$tjlZDlLnLpQQJnwJ9.7mDOvxuumMT6zwA3Wv/xfu01C.aZp8GG2dW\n"
+	if err := os.WriteFile(tmpfile.Name(), []byte(updatedContent), 0644); err != nil {
+		t.Fatalf("Failed to update htpasswd file: %v", err)
+	}
+
+	// Test 3: Verify user1:password1 still works (cached)
+	req3 := httptest.NewRequest("GET", "/", nil)
+	req3.SetBasicAuth("user1", "password1")
+	if !auth.CheckAuth(req3) {
+		t.Error("Auth check for user1:password1 should still succeed")
+	}
+
+	// Test 4: Try user2:password2 - should FAIL initially (cached)
+	// but then auto-reload and SUCCEED
+	req4 := httptest.NewRequest("GET", "/", nil)
+	req4.SetBasicAuth("user2", "password2")
+	result := auth.CheckAuth(req4)
+	if !result {
+		t.Error("Auth check for user2:password2 should succeed after auto-reload")
+	}
+
+	// Test 5: Verify the file was actually reloaded by checking mtime was updated
+	stat, err := os.Stat(tmpfile.Name())
+	if err != nil {
+		t.Fatalf("Failed to stat file: %v", err)
+	}
+
+	auth.mu.RLock()
+	cachedMtime := auth.mtime
+	auth.mu.RUnlock()
+
+	if !cachedMtime.Equal(stat.ModTime()) {
+		t.Errorf("Cached mtime should match file mtime after reload. cached=%v, file=%v",
+			cachedMtime, stat.ModTime())
+	}
+
+	// Test 6: Verify user2:password2 works again (now from cache after reload)
+	req5 := httptest.NewRequest("GET", "/", nil)
+	req5.SetBasicAuth("user2", "password2")
+	if !auth.CheckAuth(req5) {
+		t.Error("Auth check for user2:password2 should succeed from cache after reload")
+	}
 }

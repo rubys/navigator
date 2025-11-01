@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rubys/navigator/internal/config"
 	"github.com/tg123/go-htpasswd"
@@ -14,10 +16,12 @@ import (
 
 // BasicAuth represents HTTP basic authentication configuration
 type BasicAuth struct {
-	File    *htpasswd.File
-	Realm   string
-	Exclude []string
-	mu      sync.RWMutex // Protects concurrent access to File
+	File     *htpasswd.File
+	Realm    string
+	Exclude  []string
+	filename string       // Path to htpasswd file for reload checks
+	mtime    time.Time    // Last modification time of htpasswd file
+	mu       sync.RWMutex // Protects concurrent access to File, filename, and mtime
 }
 
 // LoadAuthFile loads an htpasswd file for authentication
@@ -32,10 +36,18 @@ func LoadAuthFile(filename, realm string, exclude []string) (*BasicAuth, error) 
 		return nil, err
 	}
 
+	// Get initial mtime
+	var mtime time.Time
+	if stat, err := os.Stat(filename); err == nil {
+		mtime = stat.ModTime()
+	}
+
 	auth := &BasicAuth{
-		File:    htFile,
-		Realm:   realm,
-		Exclude: exclude,
+		File:     htFile,
+		Realm:    realm,
+		Exclude:  exclude,
+		filename: filename,
+		mtime:    mtime,
 	}
 
 	return auth, nil
@@ -43,13 +55,6 @@ func LoadAuthFile(filename, realm string, exclude []string) (*BasicAuth, error) 
 
 // CheckAuth checks basic authentication credentials
 func (a *BasicAuth) CheckAuth(r *http.Request) bool {
-	// Lock for concurrent access to htpasswd.File
-	// The go-htpasswd library may not be thread-safe
-	if a != nil {
-		a.mu.RLock()
-		defer a.mu.RUnlock()
-	}
-
 	if a == nil || a.File == nil {
 		slog.Debug("Auth check: no auth configured",
 			"path", r.URL.Path)
@@ -66,13 +71,61 @@ func (a *BasicAuth) CheckAuth(r *http.Request) bool {
 	// Trim whitespace from username to handle malformed htpasswd entries
 	username = strings.TrimSpace(username)
 
-	// Use go-htpasswd library to match the password
+	// First attempt: check with current cached file
+	a.mu.RLock()
 	matched := a.File.Match(username, password)
+	currentMtime := a.mtime
+	filename := a.filename
+	a.mu.RUnlock()
 
-	slog.Debug("Auth check result",
+	slog.Debug("Auth check result (cached)",
 		"path", r.URL.Path,
 		"username", username,
 		"matched", matched)
+
+	// If authentication failed, check if htpasswd file has been modified
+	if !matched && filename != "" {
+		stat, err := os.Stat(filename)
+		if err == nil && stat.ModTime().After(currentMtime) {
+			slog.Info("htpasswd file modified, reloading",
+				"file", filename,
+				"old_mtime", currentMtime,
+				"new_mtime", stat.ModTime())
+
+			// Upgrade to write lock for reload
+			a.mu.Lock()
+
+			// Double-check that another goroutine hasn't already reloaded
+			if stat.ModTime().After(a.mtime) {
+				// Reload the htpasswd file
+				htFile, err := htpasswd.New(filename, htpasswd.DefaultSystems, nil)
+				if err != nil {
+					slog.Error("Failed to reload htpasswd file",
+						"file", filename,
+						"error", err)
+					a.mu.Unlock()
+					return false
+				}
+
+				// Update the cached file and mtime
+				a.File = htFile
+				a.mtime = stat.ModTime()
+
+				slog.Info("htpasswd file reloaded successfully",
+					"file", filename,
+					"mtime", a.mtime)
+			}
+
+			// Retry authentication with the reloaded file
+			matched = a.File.Match(username, password)
+			a.mu.Unlock()
+
+			slog.Debug("Auth check result (after reload)",
+				"path", r.URL.Path,
+				"username", username,
+				"matched", matched)
+		}
+	}
 
 	return matched
 }
