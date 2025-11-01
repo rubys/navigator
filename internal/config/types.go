@@ -181,15 +181,15 @@ type HealthCheckResponse struct {
 // Config represents the main configuration
 type Config struct {
 	Server struct {
-		Listen        string              `yaml:"listen"`
-		Hostname      string              `yaml:"hostname"`
-		RootPath      string              `yaml:"root_path"`
-		RewriteRules  []RewriteRule
-		Static        StaticConfig
-		BotDetection  BotDetectionConfig  `yaml:"bot_detection"`
-		CGIScripts    []CGIScriptConfig   `yaml:"cgi_scripts"`
-		HealthCheck   HealthCheckConfig   `yaml:"health_check"`
-		Idle          struct {
+		Listen       string `yaml:"listen"`
+		Hostname     string `yaml:"hostname"`
+		RootPath     string `yaml:"root_path"`
+		RewriteRules []RewriteRule
+		Static       StaticConfig
+		BotDetection BotDetectionConfig `yaml:"bot_detection"`
+		CGIScripts   []CGIScriptConfig  `yaml:"cgi_scripts"`
+		HealthCheck  HealthCheckConfig  `yaml:"health_check"`
+		Idle         struct {
 			Action  string `yaml:"action"`  // "suspend" or "stop"
 			Timeout string `yaml:"timeout"` // Duration string like "30s", "5m"
 		} `yaml:"idle"`
@@ -263,25 +263,25 @@ type FrameworkConfig struct {
 
 // Tenant represents a tenant configuration
 type Tenant struct {
-	Name            string                  `yaml:"name"`
-	Path            string                  `yaml:"path"` // URL path prefix for tenant matching
-	Root            string                  `yaml:"root"`
-	PublicDir       string                  `yaml:"public_dir"`
-	Env             map[string]string       `yaml:"env"`
-	Framework       string                  `yaml:"framework"`
-	Runtime         string                  `yaml:"runtime"`
-	Server          string                  `yaml:"server"`
-	Args            []string                `yaml:"args"`
-	AppManager      interface{}             // Will be *AppManager
-	Var             map[string]interface{}  `yaml:"var"`
-	Hooks           TenantHooks             `yaml:"hooks"`
-	HealthCheck     string                  `yaml:"health_check"`     // Override health check endpoint for this tenant
-	StartupTimeout  string                  `yaml:"startup_timeout"`  // Override startup timeout for this tenant (e.g., "10s")
-	TrackWebSockets *bool                   `yaml:"track_websockets"` // Override WebSocket tracking (nil = use global default)
-	BotDetection    *BotDetectionConfig     `yaml:"bot_detection"`    // Override bot detection for this tenant (nil = use global default)
-	MemoryLimit     string                  `yaml:"memory_limit"`     // Memory limit for this tenant (e.g., "512M", "1G") - Linux only
-	User            string                  `yaml:"user"`             // User to run this tenant's process as
-	Group            string                  `yaml:"group"`            // Group to run this tenant's process as
+	Name            string                 `yaml:"name"`
+	Path            string                 `yaml:"path"` // URL path prefix for tenant matching
+	Root            string                 `yaml:"root"`
+	PublicDir       string                 `yaml:"public_dir"`
+	Env             map[string]string      `yaml:"env"`
+	Framework       string                 `yaml:"framework"`
+	Runtime         string                 `yaml:"runtime"`
+	Server          string                 `yaml:"server"`
+	Args            []string               `yaml:"args"`
+	AppManager      interface{}            // Will be *AppManager
+	Var             map[string]interface{} `yaml:"var"`
+	Hooks           TenantHooks            `yaml:"hooks"`
+	HealthCheck     string                 `yaml:"health_check"`     // Override health check endpoint for this tenant
+	StartupTimeout  string                 `yaml:"startup_timeout"`  // Override startup timeout for this tenant (e.g., "10s")
+	TrackWebSockets *bool                  `yaml:"track_websockets"` // Override WebSocket tracking (nil = use global default)
+	BotDetection    *BotDetectionConfig    `yaml:"bot_detection"`    // Override bot detection for this tenant (nil = use global default)
+	MemoryLimit     string                 `yaml:"memory_limit"`     // Memory limit for this tenant (e.g., "512M", "1G") - Linux only
+	User            string                 `yaml:"user"`             // User to run this tenant's process as
+	Group           string                 `yaml:"group"`            // Group to run this tenant's process as
 }
 
 // YAMLConfig represents the raw YAML configuration structure
