@@ -20,13 +20,20 @@ import (
 	"zgo.at/isbot"
 )
 
+// CableHandler interface for WebSocket handling
+type CableHandler interface {
+	ServeHTTP(w http.ResponseWriter, r *http.Request)
+	HandleBroadcast(w http.ResponseWriter, r *http.Request)
+}
+
 // CreateHandler creates the main HTTP handler for Navigator
-func CreateHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager, currentConfigFn func() string, triggerReloadFn func(string)) http.Handler {
+func CreateHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager, cableHandler CableHandler, currentConfigFn func() string, triggerReloadFn func(string)) http.Handler {
 	h := &Handler{
 		config:        cfg,
 		appManager:    appManager,
 		auth:          basicAuth,
 		idleManager:   idleManager,
+		cableHandler:  cableHandler,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 	h.setupCGIHandlers(currentConfigFn, triggerReloadFn)
@@ -53,6 +60,7 @@ type Handler struct {
 	appManager    *process.AppManager
 	auth          *auth.BasicAuth
 	idleManager   *idle.Manager
+	cableHandler  CableHandler
 	staticHandler *StaticFileHandler
 	cgiHandlers   map[string]*cgiRoute // Path -> CGI handler mapping
 	disableLog    bool                 // When true, suppresses access log output (for tests)
@@ -156,6 +164,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		recorder.SetMetadata("response_type", "auth-failure")
 		h.auth.RequireAuth(recorder)
 		return
+	}
+
+	// Handle WebSocket routes (if cable handler is configured)
+	if h.cableHandler != nil {
+		if r.URL.Path == "/cable" {
+			recorder.SetMetadata("response_type", "websocket")
+			h.cableHandler.ServeHTTP(recorder, r)
+			return
+		} else if r.URL.Path == "/_broadcast" {
+			recorder.SetMetadata("response_type", "broadcast")
+			h.cableHandler.HandleBroadcast(recorder, r)
+			return
+		}
 	}
 
 	// Handle rewrites and redirects

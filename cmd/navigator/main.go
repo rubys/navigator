@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/rubys/navigator/internal/auth"
+	"github.com/rubys/navigator/internal/cable"
 	"github.com/rubys/navigator/internal/config"
 	"github.com/rubys/navigator/internal/idle"
 	"github.com/rubys/navigator/internal/process"
@@ -212,6 +213,7 @@ type ServerLifecycle struct {
 	processManager *process.Manager
 	basicAuth      *auth.BasicAuth
 	idleManager    *idle.Manager
+	cableHandler   *cable.Handler
 	srv            *http.Server
 	reloadChan     chan string // Channel for triggering config reload from CGI scripts
 }
@@ -221,12 +223,17 @@ func (l *ServerLifecycle) Run() error {
 	// Create reload channel for CGI scripts
 	l.reloadChan = make(chan string, 1)
 
+	// Create WebSocket/Cable handler
+	l.cableHandler = cable.NewHandler(slog.Default())
+	slog.Info("WebSocket handler initialized")
+
 	// Create HTTP handler with CGI reload support
 	handler := server.CreateHandler(
 		l.cfg,
 		l.appManager,
 		l.basicAuth,
 		l.idleManager,
+		l.cableHandler,
 		func() string { return l.configFile }, // Get current config file
 		func(path string) { l.reloadChan <- path }, // Trigger reload
 	)
@@ -359,6 +366,7 @@ func (l *ServerLifecycle) handleReload() {
 			l.appManager,
 			l.basicAuth,
 			l.idleManager,
+			l.cableHandler,
 			func() string { return l.configFile }, // Get current config file
 			func(path string) { l.reloadChan <- path }, // Trigger reload
 		)
@@ -391,6 +399,13 @@ func (l *ServerLifecycle) handleShutdown(sig os.Signal) error {
 	// Shutdown server
 	if err := l.srv.Shutdown(ctx); err != nil {
 		slog.Error("Server shutdown failed", "error", err)
+	}
+
+	// Shutdown WebSocket handler
+	if l.cableHandler != nil {
+		if err := l.cableHandler.Shutdown(ctx); err != nil {
+			slog.Error("WebSocket shutdown failed", "error", err)
+		}
 	}
 
 	// Stop all applications with context
