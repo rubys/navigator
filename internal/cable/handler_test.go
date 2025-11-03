@@ -20,6 +20,7 @@ func TestNewHandler(t *testing.T) {
 
 	if handler == nil {
 		t.Fatal("NewHandler returned nil")
+		return // Avoid further nil dereference checks
 	}
 
 	if handler.connections == nil {
@@ -242,8 +243,8 @@ func TestBroadcastToSubscribers(t *testing.T) {
 
 	// Read confirmations
 	var response Message
-	ws1.ReadJSON(&response)
-	ws2.ReadJSON(&response)
+	_ = ws1.ReadJSON(&response)
+	_ = ws2.ReadJSON(&response)
 
 	// Send broadcast via HTTP
 	broadcastMsg := Message{
@@ -261,12 +262,12 @@ func TestBroadcastToSubscribers(t *testing.T) {
 	// Both clients should receive the broadcast
 	var msg1, msg2 Message
 
-	ws1.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_ = ws1.SetReadDeadline(time.Now().Add(1 * time.Second))
 	if err := ws1.ReadJSON(&msg1); err != nil {
 		t.Fatalf("Client 1 failed to receive broadcast: %v", err)
 	}
 
-	ws2.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_ = ws2.SetReadDeadline(time.Now().Add(1 * time.Second))
 	if err := ws2.ReadJSON(&msg2); err != nil {
 		t.Fatalf("Client 2 failed to receive broadcast: %v", err)
 	}
@@ -312,7 +313,7 @@ func TestPingPong(t *testing.T) {
 	}
 
 	var response Message
-	ws.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_ = ws.SetReadDeadline(time.Now().Add(1 * time.Second))
 	if err := ws.ReadJSON(&response); err != nil {
 		t.Fatalf("Failed to read after pong: %v", err)
 	}
@@ -344,7 +345,7 @@ func TestShutdown(t *testing.T) {
 	}
 
 	var response Message
-	ws.ReadJSON(&response)
+	_ = ws.ReadJSON(&response)
 
 	// Shutdown the handler
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -355,7 +356,7 @@ func TestShutdown(t *testing.T) {
 	}
 
 	// Verify connection was closed
-	ws.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_ = ws.SetReadDeadline(time.Now().Add(1 * time.Second))
 	_, _, err = ws.ReadMessage()
 	if err == nil {
 		t.Error("Expected connection to be closed after shutdown")
@@ -386,7 +387,7 @@ func TestMultipleStreams(t *testing.T) {
 		}
 
 		var response Message
-		ws.ReadJSON(&response)
+		_ = ws.ReadJSON(&response)
 
 		if response.Stream != stream {
 			t.Errorf("Expected stream %s, got %s", stream, response.Stream)
@@ -408,7 +409,7 @@ func TestMultipleStreams(t *testing.T) {
 
 	// Should receive message on stream2
 	var msg Message
-	ws.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_ = ws.SetReadDeadline(time.Now().Add(1 * time.Second))
 	if err := ws.ReadJSON(&msg); err != nil {
 		t.Fatalf("Failed to receive broadcast: %v", err)
 	}
@@ -428,6 +429,7 @@ func TestMultipleStreams(t *testing.T) {
 
 	if conn == nil {
 		t.Fatal("No connection found")
+		return // Avoid nil dereference
 	}
 
 	conn.streamsMu.RLock()

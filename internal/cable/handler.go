@@ -213,9 +213,9 @@ func (h *Handler) Shutdown(ctx context.Context) error {
 func (conn *Connection) readPump() {
 	defer conn.ws.Close()
 
-	conn.ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+	_ = conn.ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 	conn.ws.SetPongHandler(func(string) error {
-		conn.ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+		_ = conn.ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
 
@@ -249,7 +249,7 @@ func (conn *Connection) readPump() {
 
 		case "pong":
 			// Pong received, reset deadline
-			conn.ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+			_ = conn.ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 		}
 	}
 }
@@ -265,9 +265,9 @@ func (conn *Connection) writePump() {
 	for {
 		select {
 		case message, ok := <-conn.send:
-			conn.ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			_ = conn.ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if !ok {
-				conn.ws.WriteMessage(websocket.CloseMessage, []byte{})
+				_ = conn.ws.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
@@ -276,7 +276,7 @@ func (conn *Connection) writePump() {
 			}
 
 		case <-ticker.C:
-			conn.ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			_ = conn.ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			ping, _ := json.Marshal(Message{Type: "ping"})
 			if err := conn.ws.WriteMessage(websocket.TextMessage, ping); err != nil {
 				return
