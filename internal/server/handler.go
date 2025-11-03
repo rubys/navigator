@@ -155,6 +155,24 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle /_broadcast endpoint BEFORE authentication (localhost-only)
+	// This allows tenant Rails processes to broadcast without credentials
+	if h.cableHandler != nil && r.URL.Path == "/_broadcast" {
+		// Verify request is from localhost for security
+		remoteAddr := r.RemoteAddr
+		if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+			remoteAddr = host
+		}
+		if remoteAddr == "127.0.0.1" || remoteAddr == "::1" || remoteAddr == "localhost" {
+			recorder.SetMetadata("response_type", "broadcast")
+			h.cableHandler.HandleBroadcast(recorder, r)
+			return
+		}
+		// Not from localhost, return 403 Forbidden
+		http.Error(recorder, "Forbidden: /_broadcast is only accessible from localhost", http.StatusForbidden)
+		return
+	}
+
 	// Check authentication EARLY - before any routing decisions
 	// This prevents authentication bypass via reverse proxies, fly-replay, etc.
 	isPublic := auth.ShouldExcludeFromAuth(r.URL.Path, h.config)
@@ -166,17 +184,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle WebSocket routes (if cable handler is configured)
-	if h.cableHandler != nil {
-		if r.URL.Path == "/cable" {
-			recorder.SetMetadata("response_type", "websocket")
-			h.cableHandler.ServeHTTP(recorder, r)
-			return
-		} else if r.URL.Path == "/_broadcast" {
-			recorder.SetMetadata("response_type", "broadcast")
-			h.cableHandler.HandleBroadcast(recorder, r)
-			return
-		}
+	// Handle /cable WebSocket endpoint (after auth check)
+	if h.cableHandler != nil && r.URL.Path == "/cable" {
+		recorder.SetMetadata("response_type", "websocket")
+		h.cableHandler.ServeHTTP(recorder, r)
+		return
 	}
 
 	// Handle rewrites and redirects

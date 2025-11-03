@@ -23,7 +23,18 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 3. Authentication Check ⚡ EARLY ENFORCEMENT         │
+│ 3. Broadcast Endpoint? (/_broadcast)                │
+│    → YES: Check localhost-only access               │
+│      → FROM LOCALHOST: Handle broadcast             │
+│      → NOT LOCALHOST: Return 403 Forbidden          │
+│    → NO: Continue                                   │
+│                                                      │
+│    ℹ️  NOTE: Allows tenant apps to broadcast        │
+│        without auth (localhost-only for security)   │
+└───────────────────┬─────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────────┐
+│ 4. Authentication Check ⚡ EARLY ENFORCEMENT         │
 │    - Check if path is public (auth exclusions)      │
 │    - Validate Basic Auth credentials                │
 │    → FAILED: Return 401 Unauthorized                │
@@ -34,7 +45,13 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 4. Rewrite Rules                                    │
+│ 5. WebSocket Endpoint? (/cable)                     │
+│    → YES: Upgrade to WebSocket                      │
+│    → NO: Continue                                   │
+└───────────────────┬─────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────────┐
+│ 6. Rewrite Rules                                    │
 │    - Check server.rewrite_rules                     │
 │    - Match path patterns and methods                │
 │    → REDIRECT: Return 302 with new location         │
@@ -44,7 +61,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 5. CGI Scripts                                      │
+│ 7. CGI Scripts                                      │
 │    - Check server.cgi_scripts                       │
 │    - Match exact paths and methods                  │
 │    → MATCHED: Execute CGI script                    │
@@ -56,7 +73,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 6. Reverse Proxies (Standalone Services)            │
+│ 8. Reverse Proxies (Standalone Services)            │
 │    - Check routes.reverse_proxies                   │
 │    - Match path/prefix patterns                     │
 │    → WEBSOCKET: Establish WebSocket proxy           │
@@ -65,7 +82,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 7. Static File Serving                              │
+│ 9. Static File Serving                              │
 │    - Check for static file extensions               │
 │    - Look in configured public_dir                  │
 │    → FOUND: Serve file with cache headers           │
@@ -73,7 +90,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 8. Try Files (Public Paths Only)                    │
+│ 10. Try Files (Public Paths Only)                   │
 │    - Only for paths without extensions              │
 │    - Try configured suffixes (.html, etc.)          │
 │    → FOUND: Serve file                              │
@@ -81,17 +98,17 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 9. Maintenance Mode Check                           │
+│ 11. Maintenance Mode Check                          │
 │    - Check if maintenance.enabled is true           │
 │    → YES: Serve maintenance page (503)              │
 │    → NO: Continue                                   │
 │                                                      │
-│    ℹ️  NOTE: Static files (steps 7-8) are served   │
+│    ℹ️  NOTE: Static files (steps 9-10) are served  │
 │        even in maintenance mode                     │
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 10. Web Application Proxy                           │
+│ 12. Web Application Proxy                           │
 │    - Extract tenant from path                       │
 │    - Start or get existing app process              │
 │    - Wait for app readiness (with timeout)          │
@@ -102,7 +119,7 @@ Navigator's request handling follows a carefully orchestrated sequence of decisi
 └───────────────────┬─────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
-│ 11. Response Completion                             │
+│ 13. Response Completion                             │
 │     - Stop idle tracking                            │
 │     - Log request details                           │
 │     - Return to client                              │
@@ -149,7 +166,65 @@ The `/up` endpoint provides a simple health check for load balancers and monitor
 
 This is the fastest exit path from the request handler.
 
-### 4. Rewrite Rules
+### 3. Broadcast Endpoint (TurboCable)
+
+**File:** `internal/server/handler.go:158` (`/_broadcast` handling)
+
+The `/_broadcast` endpoint is used by TurboCable for WebSocket message broadcasting. It's handled **before authentication** but restricted to **localhost-only** for security.
+
+**Security Model:**
+
+```go
+// Verify request is from localhost
+remoteAddr := r.RemoteAddr
+if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+    remoteAddr = host
+}
+if remoteAddr == "127.0.0.1" || remoteAddr == "::1" || remoteAddr == "localhost" {
+    // Handle broadcast
+    h.cableHandler.HandleBroadcast(recorder, r)
+    return
+}
+// Not from localhost, return 403 Forbidden
+http.Error(recorder, "Forbidden: /_broadcast is only accessible from localhost", http.StatusForbidden)
+```
+
+**Why Before Authentication?**
+
+Tenant Rails applications need to broadcast Turbo Stream updates without authentication credentials. Since broadcasts originate from localhost (tenant processes on the same machine), we can safely bypass auth while maintaining security through localhost-only access.
+
+**Security Guarantees:**
+
+1. **Localhost-Only:** External requests get 403 Forbidden
+2. **Network Isolation:** Only processes on same machine can broadcast
+3. **No Credential Exposure:** Tenant apps don't need auth credentials
+4. **Early Check:** Happens before routing/proxy decisions
+
+**Use Case:**
+
+When a Rails tenant app needs to broadcast real-time updates (e.g., progress bars, notifications), it POSTs to `http://localhost:9999/_broadcast` with the stream name and message data. Navigator's WebSocket handler then distributes the message to all connected clients subscribed to that stream.
+
+### 4. Authentication Check ⚡ EARLY ENFORCEMENT
+
+**File:** `internal/server/handler.go:176` (happens after health check and broadcast)
+
+See section below for full authentication flow details.
+
+### 5. WebSocket Endpoint (/cable)
+
+**File:** `internal/server/handler.go:187` (`/cable` handling)
+
+The `/cable` endpoint handles WebSocket connections for TurboCable. Unlike `/_broadcast`, this endpoint **requires authentication** since clients connect from potentially untrusted networks.
+
+**WebSocket Flow:**
+
+1. Client connects to `/cable` with authentication
+2. Navigator verifies credentials (or checks public_paths)
+3. On success, upgrades to WebSocket protocol
+4. Handles subscribe/unsubscribe messages
+5. Pushes broadcast messages to subscribed clients
+
+### 6. Rewrite Rules
 
 **File:** `internal/server/handler.go:159` (`handleRewrites`)
 
