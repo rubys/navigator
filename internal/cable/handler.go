@@ -103,12 +103,17 @@ func (h *Handler) HandleBroadcast(w http.ResponseWriter, r *http.Request) {
 		Data:   msg.Data,
 	})
 
+	// Copy connections while holding lock to avoid race conditions
 	h.streamsMu.RLock()
-	connections := h.streams[msg.Stream]
+	streamConns := h.streams[msg.Stream]
+	connections := make([]*Connection, 0, len(streamConns))
+	for conn := range streamConns {
+		connections = append(connections, conn)
+	}
 	h.streamsMu.RUnlock()
 
 	count := 0
-	for conn := range connections {
+	for _, conn := range connections {
 		select {
 		case conn.send <- data:
 			count++
@@ -126,14 +131,16 @@ func (h *Handler) HandleBroadcast(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) register(conn *Connection) {
 	h.connectionsMu.Lock()
 	h.connections[conn] = true
+	total := len(h.connections)
 	h.connectionsMu.Unlock()
-	h.logger.Debug("WebSocket connected", "total", len(h.connections))
+	h.logger.Debug("WebSocket connected", "total", total)
 }
 
 // unregister removes a connection and all its subscriptions
 func (h *Handler) unregister(conn *Connection) {
 	h.connectionsMu.Lock()
 	delete(h.connections, conn)
+	total := len(h.connections)
 	h.connectionsMu.Unlock()
 
 	conn.streamsMu.RLock()
@@ -148,7 +155,7 @@ func (h *Handler) unregister(conn *Connection) {
 	}
 
 	close(conn.send)
-	h.logger.Debug("WebSocket disconnected", "total", len(h.connections))
+	h.logger.Debug("WebSocket disconnected", "total", total)
 }
 
 // subscribe adds a connection to a stream

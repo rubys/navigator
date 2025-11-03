@@ -1293,7 +1293,7 @@ func TestJSONAccessLogging(t *testing.T) {
 	cfg.Server.Static.PublicDir = "public"
 
 	// Create handler with logging enabled (not using CreateTestHandler)
-	handler := CreateHandler(cfg, nil, nil, nil, nil, nil)
+	handler := CreateHandler(cfg, nil, nil, nil, nil, func() string { return "" }, func(string) {})
 
 	// Capture stdout to test JSON log output
 	oldStdout := os.Stdout
