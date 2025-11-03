@@ -24,6 +24,11 @@ server:                    # HTTP server settings
     action: suspend
     timeout: 20m
 
+cable:                     # Built-in WebSocket support (TurboCable)
+  enabled: true
+  path: "/cable"
+  broadcast_path: "/_broadcast"
+
 auth:                      # Authentication (top-level)
   enabled: true
   realm: "Restricted"
@@ -294,6 +299,112 @@ server:
 **Access Control**: When `allowed_users` is specified, only those usernames can access the script (returns 403 Forbidden for other authenticated users). If `allowed_users` is empty or not specified, all authenticated users can access the script. Scripts on paths listed in `auth.public_paths` can be accessed without authentication.
 
 **See Also**: [CGI Scripts Documentation](../features/cgi-scripts.md) for detailed usage examples.
+
+## cable
+
+Built-in TurboCable/WebSocket support for real-time features without external dependencies.
+
+```yaml
+cable:
+  enabled: true                   # Enable built-in WebSocket support (default: true)
+  path: "/cable"                  # WebSocket endpoint path (default: "/cable")
+  broadcast_path: "/_broadcast"   # Broadcast endpoint path (default: "/_broadcast")
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `true` | Enable built-in WebSocket/Cable support |
+| `path` | string | `"/cable"` | WebSocket endpoint for client connections (requires authentication) |
+| `broadcast_path` | string | `"/_broadcast"` | Broadcast endpoint for Rails apps (localhost-only, no auth) |
+
+### Overview
+
+Navigator provides built-in WebSocket support for Rails applications using TurboCable. This eliminates the need for:
+- Separate Action Cable server process (~153 MB)
+- Redis or Solid Cable for pub/sub (~13 MB)
+- Additional configuration and dependencies
+
+**Memory savings**: 89% reduction (163 MB → 18 MB per machine)
+
+### How It Works
+
+1. **WebSocket Endpoint** (`/cable`): Handles client WebSocket connections after authentication
+2. **Broadcast Endpoint** (`/_broadcast`): Receives broadcasts from Rails apps (localhost-only for security)
+3. **In-Memory Subscriptions**: Tracks subscriptions within Navigator process
+4. **Zero Configuration**: Works automatically with default settings
+
+### Security Model
+
+- **`/cable`**: Requires authentication, same as other protected endpoints
+- **`/_broadcast`**: Localhost-only (127.0.0.1, ::1, localhost), no authentication needed
+- Broadcasts from remote hosts return 403 Forbidden
+
+### Rails Configuration
+
+Configure your Rails app to use Navigator's built-in WebSocket support:
+
+```ruby
+# config/application.rb or config/environments/production.rb
+config.turbo_cable_broadcast_url = ENV.fetch('TURBO_CABLE_BROADCAST_URL', 'http://localhost:3000/_broadcast')
+```
+
+Set the environment variable in Navigator:
+
+```yaml
+applications:
+  env:
+    TURBO_CABLE_BROADCAST_URL: "http://localhost:3000/_broadcast"
+```
+
+### Custom Endpoints
+
+You can customize the WebSocket and broadcast endpoints:
+
+```yaml
+cable:
+  enabled: true
+  path: "/websocket"              # Custom WebSocket path
+  broadcast_path: "/internal/broadcast"  # Custom broadcast path
+```
+
+When using custom paths, update your Rails configuration accordingly:
+
+```ruby
+config.turbo_cable_broadcast_url = "http://localhost:3000/internal/broadcast"
+```
+
+And configure the WebSocket path:
+
+```ruby
+# config/application.rb
+config.action_cable.mount_path = "/websocket"  # Match cable.path
+```
+
+### Disabling Built-in WebSocket
+
+To disable Navigator's built-in WebSocket support and use traditional Action Cable:
+
+```yaml
+cable:
+  enabled: false
+
+managed_processes:
+  - name: redis
+    command: redis-server
+  - name: action-cable
+    command: bundle
+    args: [exec, puma, -p, "28080", cable/config.ru]
+```
+
+### Backward Compatibility
+
+The built-in WebSocket feature is fully backward compatible:
+- Default configuration enables WebSocket automatically
+- Existing Action Cable setups continue to work
+- Both can coexist during migration
+- No breaking changes to existing configurations
+
+**See Also**: [TurboCable Feature Documentation](../features/turbocable.md) for detailed usage, examples, and migration guide.
 
 ## auth
 

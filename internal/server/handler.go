@@ -155,9 +155,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle /_broadcast endpoint BEFORE authentication (localhost-only)
+	// Handle broadcast endpoint BEFORE authentication (localhost-only)
 	// This allows tenant Rails processes to broadcast without credentials
-	if h.cableHandler != nil && r.URL.Path == "/_broadcast" {
+	if h.cableHandler != nil && h.config.Cable.Enabled && h.config.Cable.BroadcastPath != "" && r.URL.Path == h.config.Cable.BroadcastPath {
 		// Verify request is from localhost for security
 		remoteAddr := r.RemoteAddr
 		if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
@@ -169,7 +169,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Not from localhost, return 403 Forbidden
-		http.Error(recorder, "Forbidden: /_broadcast is only accessible from localhost", http.StatusForbidden)
+		http.Error(recorder, "Forbidden: "+h.config.Cable.BroadcastPath+" is only accessible from localhost", http.StatusForbidden)
 		return
 	}
 
@@ -184,8 +184,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle /cable WebSocket endpoint (after auth check)
-	if h.cableHandler != nil && r.URL.Path == "/cable" {
+	// Handle WebSocket endpoint (after auth check)
+	if h.cableHandler != nil && h.config.Cable.Enabled && h.config.Cable.Path != "" && r.URL.Path == h.config.Cable.Path {
 		recorder.SetMetadata("response_type", "websocket")
 		h.cableHandler.ServeHTTP(recorder, r)
 		return

@@ -59,6 +59,7 @@ func NewConfigParser(yamlConfig *YAMLConfig) *ConfigParser {
 // Parse converts the YAML configuration to the internal Config structure
 func (p *ConfigParser) Parse() (*Config, error) {
 	p.parseServerConfig()
+	p.parseCableConfig()
 	p.parseAuthConfig()
 	p.parseRoutesConfig()
 	p.parseApplicationConfig()
@@ -113,6 +114,31 @@ func (p *ConfigParser) parseServerConfig() {
 
 	// Copy CGI scripts configuration
 	p.config.Server.CGIScripts = p.yamlConfig.Server.CGIScripts
+}
+
+// parseCableConfig parses TurboCable/WebSocket configuration
+func (p *ConfigParser) parseCableConfig() {
+	// Set enabled flag (defaults to true for backward compatibility)
+	// If enabled is nil (not specified in YAML), default to true
+	// If enabled is explicitly set (true or false), use that value
+	if p.yamlConfig.Cable.Enabled == nil {
+		p.config.Cable.Enabled = true // Default to enabled
+	} else {
+		p.config.Cable.Enabled = *p.yamlConfig.Cable.Enabled
+	}
+
+	// Set default paths if not specified
+	if p.yamlConfig.Cable.Path == "" {
+		p.config.Cable.Path = "/cable"
+	} else {
+		p.config.Cable.Path = p.yamlConfig.Cable.Path
+	}
+
+	if p.yamlConfig.Cable.BroadcastPath == "" {
+		p.config.Cable.BroadcastPath = "/_broadcast"
+	} else {
+		p.config.Cable.BroadcastPath = p.yamlConfig.Cable.BroadcastPath
+	}
 }
 
 // parseAuthConfig parses authentication configuration

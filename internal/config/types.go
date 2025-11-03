@@ -165,6 +165,13 @@ type BotDetectionConfig struct {
 	Action  string `yaml:"action"`  // Action to take: "reject" (403), "ignore" (allow), "static-only" (allow static, reject dynamic)
 }
 
+// CableConfig represents TurboCable/WebSocket configuration
+type CableConfig struct {
+	Enabled          bool   `yaml:"enabled"`           // Enable built-in WebSocket/Cable support (default: true)
+	Path             string `yaml:"path"`              // WebSocket endpoint path (default: "/cable")
+	BroadcastPath    string `yaml:"broadcast_path"`    // Broadcast endpoint path (default: "/_broadcast")
+}
+
 // HealthCheckConfig represents health check configuration
 type HealthCheckConfig struct {
 	Path     string               `yaml:"path"`     // Health check path (e.g., "/up")
@@ -194,6 +201,7 @@ type Config struct {
 			Timeout string `yaml:"timeout"` // Duration string like "30s", "5m"
 		} `yaml:"idle"`
 	} `yaml:"server"`
+	Cable               CableConfig
 	Auth                AuthConfig
 	Routes              RoutesConfig           `yaml:"routes"`
 	Applications        Applications           `yaml:"applications"`
@@ -286,6 +294,11 @@ type Tenant struct {
 
 // YAMLConfig represents the raw YAML configuration structure
 type YAMLConfig struct {
+	Cable struct {
+		Enabled       *bool  `yaml:"enabled"` // Pointer to distinguish unset from false
+		Path          string `yaml:"path"`
+		BroadcastPath string `yaml:"broadcast_path"`
+	} `yaml:"cable"`
 	Auth struct {
 		Enabled      bool     `yaml:"enabled"`
 		Realm        string   `yaml:"realm"`

@@ -1007,3 +1007,236 @@ applications:
 		}
 	}
 }
+
+func TestCableConfigDefaults(t *testing.T) {
+	// Test that cable config has proper defaults when not specified
+	testConfig := `
+server:
+  listen: 3000
+
+applications:
+  pools:
+    max_size: 10
+  tenants:
+    - path: /
+      root: /tmp/test
+`
+
+	tmpFile, err := os.CreateTemp("", "navigator-test-*.yml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(testConfig); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+	tmpFile.Close()
+
+	config, err := LoadConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify defaults
+	if !config.Cable.Enabled {
+		t.Error("Expected cable.enabled to default to true")
+	}
+
+	if config.Cable.Path != "/cable" {
+		t.Errorf("Expected cable.path to default to '/cable', got '%s'", config.Cable.Path)
+	}
+
+	if config.Cable.BroadcastPath != "/_broadcast" {
+		t.Errorf("Expected cable.broadcast_path to default to '/_broadcast', got '%s'", config.Cable.BroadcastPath)
+	}
+}
+
+func TestCableConfigCustom(t *testing.T) {
+	// Test custom cable configuration
+	testConfig := `
+server:
+  listen: 3000
+
+cable:
+  enabled: true
+  path: "/websocket"
+  broadcast_path: "/internal/broadcast"
+
+applications:
+  pools:
+    max_size: 10
+  tenants:
+    - path: /
+      root: /tmp/test
+`
+
+	tmpFile, err := os.CreateTemp("", "navigator-test-*.yml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(testConfig); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+	tmpFile.Close()
+
+	config, err := LoadConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify custom values
+	if !config.Cable.Enabled {
+		t.Error("Expected cable.enabled to be true")
+	}
+
+	if config.Cable.Path != "/websocket" {
+		t.Errorf("Expected cable.path '/websocket', got '%s'", config.Cable.Path)
+	}
+
+	if config.Cable.BroadcastPath != "/internal/broadcast" {
+		t.Errorf("Expected cable.broadcast_path '/internal/broadcast', got '%s'", config.Cable.BroadcastPath)
+	}
+}
+
+func TestCableConfigDisabled(t *testing.T) {
+	// Test explicitly disabled cable
+	testConfig := `
+server:
+  listen: 3000
+
+cable:
+  enabled: false
+
+applications:
+  pools:
+    max_size: 10
+  tenants:
+    - path: /
+      root: /tmp/test
+`
+
+	tmpFile, err := os.CreateTemp("", "navigator-test-*.yml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(testConfig); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+	tmpFile.Close()
+
+	config, err := LoadConfig(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify disabled state
+	if config.Cable.Enabled {
+		t.Error("Expected cable.enabled to be false")
+	}
+
+	// Even when disabled, defaults should be set for paths
+	if config.Cable.Path != "/cable" {
+		t.Errorf("Expected cable.path to default to '/cable', got '%s'", config.Cable.Path)
+	}
+
+	if config.Cable.BroadcastPath != "/_broadcast" {
+		t.Errorf("Expected cable.broadcast_path to default to '/_broadcast', got '%s'", config.Cable.BroadcastPath)
+	}
+}
+
+func TestUpdateConfigPreservesCable(t *testing.T) {
+	// Test that UpdateConfig preserves cable configuration
+	initialConfig := `
+server:
+  listen: 3000
+
+cable:
+  enabled: true
+  path: "/ws"
+  broadcast_path: "/bc"
+
+applications:
+  pools:
+    max_size: 10
+  tenants:
+    - path: /
+      root: /tmp/test1
+`
+
+	newConfigYAML := `
+server:
+  listen: 3000
+
+cable:
+  enabled: false
+  path: "/websocket"
+  broadcast_path: "/broadcast"
+
+applications:
+  pools:
+    max_size: 20
+  tenants:
+    - path: /new
+      root: /tmp/test2
+`
+
+	// Load initial config
+	tmpFile1, err := os.CreateTemp("", "navigator-test-*.yml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile1.Name())
+
+	if _, err := tmpFile1.WriteString(initialConfig); err != nil {
+		t.Fatalf("Failed to write initial config: %v", err)
+	}
+	tmpFile1.Close()
+
+	currentConfig, err := LoadConfig(tmpFile1.Name())
+	if err != nil {
+		t.Fatalf("Failed to load initial config: %v", err)
+	}
+
+	// Load new config
+	tmpFile2, err := os.CreateTemp("", "navigator-test-*.yml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile2.Name())
+
+	if _, err := tmpFile2.WriteString(newConfigYAML); err != nil {
+		t.Fatalf("Failed to write new config: %v", err)
+	}
+	tmpFile2.Close()
+
+	newConfig, err := LoadConfig(tmpFile2.Name())
+	if err != nil {
+		t.Fatalf("Failed to load new config: %v", err)
+	}
+
+	// Update the current config
+	UpdateConfig(currentConfig, newConfig)
+
+	// Verify cable config was updated
+	if currentConfig.Cable.Enabled {
+		t.Error("Expected cable.enabled to be false after update")
+	}
+
+	if currentConfig.Cable.Path != "/websocket" {
+		t.Errorf("Expected cable.path '/websocket' after update, got '%s'", currentConfig.Cable.Path)
+	}
+
+	if currentConfig.Cable.BroadcastPath != "/broadcast" {
+		t.Errorf("Expected cable.broadcast_path '/broadcast' after update, got '%s'", currentConfig.Cable.BroadcastPath)
+	}
+
+	// Verify other config was updated
+	if currentConfig.Applications.Pools.MaxSize != 20 {
+		t.Errorf("Expected pools.max_size 20 after update, got %d", currentConfig.Applications.Pools.MaxSize)
+	}
+}
