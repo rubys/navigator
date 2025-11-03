@@ -1,15 +1,75 @@
 # WebSocket Support
 
-Navigator provides comprehensive WebSocket support for real-time applications, including Action Cable integration, standalone WebSocket servers, and connection management.
+Navigator provides comprehensive WebSocket support for real-time applications, including built-in TurboCable, Action Cable integration, standalone WebSocket servers, and connection management.
 
 ## Overview
 
 Navigator supports WebSocket connections through multiple approaches:
 
-- **Rails Action Cable**: Standard Rails WebSocket integration
+- **Built-in TurboCable**: Native WebSocket support with zero external dependencies (recommended)
+- **Rails Action Cable**: Standard Rails WebSocket integration with Redis/Solid Cable
 - **Standalone WebSocket Servers**: External WebSocket services
 - **Pattern-Based Routing**: Flexible WebSocket endpoint matching
 - **Connection Management**: Proper connection lifecycle handling
+
+## Built-in TurboCable Support (Recommended)
+
+Navigator includes native TurboCable/WebSocket support, eliminating the need for external dependencies:
+
+```yaml
+# Zero configuration needed - enabled by default!
+cable:
+  enabled: true                   # Default: true
+  path: "/cable"                  # WebSocket endpoint
+  broadcast_path: "/_broadcast"   # Broadcast endpoint (localhost-only)
+```
+
+### Benefits
+
+- **89% memory reduction**: 163 MB (Action Cable + Redis) → 18 MB (built-in)
+- **Zero external dependencies**: No Redis, no Solid Cable, no managed processes
+- **Zero configuration**: Works automatically with sensible defaults
+- **Perfect for Turbo Streams**: Server → client broadcasts (HTML and JSON)
+- **Secure by default**: Authenticated WebSocket, localhost-only broadcasts
+
+### Quick Start
+
+1. **Add TurboCable to Rails**:
+   ```ruby
+   # Gemfile
+   gem 'turbo_cable', github: 'rubys/turbo_cable'
+   ```
+
+2. **Configure broadcast URL**:
+   ```yaml
+   # config/navigator.yml
+   applications:
+     env:
+       TURBO_CABLE_BROADCAST_URL: "http://localhost:3000/_broadcast"
+   ```
+
+3. **Use in views**:
+   ```erb
+   <%= turbo_stream_from "live-scores" %>
+   ```
+
+That's it! No Redis, no Action Cable server, no additional configuration.
+
+### When to Use Built-in TurboCable
+
+**Perfect for:**
+- Single-server applications
+- Process-per-tenant multi-tenancy (each tenant isolated)
+- Server → client real-time updates
+- Turbo Streams applications
+- Memory-constrained deployments
+
+**Not appropriate for:**
+- Horizontally scaled apps with load balancing
+- Bidirectional WebSocket (client actions)
+- Chat applications requiring client → server messages
+
+**See**: [TurboCable Documentation](turbocable.md) for complete usage, examples, and migration guide.
 
 ## Action Cable Integration
 

@@ -1,6 +1,6 @@
 # Action Cable and WebSockets
 
-Configure Navigator to support Rails Action Cable for real-time WebSocket connections, including standalone cable servers and multi-tenant WebSocket routing.
+Configure Navigator to support Rails WebSocket connections for real-time features, including built-in TurboCable support and traditional Action Cable.
 
 ## Use Cases
 
@@ -10,6 +10,68 @@ Configure Navigator to support Rails Action Cable for real-time WebSocket connec
 - Live dashboards and analytics
 - Real-time gaming features
 - Live streaming data
+
+## TurboCable (Recommended)
+
+Navigator includes built-in TurboCable support, eliminating the need for Action Cable and Redis:
+
+```yaml
+# config/navigator.yml
+# No configuration needed! TurboCable is enabled by default
+
+applications:
+  env:
+    # Point Rails broadcasts to Navigator
+    TURBO_CABLE_BROADCAST_URL: "http://localhost:3000/_broadcast"
+
+  tenants:
+    - name: main
+      path: /
+      working_dir: /var/www/app
+```
+
+### Rails Setup
+
+```ruby
+# Gemfile
+gem 'turbo_cable', github: 'rubys/turbo_cable'
+```
+
+```bash
+bundle install
+rails generate turbo_cable:install
+```
+
+### Usage
+
+```erb
+<%# app/views/scores/index.html.erb %>
+<div id="scores-board">
+  <%= turbo_stream_from "live-scores" %>
+  <%= render @scores %>
+</div>
+```
+
+```ruby
+# app/models/score.rb
+class Score < ApplicationRecord
+  after_save do
+    broadcast_replace_later_to "live-scores",
+      partial: "scores/score",
+      target: dom_id(self)
+  end
+end
+```
+
+**Memory savings**: 89% reduction (163 MB → 18 MB)
+
+**See**: [TurboCable Documentation](../features/turbocable.md) for complete details, examples, and migration guide.
+
+---
+
+## Traditional Action Cable
+
+For applications requiring bidirectional WebSocket communication or horizontal scaling, use traditional Action Cable with Redis:
 
 ## Basic Action Cable Setup
 

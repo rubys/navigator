@@ -55,13 +55,14 @@ Navigator provides a comprehensive set of features for multi-tenant web applicat
 
 [Learn more about Hot Reload](hot-reload.md)
 
-### :electric_plug: WebSocket Support
-- **Action Cable integration** - Built-in Rails Action Cable support
-- **Standalone servers** - Manage WebSocket servers as separate processes
-- **Connection upgrades** - Automatic WebSocket protocol upgrades
-- **Long-lived connections** - Efficient handling of persistent connections
+### :zap: TurboCable / WebSocket Support
+- **Built-in WebSocket** - Zero-config real-time support with 89% memory savings
+- **No external dependencies** - No Redis, no Solid Cable, no separate servers
+- **Turbo Streams ready** - Perfect for Rails Turbo Streams applications
+- **Action Cable compatible** - Traditional Action Cable also supported
+- **Secure by default** - Authenticated WebSocket, localhost-only broadcasts
 
-[Learn more about WebSocket Support](websocket-support.md)
+[Learn more about TurboCable](turbocable.md) | [WebSocket Support](websocket-support.md)
 
 ### :hook: Lifecycle Hooks
 - **Server hooks** - Execute commands at Navigator lifecycle events (start, ready, idle, resume)

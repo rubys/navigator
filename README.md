@@ -6,10 +6,10 @@ A lightweight web server for multi-tenant applications with on-demand process ma
 
 - **Process management** - On-demand startup, auto-restart, graceful shutdown
 - **Multi-tenant hosting** - Isolated databases and processes per customer
+- **TurboCable WebSockets** - Built-in real-time support with 89% memory savings (no Redis needed)
 - **Static file serving** - High-performance direct filesystem access with try-files
 - **Authentication** - htpasswd support with flexible exclusions
 - **Hot reload** - Update configuration without restart
-- **WebSocket support** - Built-in Action Cable and WebSocket proxying
 - **Regional routing** - Smart routing with Fly-Replay
 - **Machine suspension** - Auto-suspend idle machines on Fly.io
 - **Structured logging** - Built-in Vector integration for log aggregation
