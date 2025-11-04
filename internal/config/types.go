@@ -167,9 +167,9 @@ type BotDetectionConfig struct {
 
 // CableConfig represents TurboCable/WebSocket configuration
 type CableConfig struct {
-	Enabled          bool   `yaml:"enabled"`           // Enable built-in WebSocket/Cable support (default: true)
-	Path             string `yaml:"path"`              // WebSocket endpoint path (default: "/cable")
-	BroadcastPath    string `yaml:"broadcast_path"`    // Broadcast endpoint path (default: "/_broadcast")
+	Enabled       bool   `yaml:"enabled"`        // Enable built-in WebSocket/Cable support (default: true)
+	Path          string `yaml:"path"`           // WebSocket endpoint path (default: "/cable")
+	BroadcastPath string `yaml:"broadcast_path"` // Broadcast endpoint path (default: "/_broadcast")
 }
 
 // HealthCheckConfig represents health check configuration
