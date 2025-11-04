@@ -440,3 +440,69 @@ func TestMultipleStreams(t *testing.T) {
 		t.Errorf("Expected 3 subscribed streams, got %d", subscribedCount)
 	}
 }
+
+func TestMaxMessageSize(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
+	handler := NewHandler(logger)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to connect: %v", err)
+	}
+	defer ws.Close()
+
+	// First verify normal message works
+	subscribe := Message{Type: "subscribe", Stream: "test"}
+	if err := ws.WriteJSON(subscribe); err != nil {
+		t.Fatalf("Failed to send normal message: %v", err)
+	}
+
+	var response Message
+	_ = ws.SetReadDeadline(time.Now().Add(1 * time.Second))
+	if err := ws.ReadJSON(&response); err != nil {
+		t.Fatalf("Failed to read normal response: %v", err)
+	}
+
+	// Create a message that exceeds maxMessageSize (128KB)
+	largeData := make([]byte, maxMessageSize+1024) // 129KB
+	for i := range largeData {
+		largeData[i] = 'x'
+	}
+
+	largeMsg := Message{
+		Type:   "subscribe",
+		Stream: string(largeData),
+	}
+
+	// Attempt to send oversized message
+	if err := ws.WriteJSON(largeMsg); err != nil {
+		// Expected to fail during write or immediately after
+		return
+	}
+
+	// If write succeeded, connection should be closed by server
+	_ = ws.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, _, err = ws.ReadMessage()
+
+	// Connection should be closed due to oversized message
+	if err == nil {
+		t.Error("Expected connection to be closed after oversized message")
+	}
+}
+
+func TestPingMessageFormat(t *testing.T) {
+	// Verify pre-encoded ping message is valid JSON
+	var msg Message
+	if err := json.Unmarshal(pingMessage, &msg); err != nil {
+		t.Fatalf("Pre-encoded ping message is invalid JSON: %v", err)
+	}
+
+	if msg.Type != "ping" {
+		t.Errorf("Expected ping message type, got %s", msg.Type)
+	}
+}

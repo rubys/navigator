@@ -11,6 +11,17 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// WebSocket timing and size constants
+const (
+	maxMessageSize = 128 * 1024       // 128KB - prevents DoS via large messages
+	writeWait      = 10 * time.Second // Write timeout
+	pongWait       = 60 * time.Second // Pong response timeout
+	pingPeriod     = 30 * time.Second // Ping interval
+)
+
+// Pre-encoded ping message (performance optimization)
+var pingMessage = []byte(`{"type":"ping"}`)
+
 // Message types for the custom WebSocket protocol
 type Message struct {
 	Type   string          `json:"type"`
@@ -213,9 +224,12 @@ func (h *Handler) Shutdown(ctx context.Context) error {
 func (conn *Connection) readPump() {
 	defer conn.ws.Close()
 
-	_ = conn.ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+	// Set max message size to prevent DoS attacks
+	conn.ws.SetReadLimit(maxMessageSize)
+
+	_ = conn.ws.SetReadDeadline(time.Now().Add(pongWait))
 	conn.ws.SetPongHandler(func(string) error {
-		_ = conn.ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+		_ = conn.ws.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
 
@@ -249,14 +263,14 @@ func (conn *Connection) readPump() {
 
 		case "pong":
 			// Pong received, reset deadline
-			_ = conn.ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+			_ = conn.ws.SetReadDeadline(time.Now().Add(pongWait))
 		}
 	}
 }
 
 // writePump sends messages to the WebSocket
 func (conn *Connection) writePump() {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
 		conn.ws.Close()
@@ -265,7 +279,7 @@ func (conn *Connection) writePump() {
 	for {
 		select {
 		case message, ok := <-conn.send:
-			_ = conn.ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			_ = conn.ws.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				_ = conn.ws.WriteMessage(websocket.CloseMessage, []byte{})
 				return
@@ -276,9 +290,9 @@ func (conn *Connection) writePump() {
 			}
 
 		case <-ticker.C:
-			_ = conn.ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			ping, _ := json.Marshal(Message{Type: "ping"})
-			if err := conn.ws.WriteMessage(websocket.TextMessage, ping); err != nil {
+			_ = conn.ws.SetWriteDeadline(time.Now().Add(writeWait))
+			// Use pre-encoded ping message for performance
+			if err := conn.ws.WriteMessage(websocket.TextMessage, pingMessage); err != nil {
 				return
 			}
 		}
