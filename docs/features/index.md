@@ -2,12 +2,11 @@
 
 Navigator provides a comprehensive set of features for multi-tenant web applications, from basic process management to advanced regional routing.
 
-!!! tip "What's New in v0.16.0"
-    - **CGI Script Support**: Execute standalone scripts without starting web applications
-    - **User Switching**: CGI scripts can run as different Unix users (requires root)
-    - **Access Control**: New `allowed_users` configuration to restrict CGI script access
-    - **Config Reload**: Automatic configuration reload after CGI script execution
-    - **Timeout Control**: Set execution time limits for CGI scripts
+!!! tip "Navigator 1.0 - Production Ready"
+    - **Battle-Tested**: Serving 75+ customers across 8 countries
+    - **Comprehensive Features**: CGI support, TurboCable WebSockets, machine auto-suspend
+    - **Well-Tested**: 81.2% test coverage with race detection
+    - **Production Proven**: Reliable process management and graceful error handling
 
 ## Core Features
 

@@ -2,10 +2,10 @@
 
 A lightweight web server for multi-tenant applications with on-demand process management. Deploy multiple customers or projects from a single configuration file.
 
-!!! success "Latest Release: v0.16.0"
-    **CGI Script Support and Access Control** - Execute standalone scripts with user switching and allowed_users configuration.
+!!! success "Latest Release: v1.0.0"
+    **Production-Ready Release** - Navigator 1.0 is here! Battle-tested with 75+ customers, comprehensive features, and 81.2% test coverage.
 
-    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v0.16.0)
+    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v1.0.0)
 
 ## Features
 

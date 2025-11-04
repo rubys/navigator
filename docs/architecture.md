@@ -1,6 +1,6 @@
 # Architecture
 
-Navigator v0.16.0 represents a significant architectural evolution from a single-file implementation to a **modular, well-tested Go application** with clear separation of concerns.
+Navigator v1.0.0 is a **production-ready, modular Go application** with clear separation of concerns, comprehensive test coverage, and battle-tested reliability.
 
 ## Design Principles
 
