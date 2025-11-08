@@ -236,6 +236,7 @@ server:
   listen: 3000              # Internal port
   hostname: ""              # Proxy handles hostname
   root_path: "/api"         # Strip /api prefix
+  trust_proxy: true         # Trust X-Forwarded-Host from upstream proxy
   static:
     public_dir: "/app/public"
 ```
@@ -246,8 +247,70 @@ location /api/ {
     proxy_pass http://127.0.0.1:3000/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
 }
 ```
+
+### trust_proxy
+
+**Type:** Boolean
+**Default:** `false`
+**Security:** Only enable when behind a trusted reverse proxy
+
+Controls whether Navigator trusts `X-Forwarded-Host` headers from an upstream proxy.
+
+**Default Behavior (trust_proxy: false):**
+- Navigator overwrites `X-Forwarded-Host` with the current request host
+- Secure for internet-facing deployments
+- Prevents header injection attacks
+
+**When Enabled (trust_proxy: true):**
+- Navigator preserves existing `X-Forwarded-Host` from upstream proxy
+- Required when behind Apache, nginx, or other reverse proxies
+- Allows correct origin detection for CSRF protection in backend applications
+
+**Example - Behind Apache/nginx:**
+```yaml
+server:
+  listen: 3000
+  hostname: app.example.com
+  trust_proxy: true  # Trust Apache's X-Forwarded-Host header
+```
+
+**Example - Internet-facing:**
+```yaml
+server:
+  listen: 3000
+  hostname: app.example.com
+  trust_proxy: false  # Don't trust client-provided headers (default)
+```
+
+**Use Cases:**
+
+1. **Behind reverse proxy** (Apache/nginx scenario):
+   - Apache/nginx forwards requests to Navigator
+   - Proxy sets `X-Forwarded-Host: public-domain.com`
+   - With `trust_proxy: true`, backend app sees correct host for CSRF validation
+
+2. **Direct deployment** (Fly.io, cloud VMs):
+   - Navigator directly receives internet traffic
+   - With `trust_proxy: false` (default), prevents header spoofing
+   - Secure by default
+
+**Security Warning:**
+
+⚠️ **Only enable `trust_proxy` when:**
+
+- Navigator is in a trusted network
+- Upstream proxy (Apache/nginx) is properly configured
+- Client access is blocked (only proxy can reach Navigator)
+
+❌ **Never enable when:**
+
+- Navigator is directly exposed to the internet
+- You don't control the upstream proxy
+- Multiple untrusted proxies are in the chain
 
 ## Advanced Configuration
 

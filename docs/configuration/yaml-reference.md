@@ -74,6 +74,7 @@ server:
   listen: 3000                    # Port to listen on (required)
   hostname: "localhost"           # Hostname for requests (optional)
   root_path: "/showcase"          # Root URL path prefix (optional)
+  trust_proxy: false              # Trust X-Forwarded-Host from upstream proxy (optional, default: false)
 
   # Health check configuration
   health_check:
@@ -115,6 +116,7 @@ server:
 | `listen` | integer/string | `3000` | Port to bind HTTP server |
 | `hostname` | string | `""` | Hostname for Host header matching |
 | `root_path` | string | `""` | Root URL path prefix (e.g., "/showcase") |
+| `trust_proxy` | boolean | `false` | Trust X-Forwarded-Host headers from upstream proxy (see [server.md](server.md#trust_proxy)) |
 
 ### server.health_check
 

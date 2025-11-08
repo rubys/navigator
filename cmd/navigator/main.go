@@ -19,6 +19,7 @@ import (
 	"github.com/rubys/navigator/internal/config"
 	"github.com/rubys/navigator/internal/idle"
 	"github.com/rubys/navigator/internal/process"
+	"github.com/rubys/navigator/internal/proxy"
 	"github.com/rubys/navigator/internal/server"
 	"github.com/rubys/navigator/internal/utils"
 )
@@ -55,6 +56,9 @@ func main() {
 		"tenants", len(cfg.Applications.Tenants),
 		"reverseProxies", len(cfg.Routes.ReverseProxies),
 		"cgiScripts", len(cfg.Server.CGIScripts))
+
+	// Configure proxy trust settings
+	proxy.SetTrustProxy(cfg.Server.TrustProxy)
 
 	// Log maintenance mode status
 	if cfg.Maintenance.Enabled {
@@ -325,6 +329,9 @@ func (l *ServerLifecycle) handleReload() {
 	l.appManager.UpdateConfig(newConfig)
 	l.processManager.UpdateManagedProcesses(newConfig)
 	l.idleManager.UpdateConfig(newConfig)
+
+	// Update proxy trust settings
+	proxy.SetTrustProxy(newConfig.Server.TrustProxy)
 
 	// Update logging format if changed
 	setupLogging(newConfig)

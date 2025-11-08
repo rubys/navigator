@@ -324,9 +324,21 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
     }
 }
 ```
+
+**Important:** When using nginx or Apache as a reverse proxy, enable `trust_proxy` in your Navigator configuration to preserve the X-Forwarded-Host header:
+
+```yaml
+server:
+  listen: 3000
+  hostname: myapp.com
+  trust_proxy: true  # Trust X-Forwarded-Host from nginx/Apache
+```
+
+This ensures your backend application receives the correct hostname for CSRF protection and other origin-based validations. See [server configuration](../configuration/server.md#trust_proxy) for security considerations.
 
 ## Monitoring and Logging
 

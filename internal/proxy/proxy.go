@@ -17,6 +17,21 @@ import (
 	"github.com/rubys/navigator/internal/logging"
 )
 
+// trustProxy indicates whether to trust X-Forwarded-* headers from upstream proxy
+// Set to false by default for security. Only set to true when Navigator is behind
+// a trusted proxy (e.g., Apache, nginx) that sets these headers correctly.
+var trustProxy atomic.Bool
+
+// SetTrustProxy configures whether to trust X-Forwarded-* headers
+func SetTrustProxy(trust bool) {
+	trustProxy.Store(trust)
+}
+
+// GetTrustProxy returns the current trust_proxy setting
+func GetTrustProxy() bool {
+	return trustProxy.Load()
+}
+
 // MetadataSetter is an interface for response writers that support metadata
 type MetadataSetter interface {
 	SetMetadata(key string, value interface{})
@@ -65,7 +80,13 @@ func HandleProxy(w http.ResponseWriter, r *http.Request, targetURL string) {
 		if req.Header.Get("X-Forwarded-For") == "" {
 			req.Header.Set("X-Forwarded-For", r.RemoteAddr)
 		}
-		req.Header.Set("X-Forwarded-Host", req.Host)
+		// Only preserve X-Forwarded-Host if trust_proxy is enabled and header already exists
+		// Otherwise set it to current host for security (default behavior)
+		if trustProxy.Load() && req.Header.Get("X-Forwarded-Host") != "" {
+			// Trust existing X-Forwarded-Host from upstream proxy
+		} else {
+			req.Header.Set("X-Forwarded-Host", req.Host)
+		}
 		if req.Header.Get("X-Forwarded-Proto") == "" {
 			req.Header.Set("X-Forwarded-Proto", "http")
 		}
@@ -284,7 +305,13 @@ func ProxyWithWebSocketSupport(w http.ResponseWriter, r *http.Request, targetURL
 		if req.Header.Get("X-Forwarded-For") == "" {
 			req.Header.Set("X-Forwarded-For", r.RemoteAddr)
 		}
-		req.Header.Set("X-Forwarded-Host", req.Host)
+		// Only preserve X-Forwarded-Host if trust_proxy is enabled and header already exists
+		// Otherwise set it to current host for security (default behavior)
+		if trustProxy.Load() && req.Header.Get("X-Forwarded-Host") != "" {
+			// Trust existing X-Forwarded-Host from upstream proxy
+		} else {
+			req.Header.Set("X-Forwarded-Host", req.Host)
+		}
 		if req.Header.Get("X-Forwarded-Proto") == "" {
 			req.Header.Set("X-Forwarded-Proto", "http")
 		}

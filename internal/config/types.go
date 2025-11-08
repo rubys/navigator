@@ -191,6 +191,7 @@ type Config struct {
 		Listen       string `yaml:"listen"`
 		Hostname     string `yaml:"hostname"`
 		RootPath     string `yaml:"root_path"`
+		TrustProxy   bool   `yaml:"trust_proxy"` // Trust X-Forwarded-* headers from upstream proxy
 		RewriteRules []RewriteRule
 		Static       StaticConfig
 		BotDetection BotDetectionConfig `yaml:"bot_detection"`
