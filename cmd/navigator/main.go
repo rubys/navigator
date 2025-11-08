@@ -58,6 +58,7 @@ func main() {
 		"cgiScripts", len(cfg.Server.CGIScripts))
 
 	// Configure proxy trust settings
+	slog.Debug("Initial trust_proxy value from config", "trust_proxy", cfg.Server.TrustProxy, "config_file", configFile)
 	proxy.SetTrustProxy(cfg.Server.TrustProxy)
 
 	// Log maintenance mode status
@@ -325,6 +326,11 @@ func (l *ServerLifecycle) handleReload() {
 		return
 	}
 
+	// DEBUG: Log the trust_proxy value from loaded config
+	slog.Debug("Loaded config trust_proxy value",
+		"trust_proxy", newConfig.Server.TrustProxy,
+		"config_file", l.configFile)
+
 	// Update configuration in all managers
 	l.appManager.UpdateConfig(newConfig)
 	l.processManager.UpdateManagedProcesses(newConfig)
@@ -332,6 +338,7 @@ func (l *ServerLifecycle) handleReload() {
 
 	// Update proxy trust settings
 	proxy.SetTrustProxy(newConfig.Server.TrustProxy)
+	slog.Debug("Set trust_proxy in proxy package", "value", newConfig.Server.TrustProxy)
 
 	// Update logging format if changed
 	setupLogging(newConfig)
