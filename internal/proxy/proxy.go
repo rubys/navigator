@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -80,12 +81,24 @@ func HandleProxy(w http.ResponseWriter, r *http.Request, targetURL string) {
 		if req.Header.Get("X-Forwarded-For") == "" {
 			req.Header.Set("X-Forwarded-For", r.RemoteAddr)
 		}
+
+		// DEBUG: Log trust_proxy state and incoming X-Forwarded-Host
+		incomingXFH := req.Header.Get("X-Forwarded-Host")
+		trustProxyEnabled := trustProxy.Load()
+		slog.Debug("trust_proxy check",
+			"trust_proxy", trustProxyEnabled,
+			"incoming_x_forwarded_host", incomingXFH,
+			"req_host", req.Host,
+			"path", req.URL.Path)
+
 		// Only preserve X-Forwarded-Host if trust_proxy is enabled and header already exists
 		// Otherwise set it to current host for security (default behavior)
-		if trustProxy.Load() && req.Header.Get("X-Forwarded-Host") != "" {
+		if trustProxyEnabled && incomingXFH != "" {
 			// Trust existing X-Forwarded-Host from upstream proxy
+			slog.Debug("trust_proxy: preserving X-Forwarded-Host", "value", incomingXFH)
 		} else {
 			req.Header.Set("X-Forwarded-Host", req.Host)
+			slog.Debug("trust_proxy: setting X-Forwarded-Host to current host", "value", req.Host)
 		}
 		if req.Header.Get("X-Forwarded-Proto") == "" {
 			req.Header.Set("X-Forwarded-Proto", "http")
@@ -305,12 +318,24 @@ func ProxyWithWebSocketSupport(w http.ResponseWriter, r *http.Request, targetURL
 		if req.Header.Get("X-Forwarded-For") == "" {
 			req.Header.Set("X-Forwarded-For", r.RemoteAddr)
 		}
+
+		// DEBUG: Log trust_proxy state and incoming X-Forwarded-Host
+		incomingXFH := req.Header.Get("X-Forwarded-Host")
+		trustProxyEnabled := trustProxy.Load()
+		slog.Debug("trust_proxy check",
+			"trust_proxy", trustProxyEnabled,
+			"incoming_x_forwarded_host", incomingXFH,
+			"req_host", req.Host,
+			"path", req.URL.Path)
+
 		// Only preserve X-Forwarded-Host if trust_proxy is enabled and header already exists
 		// Otherwise set it to current host for security (default behavior)
-		if trustProxy.Load() && req.Header.Get("X-Forwarded-Host") != "" {
+		if trustProxyEnabled && incomingXFH != "" {
 			// Trust existing X-Forwarded-Host from upstream proxy
+			slog.Debug("trust_proxy: preserving X-Forwarded-Host", "value", incomingXFH)
 		} else {
 			req.Header.Set("X-Forwarded-Host", req.Host)
+			slog.Debug("trust_proxy: setting X-Forwarded-Host to current host", "value", req.Host)
 		}
 		if req.Header.Get("X-Forwarded-Proto") == "" {
 			req.Header.Set("X-Forwarded-Proto", "http")
