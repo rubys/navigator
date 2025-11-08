@@ -314,6 +314,7 @@ type YAMLConfig struct {
 		Listen     interface{}       `yaml:"listen"`
 		Hostname   string            `yaml:"hostname"`
 		RootPath   string            `yaml:"root_path"`
+		TrustProxy bool              `yaml:"trust_proxy"`
 		CGIScripts []CGIScriptConfig `yaml:"cgi_scripts"`
 		Static     struct {
 			PublicDir                string   `yaml:"public_dir"`
