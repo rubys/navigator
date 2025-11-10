@@ -1269,6 +1269,290 @@ func TestMultiDestinationLogging(t *testing.T) {
 	}
 }
 
+// TestBuildManagedProcessConfigs tests Vector auto-injection
+func TestBuildManagedProcessConfigs(t *testing.T) {
+	tests := []struct {
+		name           string
+		cfg            *config.Config
+		expectVector   bool
+		expectCount    int
+		vectorPosition int // 0-indexed position where Vector should appear (-1 if not expected)
+	}{
+		{
+			name: "Vector enabled with config",
+			cfg: &config.Config{
+				Logging: config.LogConfig{
+					Vector: struct {
+						Enabled bool   `yaml:"enabled"`
+						Socket  string `yaml:"socket"`
+						Config  string `yaml:"config"`
+					}{
+						Enabled: true,
+						Socket:  "/tmp/vector.sock",
+						Config:  "/etc/vector/vector.toml",
+					},
+				},
+				ManagedProcesses: []config.ManagedProcessConfig{
+					{Name: "redis", Command: "redis-server"},
+				},
+			},
+			expectVector:   true,
+			expectCount:    2, // Vector + redis
+			vectorPosition: 0, // Vector should be first
+		},
+		{
+			name: "Vector disabled",
+			cfg: &config.Config{
+				Logging: config.LogConfig{
+					Vector: struct {
+						Enabled bool   `yaml:"enabled"`
+						Socket  string `yaml:"socket"`
+						Config  string `yaml:"config"`
+					}{
+						Enabled: false,
+						Socket:  "/tmp/vector.sock",
+						Config:  "/etc/vector/vector.toml",
+					},
+				},
+				ManagedProcesses: []config.ManagedProcessConfig{
+					{Name: "redis", Command: "redis-server"},
+				},
+			},
+			expectVector:   false,
+			expectCount:    1, // Only redis
+			vectorPosition: -1,
+		},
+		{
+			name: "Vector enabled but no config path",
+			cfg: &config.Config{
+				Logging: config.LogConfig{
+					Vector: struct {
+						Enabled bool   `yaml:"enabled"`
+						Socket  string `yaml:"socket"`
+						Config  string `yaml:"config"`
+					}{
+						Enabled: true,
+						Socket:  "/tmp/vector.sock",
+						Config:  "", // Empty config path
+					},
+				},
+				ManagedProcesses: []config.ManagedProcessConfig{
+					{Name: "redis", Command: "redis-server"},
+				},
+			},
+			expectVector:   false,
+			expectCount:    1,
+			vectorPosition: -1,
+		},
+		{
+			name: "No managed processes, Vector enabled",
+			cfg: &config.Config{
+				Logging: config.LogConfig{
+					Vector: struct {
+						Enabled bool   `yaml:"enabled"`
+						Socket  string `yaml:"socket"`
+						Config  string `yaml:"config"`
+					}{
+						Enabled: true,
+						Socket:  "/tmp/vector.sock",
+						Config:  "/etc/vector/vector.toml",
+					},
+				},
+				ManagedProcesses: []config.ManagedProcessConfig{},
+			},
+			expectVector:   true,
+			expectCount:    1, // Only Vector
+			vectorPosition: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			processes := buildManagedProcessConfigs(tt.cfg)
+
+			if len(processes) != tt.expectCount {
+				t.Errorf("Expected %d processes, got %d", tt.expectCount, len(processes))
+			}
+
+			foundVector := false
+			vectorPos := -1
+			for i, proc := range processes {
+				if proc.Name == "vector" {
+					foundVector = true
+					vectorPos = i
+
+					// Verify Vector configuration
+					if proc.Command != "vector" {
+						t.Errorf("Expected Vector command to be 'vector', got %q", proc.Command)
+					}
+					if len(proc.Args) != 2 || proc.Args[0] != "--config" {
+						t.Errorf("Expected Vector args [--config, path], got %v", proc.Args)
+					}
+					if !proc.AutoRestart {
+						t.Error("Vector should have AutoRestart enabled")
+					}
+				}
+			}
+
+			if foundVector != tt.expectVector {
+				t.Errorf("Expected Vector present: %v, got: %v", tt.expectVector, foundVector)
+			}
+
+			if tt.vectorPosition >= 0 && vectorPos != tt.vectorPosition {
+				t.Errorf("Expected Vector at position %d, got %d", tt.vectorPosition, vectorPos)
+			}
+		})
+	}
+}
+
+// TestVectorStartsOnConfigReload tests that Vector starts when added via config reload
+func TestVectorStartsOnConfigReload(t *testing.T) {
+	// Initial config without Vector
+	initialConfig := &config.Config{
+		Logging: config.LogConfig{
+			Format: "json",
+		},
+		ManagedProcesses: []config.ManagedProcessConfig{},
+	}
+
+	manager := NewManager(initialConfig)
+	if err := manager.StartManagedProcesses(); err != nil {
+		t.Fatalf("Failed to start initial processes: %v", err)
+	}
+
+	// Verify no Vector process
+	manager.mutex.RLock()
+	initialCount := len(manager.processes)
+	manager.mutex.RUnlock()
+
+	if initialCount != 0 {
+		t.Errorf("Expected 0 processes initially, got %d", initialCount)
+	}
+
+	// New config with Vector enabled
+	newConfig := &config.Config{
+		Logging: config.LogConfig{
+			Format: "json",
+			Vector: struct {
+				Enabled bool   `yaml:"enabled"`
+				Socket  string `yaml:"socket"`
+				Config  string `yaml:"config"`
+			}{
+				Enabled: true,
+				Socket:  "/tmp/test-vector.sock",
+				Config:  "/tmp/test-vector.toml",
+			},
+		},
+		ManagedProcesses: []config.ManagedProcessConfig{},
+	}
+
+	// Update config (simulates config reload)
+	manager.UpdateManagedProcesses(newConfig)
+
+	// Give it a moment to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify Vector was added
+	manager.mutex.RLock()
+	newCount := len(manager.processes)
+	foundVector := false
+	for _, proc := range manager.processes {
+		if proc.Name == "vector" {
+			foundVector = true
+			break
+		}
+	}
+	manager.mutex.RUnlock()
+
+	if newCount != 1 {
+		t.Errorf("Expected 1 process after reload, got %d", newCount)
+	}
+
+	if !foundVector {
+		t.Error("Vector process should be added after config reload")
+	}
+
+	// Cleanup
+	manager.StopManagedProcesses()
+}
+
+// TestVectorStopsOnConfigReload tests that Vector stops when removed via config reload
+func TestVectorStopsOnConfigReload(t *testing.T) {
+	// Initial config with Vector
+	initialConfig := &config.Config{
+		Logging: config.LogConfig{
+			Format: "json",
+			Vector: struct {
+				Enabled bool   `yaml:"enabled"`
+				Socket  string `yaml:"socket"`
+				Config  string `yaml:"config"`
+			}{
+				Enabled: true,
+				Socket:  "/tmp/test-vector.sock",
+				Config:  "/tmp/test-vector.toml",
+			},
+		},
+		ManagedProcesses: []config.ManagedProcessConfig{},
+	}
+
+	manager := NewManager(initialConfig)
+	if err := manager.StartManagedProcesses(); err != nil {
+		t.Fatalf("Failed to start initial processes: %v", err)
+	}
+
+	// Give it a moment to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify Vector is running
+	manager.mutex.RLock()
+	initialCount := len(manager.processes)
+	manager.mutex.RUnlock()
+
+	if initialCount != 1 {
+		t.Errorf("Expected 1 process initially (Vector), got %d", initialCount)
+	}
+
+	// New config with Vector disabled
+	newConfig := &config.Config{
+		Logging: config.LogConfig{
+			Format: "json",
+			Vector: struct {
+				Enabled bool   `yaml:"enabled"`
+				Socket  string `yaml:"socket"`
+				Config  string `yaml:"config"`
+			}{
+				Enabled: false,
+			},
+		},
+		ManagedProcesses: []config.ManagedProcessConfig{},
+	}
+
+	// Update config (simulates config reload)
+	manager.UpdateManagedProcesses(newConfig)
+
+	// Give it a moment to stop
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify Vector was removed (process list doesn't shrink, but the process should be stopped)
+	manager.mutex.RLock()
+	foundRunningVector := false
+	for _, proc := range manager.processes {
+		proc.mutex.RLock()
+		if proc.Name == "vector" && proc.Running {
+			foundRunningVector = true
+		}
+		proc.mutex.RUnlock()
+	}
+	manager.mutex.RUnlock()
+
+	if foundRunningVector {
+		t.Error("Vector process should be stopped after config reload disables it")
+	}
+
+	// Cleanup
+	manager.StopManagedProcesses()
+}
+
 // Helper functions for testing
 func createTestConfig() *config.Config {
 	return &config.Config{

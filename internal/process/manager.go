@@ -45,12 +45,37 @@ func NewManager(cfg *config.Config) *Manager {
 	}
 }
 
+// buildManagedProcessConfigs returns the complete list of managed processes,
+// including automatically injected processes like Vector
+func buildManagedProcessConfigs(cfg *config.Config) []config.ManagedProcessConfig {
+	processes := make([]config.ManagedProcessConfig, 0, len(cfg.ManagedProcesses)+1)
+
+	// Add Vector as first process if enabled (high priority)
+	if cfg.Logging.Vector.Enabled && cfg.Logging.Vector.Config != "" {
+		vectorProc := config.ManagedProcessConfig{
+			Name:        "vector",
+			Command:     "vector",
+			Args:        []string{"--config", cfg.Logging.Vector.Config},
+			AutoRestart: true,
+		}
+		processes = append(processes, vectorProc)
+	}
+
+	// Add user-configured managed processes
+	processes = append(processes, cfg.ManagedProcesses...)
+
+	return processes
+}
+
 // StartManagedProcesses starts all configured managed processes
 func (m *Manager) StartManagedProcesses() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	for _, procConfig := range m.config.ManagedProcesses {
+	// Get complete list including Vector if enabled
+	allProcesses := buildManagedProcessConfigs(m.config)
+
+	for _, procConfig := range allProcesses {
 		// Parse start delay
 		startDelay := utils.ParseDurationWithContext(procConfig.StartDelay, 0, map[string]interface{}{
 			"process": procConfig.Name,
@@ -241,9 +266,12 @@ func (m *Manager) UpdateManagedProcesses(newConfig *config.Config) {
 		oldProcs[proc.Name] = proc
 	}
 
+	// Get complete list including Vector if enabled
+	allNewProcesses := buildManagedProcessConfigs(newConfig)
+
 	newProcs := make(map[string]*config.ManagedProcessConfig)
-	for i := range newConfig.ManagedProcesses {
-		proc := &newConfig.ManagedProcesses[i]
+	for i := range allNewProcesses {
+		proc := &allNewProcesses[i]
 		newProcs[proc.Name] = proc
 	}
 
