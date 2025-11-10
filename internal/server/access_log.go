@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -30,6 +31,16 @@ type AccessLogEntry struct {
 	ProxyBackend  string `json:"proxy_backend,omitempty"` // For proxy responses
 	FilePath      string `json:"file_path,omitempty"`     // For static file responses
 	ErrorMessage  string `json:"error_message,omitempty"` // For error responses
+}
+
+// accessLogWriter is the configured output destination for access logs
+var accessLogWriter io.Writer = os.Stdout
+
+// SetAccessLogWriter configures the output destination for access logs
+func SetAccessLogWriter(writer io.Writer) {
+	if writer != nil {
+		accessLogWriter = writer
+	}
 }
 
 // LogRequest logs an HTTP request in JSON format matching nginx/legacy navigator format
@@ -115,5 +126,5 @@ func LogRequest(req *http.Request, statusCode, bodySize int, startTime time.Time
 
 	// Output JSON log entry (matching nginx/rails format)
 	data, _ := json.Marshal(entry)
-	fmt.Fprintln(os.Stdout, string(data))
+	fmt.Fprintln(accessLogWriter, string(data))
 }

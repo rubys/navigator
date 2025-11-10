@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -154,6 +155,25 @@ func (v *VectorWriter) Close() error {
 		return err
 	}
 	return nil
+}
+
+// CreateAccessLogWriter creates a writer for Navigator's HTTP access logs
+// This sends logs to stdout and optionally to Vector for aggregation
+func CreateAccessLogWriter(logConfig config.LogConfig, stdout io.Writer) io.Writer {
+	outputs := []io.Writer{stdout}
+
+	// Add Vector output if configured
+	if logConfig.Vector.Enabled && logConfig.Vector.Socket != "" {
+		vectorWriter := NewVectorWriter(logConfig.Vector.Socket)
+		outputs = append(outputs, vectorWriter)
+		slog.Debug("Access logs will be sent to Vector", "socket", logConfig.Vector.Socket)
+	}
+
+	// Return appropriate writer
+	if len(outputs) == 1 {
+		return outputs[0]
+	}
+	return &MultiLogWriter{outputs: outputs}
 }
 
 // createFileWriter creates a file writer with the specified path

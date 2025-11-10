@@ -1300,6 +1300,9 @@ func TestJSONAccessLogging(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
+	// Update access log writer to use the pipe
+	SetAccessLogWriter(w)
+
 	// Create test request
 	req := httptest.NewRequest("GET", "/test-path?param=value", nil)
 	req.Header.Set("X-Forwarded-For", "203.0.113.1")
@@ -1318,6 +1321,9 @@ func TestJSONAccessLogging(t *testing.T) {
 	// Close writer and restore stdout
 	w.Close()
 	os.Stdout = oldStdout
+
+	// Restore access log writer
+	SetAccessLogWriter(oldStdout)
 
 	// Read captured output
 	output := make([]byte, 1024)

@@ -164,6 +164,10 @@ func setupLogging(cfg *config.Config) {
 		// Log the format switch (like the original navigator)
 		slog.Info("Switched to JSON logging format")
 	}
+
+	// Configure access log output destinations
+	accessLogWriter := process.CreateAccessLogWriter(cfg.Logging, os.Stdout)
+	server.SetAccessLogWriter(accessLogWriter)
 }
 
 func handleCommandLineArgs() error {
