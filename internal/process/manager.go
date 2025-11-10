@@ -129,12 +129,16 @@ func (m *Manager) startProcess(proc *ManagedProcess) error {
 	// Clean up Vector's Unix socket before starting (if this is Vector)
 	if proc.Name == "vector" && m.config.Logging.Vector.Socket != "" {
 		socketPath := m.config.Logging.Vector.Socket
-		if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
-			slog.Warn("Failed to remove stale Vector socket",
-				"socket", socketPath,
-				"error", err)
-		} else if err == nil {
-			slog.Debug("Removed stale Vector socket", "socket", socketPath)
+		// Check if socket exists first
+		if _, err := os.Stat(socketPath); err == nil {
+			// Socket exists, remove it
+			if err := os.Remove(socketPath); err != nil {
+				slog.Warn("Failed to remove stale Vector socket",
+					"socket", socketPath,
+					"error", err)
+			} else {
+				slog.Info("Removed stale Vector socket", "socket", socketPath)
+			}
 		}
 	}
 
