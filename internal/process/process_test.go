@@ -1553,6 +1553,65 @@ func TestVectorStopsOnConfigReload(t *testing.T) {
 	manager.StopManagedProcesses()
 }
 
+// TestVectorSocketCleanup tests that Vector's Unix socket is cleaned up before starting
+func TestVectorSocketCleanup(t *testing.T) {
+	// Create a temporary socket file to simulate stale socket
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "test-vector.sock")
+
+	// Create a stale socket file
+	if err := os.WriteFile(socketPath, []byte("stale"), 0644); err != nil {
+		t.Fatalf("Failed to create stale socket file: %v", err)
+	}
+
+	// Verify the file exists
+	if _, err := os.Stat(socketPath); os.IsNotExist(err) {
+		t.Fatal("Stale socket file should exist before test")
+	}
+
+	// Config with Vector enabled
+	cfg := &config.Config{
+		Logging: config.LogConfig{
+			Format: "json",
+			Vector: struct {
+				Enabled bool   `yaml:"enabled"`
+				Socket  string `yaml:"socket"`
+				Config  string `yaml:"config"`
+			}{
+				Enabled: true,
+				Socket:  socketPath,
+				Config:  "/tmp/test-vector.toml",
+			},
+		},
+		ManagedProcesses: []config.ManagedProcessConfig{},
+	}
+
+	// Create a mock ManagedProcess for Vector
+	manager := NewManager(cfg)
+	proc := &ManagedProcess{
+		Name:    "vector",
+		Command: "echo", // Use echo instead of vector for testing
+		Args:    []string{"test"},
+	}
+
+	// Start the process (which should clean up the socket)
+	if err := manager.startProcess(proc); err != nil {
+		t.Fatalf("Failed to start process: %v", err)
+	}
+
+	// Verify the socket file was removed
+	if _, err := os.Stat(socketPath); !os.IsNotExist(err) {
+		t.Error("Stale socket file should be removed before Vector starts")
+	}
+
+	// Cleanup
+	proc.mutex.Lock()
+	if proc.Cancel != nil {
+		proc.Cancel()
+	}
+	proc.mutex.Unlock()
+}
+
 // Helper functions for testing
 func createTestConfig() *config.Config {
 	return &config.Config{

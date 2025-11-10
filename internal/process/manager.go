@@ -126,6 +126,18 @@ func (m *Manager) startProcess(proc *ManagedProcess) error {
 		return fmt.Errorf("process %s is already running", proc.Name)
 	}
 
+	// Clean up Vector's Unix socket before starting (if this is Vector)
+	if proc.Name == "vector" && m.config.Logging.Vector.Socket != "" {
+		socketPath := m.config.Logging.Vector.Socket
+		if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
+			slog.Warn("Failed to remove stale Vector socket",
+				"socket", socketPath,
+				"error", err)
+		} else if err == nil {
+			slog.Debug("Removed stale Vector socket", "socket", socketPath)
+		}
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	proc.Cancel = cancel
 
