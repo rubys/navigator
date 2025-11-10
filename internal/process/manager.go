@@ -305,6 +305,10 @@ func (m *Manager) UpdateManagedProcesses(newConfig *config.Config) {
 		}
 	}
 
+	// Update configuration before starting new processes
+	// This ensures startProcess() can access the new config (e.g., for Vector socket cleanup)
+	m.config = newConfig
+
 	// Start new processes
 	for name, procConfig := range newProcs {
 		if _, exists := oldProcs[name]; !exists {
@@ -333,7 +337,4 @@ func (m *Manager) UpdateManagedProcesses(newConfig *config.Config) {
 			}
 		}
 	}
-
-	// Update configuration
-	m.config = newConfig
 }
