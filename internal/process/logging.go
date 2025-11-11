@@ -240,6 +240,7 @@ func CreateLogWriter(source, stream string, logConfig config.LogConfig) io.Write
 		outputs = append(outputs, &JSONLogWriter{
 			source: source,
 			stream: stream,
+			tenant: source, // Set tenant to source for tenant web apps
 			output: vectorWriter,
 		})
 	}
