@@ -240,13 +240,14 @@ type Pools struct {
 
 // ProxyRoute represents a proxy route configuration
 type ProxyRoute struct {
-	Name      string            `yaml:"name"`
-	Path      string            `yaml:"path"`   // Regex pattern for matching paths
-	Prefix    string            `yaml:"prefix"` // Alternative to Path for simple prefix matching
-	Target    string            `yaml:"target"`
-	StripPath bool              `yaml:"strip_path"`
-	Headers   map[string]string `yaml:"headers"`
-	WebSocket bool              `yaml:"websocket"` // Enable WebSocket support
+	Name            string            `yaml:"name"`
+	Path            string            `yaml:"path"`   // Regex pattern for matching paths
+	Prefix          string            `yaml:"prefix"` // Alternative to Path for simple prefix matching
+	Target          string            `yaml:"target"`
+	StripPath       bool              `yaml:"strip_path"`
+	Headers         map[string]string `yaml:"headers"`          // Headers to add to outgoing request
+	ResponseHeaders map[string]string `yaml:"response_headers"` // Headers to add to response from upstream
+	WebSocket       bool              `yaml:"websocket"`        // Enable WebSocket support
 }
 
 // WebApp represents a web application

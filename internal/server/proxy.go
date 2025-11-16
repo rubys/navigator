@@ -62,6 +62,16 @@ func (h *Handler) handleReverseProxies(w http.ResponseWriter, r *http.Request) b
 
 		logging.LogProxyMatch(r.URL.Path, proxy.Target, proxy.WebSocket)
 
+		// Handle CORS preflight (OPTIONS) if response headers are configured
+		if r.Method == "OPTIONS" && len(proxy.ResponseHeaders) > 0 {
+			// Add configured response headers for CORS
+			for key, value := range proxy.ResponseHeaders {
+				w.Header().Set(key, value)
+			}
+			w.WriteHeader(http.StatusOK)
+			return true
+		}
+
 		// Handle the proxy
 		if proxy.WebSocket && isWebSocketRequest(r) {
 			h.handleWebSocketProxy(w, r, &proxy)
@@ -160,6 +170,16 @@ func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route 
 		}
 
 		logging.LogProxyHTTPRequest(req.Method, r.URL.Path, req.URL.String())
+	}
+
+	// Add response headers from upstream
+	if len(route.ResponseHeaders) > 0 {
+		proxy.ModifyResponse = func(resp *http.Response) error {
+			for key, value := range route.ResponseHeaders {
+				resp.Header.Set(key, value)
+			}
+			return nil
+		}
 	}
 
 	// Handle errors
