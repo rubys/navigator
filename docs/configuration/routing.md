@@ -111,7 +111,8 @@ routes:
 | `prefix` | string | - | Simple prefix match (alternative to `path`) |
 | `target` | string | - | Target URL (supports `$1`, `$2` for capture groups) |
 | `strip_path` | boolean | `false` | Remove matched prefix before proxying |
-| `headers` | object | - | Custom headers to add (supports variables) |
+| `headers` | object | - | Custom headers to add to requests (supports variables) |
+| `response_headers` | object | - | Custom headers to add to responses from upstream |
 | `websocket` | boolean | `false` | Enable WebSocket proxying |
 
 ### Capture Group Substitution
@@ -164,6 +165,42 @@ routes:
         X-Real-IP: "$remote_addr"
         X-Custom-Header: "static-value"
 ```
+
+### Response Headers
+
+Add custom headers to responses from the upstream server:
+
+```yaml
+routes:
+  reverse_proxies:
+    # Add CORS headers to third-party API responses
+    - name: external-api
+      path: "^/api/"
+      target: https://api.third-party.com
+      strip_path: true
+      response_headers:
+        Access-Control-Allow-Origin: "*"
+        Access-Control-Allow-Methods: "GET, POST, OPTIONS"
+        Access-Control-Allow-Headers: "Content-Type, Authorization"
+        Access-Control-Max-Age: "86400"
+
+    # Add security headers to proxied content
+    - name: cdn-proxy
+      prefix: /cdn/
+      target: https://cdn.example.com
+      response_headers:
+        X-Content-Type-Options: "nosniff"
+        X-Frame-Options: "SAMEORIGIN"
+        Strict-Transport-Security: "max-age=31536000"
+```
+
+**CORS Preflight Support**: Navigator automatically handles OPTIONS requests for routes with `response_headers` configured, returning the configured headers with a 200 OK response.
+
+**Use Cases**:
+- Add CORS headers to APIs that don't support CORS natively
+- Add security headers to proxied content
+- Override cache control headers from upstream
+- Add custom application headers to responses
 
 ### Path Stripping
 

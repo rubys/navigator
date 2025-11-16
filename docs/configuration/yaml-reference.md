@@ -771,8 +771,10 @@ routes:
       path: "^/api/"             # URL pattern (regex)
       target: "https://api.example.com"  # Target URL
       strip_path: true           # Remove prefix before proxying
-      headers:                   # Custom headers
+      headers:                   # Custom request headers
         X-Forwarded-Host: "$host"
+      response_headers:          # Custom response headers
+        Access-Control-Allow-Origin: "*"
 
   fly:                           # Fly.io-specific routing
     replay:                      # Fly-Replay routing
@@ -804,7 +806,8 @@ Reverse proxy routes to external services.
 | `prefix` | string | - | | Simple prefix match (alternative to path) |
 | `target` | string | - | ✓ | Target URL (supports `$1`, `$2` for capture groups) |
 | `strip_path` | boolean | `false` | | Remove matched prefix before proxying |
-| `headers` | object | - | | Custom headers (supports `$host`, `$remote_addr`, `$scheme`) |
+| `headers` | object | - | | Custom headers to add to requests (supports `$host`, `$remote_addr`, `$scheme`) |
+| `response_headers` | object | - | | Custom headers to add to responses from upstream |
 | `websocket` | boolean | `false` | | Enable WebSocket proxying |
 
 **Note:** Either `path` (regex) or `prefix` (simple string) must be specified, but not both.
