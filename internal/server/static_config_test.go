@@ -98,7 +98,7 @@ func TestServerTryFilesWithFileResolution(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, tt.requestPath, nil)
 			recorder := httptest.NewRecorder()
-			respRecorder := NewResponseRecorder(recorder, nil)
+			respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 			served := handler.TryFiles(respRecorder, req)
 
@@ -198,7 +198,7 @@ func TestServerAllowedExtensions(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodGet, tt.requestPath, nil)
 			recorder := httptest.NewRecorder()
-			respRecorder := NewResponseRecorder(recorder, nil)
+			respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 			served := handler.ServeStatic(respRecorder, req)
 
@@ -291,7 +291,7 @@ func TestServerCacheControl(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, tt.requestPath, nil)
 			recorder := httptest.NewRecorder()
-			respRecorder := NewResponseRecorder(recorder, nil)
+			respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 			served := handler.ServeStatic(respRecorder, req)
 
@@ -376,7 +376,7 @@ func TestServerTryFilesWithAllowedExtensions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, tt.requestPath, nil)
 			recorder := httptest.NewRecorder()
-			respRecorder := NewResponseRecorder(recorder, nil)
+			respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 			served := handler.TryFiles(respRecorder, req)
 
@@ -412,7 +412,7 @@ func TestServerTryFilesDisabled(t *testing.T) {
 	// Request without extension should NOT be served when try_files is disabled
 	req := httptest.NewRequest(http.MethodGet, "/page", nil)
 	recorder := httptest.NewRecorder()
-	respRecorder := NewResponseRecorder(recorder, nil)
+	respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 	served := handler.TryFiles(respRecorder, req)
 
@@ -423,7 +423,7 @@ func TestServerTryFilesDisabled(t *testing.T) {
 	// Request WITH extension should still work via ServeStatic
 	req2 := httptest.NewRequest(http.MethodGet, "/page.html", nil)
 	recorder2 := httptest.NewRecorder()
-	respRecorder2 := NewResponseRecorder(recorder2, nil)
+	respRecorder2 := NewResponseRecorder(recorder2, nil, nil)
 
 	served2 := handler.ServeStatic(respRecorder2, req2)
 
@@ -469,7 +469,7 @@ func TestServerTryFilesWithTenantPaths(t *testing.T) {
 	// even though it matches the index tenant path
 	req := httptest.NewRequest(http.MethodGet, "/showcase/studios/millbrae", nil)
 	recorder := httptest.NewRecorder()
-	respRecorder := NewResponseRecorder(recorder, nil)
+	respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 	served := handler.TryFiles(respRecorder, req)
 
@@ -521,7 +521,7 @@ func TestDirectoryRedirect(t *testing.T) {
 	t.Run("directory without trailing slash redirects", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/showcase/studios/laval", nil)
 		recorder := httptest.NewRecorder()
-		respRecorder := NewResponseRecorder(recorder, nil)
+		respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 		served := handler.TryFiles(respRecorder, req)
 
@@ -553,7 +553,7 @@ func TestDirectoryRedirect(t *testing.T) {
 	t.Run("directory with trailing slash serves index.html", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/showcase/studios/laval/", nil)
 		recorder := httptest.NewRecorder()
-		respRecorder := NewResponseRecorder(recorder, nil)
+		respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 		served := handler.TryFiles(respRecorder, req)
 
@@ -586,7 +586,7 @@ func TestDirectoryRedirect(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/showcase/studios/empty", nil)
 		recorder := httptest.NewRecorder()
-		respRecorder := NewResponseRecorder(recorder, nil)
+		respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 		served := handler.TryFiles(respRecorder, req)
 
@@ -608,7 +608,7 @@ func TestDirectoryRedirect(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/showcase/studios/laval", nil)
 		recorder := httptest.NewRecorder()
-		respRecorder := NewResponseRecorder(recorder, nil)
+		respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 		served := handlerDisabled.TryFiles(respRecorder, req)
 

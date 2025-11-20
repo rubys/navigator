@@ -139,7 +139,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create response recorder for logging and tracking
-	recorder := NewResponseRecorder(w, h.idleManager)
+	recorder := NewResponseRecorder(w, h.idleManager, r)
 	recorder.disableLog = h.disableLog
 	defer recorder.Finish(r)
 
@@ -455,22 +455,24 @@ type ResponseRecorder struct {
 	idleManager *idle.Manager
 	tracked     bool
 	disableLog  bool // When true, suppresses access log output
+	request     *http.Request
 }
 
 // NewResponseRecorder creates a new response recorder
-func NewResponseRecorder(w http.ResponseWriter, idleManager *idle.Manager) *ResponseRecorder {
+func NewResponseRecorder(w http.ResponseWriter, idleManager *idle.Manager, req *http.Request) *ResponseRecorder {
 	return &ResponseRecorder{
 		ResponseWriter: w,
 		statusCode:     200,
 		startTime:      time.Now(),
 		metadata:       make(map[string]interface{}),
 		idleManager:    idleManager,
+		request:        req,
 	}
 }
 
 // NewTestResponseRecorder creates a response recorder with logging disabled for tests
-func NewTestResponseRecorder(w http.ResponseWriter, idleManager *idle.Manager) *ResponseRecorder {
-	recorder := NewResponseRecorder(w, idleManager)
+func NewTestResponseRecorder(w http.ResponseWriter, idleManager *idle.Manager, req *http.Request) *ResponseRecorder {
+	recorder := NewResponseRecorder(w, idleManager, req)
 	recorder.disableLog = true
 	return recorder
 }
@@ -481,10 +483,37 @@ func (r *ResponseRecorder) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 }
 
-// Write captures the response size
+// Write captures the response size and logs incomplete writes
 func (r *ResponseRecorder) Write(data []byte) (int, error) {
 	n, err := r.ResponseWriter.Write(data)
 	r.size += n
+
+	// Log partial writes or errors (only when write fails or is incomplete)
+	if err != nil || n < len(data) {
+		// Extract relevant headers for compression/encoding debugging
+		contentEncoding := r.Header().Get("Content-Encoding")
+		contentLength := r.Header().Get("Content-Length")
+		transferEncoding := r.Header().Get("Transfer-Encoding")
+		requestID := ""
+		if r.request != nil {
+			requestID = r.request.Header.Get("X-Request-Id")
+			if requestID == "" {
+				requestID = r.request.Header.Get("X-Amzn-Trace-Id")
+			}
+		}
+
+		logging.LogResponseWriteIncomplete(
+			len(data),
+			n,
+			r.size,
+			err,
+			contentEncoding,
+			contentLength,
+			transferEncoding,
+			requestID,
+		)
+	}
+
 	return n, err
 }
 

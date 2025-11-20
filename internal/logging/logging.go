@@ -478,6 +478,21 @@ func LogFlyReplayFallbackProxy(target, fallbackURL string) {
 		"fallbackURL", fallbackURL)
 }
 
+// Response write logging helpers
+
+// LogResponseWriteIncomplete logs partial or failed response writes
+func LogResponseWriteIncomplete(bytesToWrite, bytesWritten, totalWritten int, err error, contentEncoding, contentLength, transferEncoding, requestID string) {
+	slog.Warn("Response write incomplete",
+		"bytes_to_write", bytesToWrite,
+		"bytes_written", bytesWritten,
+		"total_written", totalWritten,
+		"content_encoding", contentEncoding,
+		"content_length", contentLength,
+		"transfer_encoding", transferEncoding,
+		"request_id", requestID,
+		"error", err)
+}
+
 // Request handling logging helpers
 
 // LogTenantExtraction logs tenant extraction result

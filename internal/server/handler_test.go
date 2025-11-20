@@ -21,7 +21,7 @@ func TestResponseRecorder(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	// Create ResponseRecorder
-	respRecorder := NewResponseRecorder(recorder, nil)
+	respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 	// Test WriteHeader
 	respRecorder.WriteHeader(http.StatusCreated)
@@ -271,7 +271,7 @@ func TestServeStaticFileWithRootPath(t *testing.T) {
 			// Create request and response recorder
 			req := httptest.NewRequest(http.MethodGet, tt.requestPath, nil)
 			recorder := httptest.NewRecorder()
-			respRecorder := NewResponseRecorder(recorder, nil)
+			respRecorder := NewResponseRecorder(recorder, nil, nil)
 
 			// Test serveStaticFile
 			handled := handler.staticHandler.ServeStatic(respRecorder, req)
@@ -320,7 +320,7 @@ func BenchmarkResponseRecorder(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		respRecorder := NewResponseRecorder(recorder, nil)
+		respRecorder := NewResponseRecorder(recorder, nil, nil)
 		respRecorder.WriteHeader(http.StatusOK)
 		_, _ = respRecorder.Write(testData)
 		respRecorder.SetMetadata("test", "value")
