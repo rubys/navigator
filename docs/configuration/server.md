@@ -237,6 +237,7 @@ server:
   hostname: ""              # Proxy handles hostname
   root_path: "/api"         # Strip /api prefix
   trust_proxy: true         # Trust X-Forwarded-Host from upstream proxy
+  disable_compression: true # Disable automatic compression (recommended for reverse proxy)
   static:
     public_dir: "/app/public"
 ```

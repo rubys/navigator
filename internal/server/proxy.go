@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rubys/navigator/internal/config"
 	"github.com/rubys/navigator/internal/logging"
+	proxypkg "github.com/rubys/navigator/internal/proxy"
 )
 
 var upgrader = websocket.Upgrader{
@@ -114,6 +115,13 @@ func (h *Handler) handleHTTPProxy(w http.ResponseWriter, r *http.Request, route 
 
 	// Create reverse proxy
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+
+	// Apply custom transport if compression should be disabled
+	if proxypkg.GetDisableCompression() {
+		proxy.Transport = &http.Transport{
+			DisableCompression: true,
+		}
+	}
 
 	// Customize the director to modify the request
 	originalDirector := proxy.Director

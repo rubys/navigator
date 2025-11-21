@@ -75,6 +75,7 @@ server:
   hostname: "localhost"           # Hostname for requests (optional)
   root_path: "/showcase"          # Root URL path prefix (optional)
   trust_proxy: false              # Trust X-Forwarded-Host from upstream proxy (optional, default: false)
+  disable_compression: false      # Disable automatic compression in reverse proxy (optional, default: false)
 
   # Health check configuration
   health_check:

@@ -57,9 +57,13 @@ func main() {
 		"reverseProxies", len(cfg.Routes.ReverseProxies),
 		"cgiScripts", len(cfg.Server.CGIScripts))
 
-	// Configure proxy trust settings
-	slog.Debug("Initial trust_proxy value from config", "trust_proxy", cfg.Server.TrustProxy, "config_file", configFile)
+	// Configure proxy settings
+	slog.Debug("Initial proxy configuration",
+		"trust_proxy", cfg.Server.TrustProxy,
+		"disable_compression", cfg.Server.DisableCompression,
+		"config_file", configFile)
 	proxy.SetTrustProxy(cfg.Server.TrustProxy)
+	proxy.SetDisableCompression(cfg.Server.DisableCompression)
 
 	// Log maintenance mode status
 	if cfg.Maintenance.Enabled {
@@ -340,9 +344,12 @@ func (l *ServerLifecycle) handleReload() {
 	l.processManager.UpdateManagedProcesses(newConfig)
 	l.idleManager.UpdateConfig(newConfig)
 
-	// Update proxy trust settings
+	// Update proxy settings
 	proxy.SetTrustProxy(newConfig.Server.TrustProxy)
-	slog.Debug("Set trust_proxy in proxy package", "value", newConfig.Server.TrustProxy)
+	proxy.SetDisableCompression(newConfig.Server.DisableCompression)
+	slog.Debug("Set proxy configuration",
+		"trust_proxy", newConfig.Server.TrustProxy,
+		"disable_compression", newConfig.Server.DisableCompression)
 
 	// Update logging format if changed
 	setupLogging(newConfig)

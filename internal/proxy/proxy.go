@@ -23,6 +23,11 @@ import (
 // a trusted proxy (e.g., Apache, nginx) that sets these headers correctly.
 var trustProxy atomic.Bool
 
+// disableCompression indicates whether to disable automatic compression/decompression
+// When true, responses are passed through as-is without any compression handling.
+// This is recommended for reverse proxy scenarios to ensure pure pass-through behavior.
+var disableCompression atomic.Bool
+
 // SetTrustProxy configures whether to trust X-Forwarded-* headers
 func SetTrustProxy(trust bool) {
 	trustProxy.Store(trust)
@@ -31,6 +36,16 @@ func SetTrustProxy(trust bool) {
 // GetTrustProxy returns the current trust_proxy setting
 func GetTrustProxy() bool {
 	return trustProxy.Load()
+}
+
+// SetDisableCompression configures whether to disable automatic compression
+func SetDisableCompression(disable bool) {
+	disableCompression.Store(disable)
+}
+
+// GetDisableCompression returns the current disable_compression setting
+func GetDisableCompression() bool {
+	return disableCompression.Load()
 }
 
 // MetadataSetter is an interface for response writers that support metadata
@@ -71,6 +86,13 @@ func HandleProxy(w http.ResponseWriter, r *http.Request, targetURL string) {
 
 	// Create reverse proxy
 	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	// Apply custom transport if compression should be disabled
+	if disableCompression.Load() {
+		proxy.Transport = &http.Transport{
+			DisableCompression: true,
+		}
+	}
 
 	// Customize the director to modify the request
 	originalDirector := proxy.Director
@@ -138,6 +160,13 @@ func HandleProxyWithRetry(w http.ResponseWriter, r *http.Request, targetURL stri
 	// Use default transport - no custom connection timeout needed
 	// The 500ms ProxyRetryMaxDelay is for retry backoff, not connection timeout
 	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	// Apply custom transport if compression should be disabled
+	if disableCompression.Load() {
+		proxy.Transport = &http.Transport{
+			DisableCompression: true,
+		}
+	}
 
 	// Implement retry logic
 	startTime := time.Now()

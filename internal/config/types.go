@@ -188,16 +188,17 @@ type HealthCheckResponse struct {
 // Config represents the main configuration
 type Config struct {
 	Server struct {
-		Listen       string `yaml:"listen"`
-		Hostname     string `yaml:"hostname"`
-		RootPath     string `yaml:"root_path"`
-		TrustProxy   bool   `yaml:"trust_proxy"` // Trust X-Forwarded-* headers from upstream proxy
-		RewriteRules []RewriteRule
-		Static       StaticConfig
-		BotDetection BotDetectionConfig `yaml:"bot_detection"`
-		CGIScripts   []CGIScriptConfig  `yaml:"cgi_scripts"`
-		HealthCheck  HealthCheckConfig  `yaml:"health_check"`
-		Idle         struct {
+		Listen             string `yaml:"listen"`
+		Hostname           string `yaml:"hostname"`
+		RootPath           string `yaml:"root_path"`
+		TrustProxy         bool   `yaml:"trust_proxy"`         // Trust X-Forwarded-* headers from upstream proxy
+		DisableCompression bool   `yaml:"disable_compression"` // Disable automatic compression/decompression in reverse proxy
+		RewriteRules       []RewriteRule
+		Static             StaticConfig
+		BotDetection       BotDetectionConfig `yaml:"bot_detection"`
+		CGIScripts         []CGIScriptConfig  `yaml:"cgi_scripts"`
+		HealthCheck        HealthCheckConfig  `yaml:"health_check"`
+		Idle               struct {
 			Action  string `yaml:"action"`  // "suspend" or "stop"
 			Timeout string `yaml:"timeout"` // Duration string like "30s", "5m"
 		} `yaml:"idle"`
