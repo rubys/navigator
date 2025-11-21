@@ -134,7 +134,37 @@ func (h *Handler) HandleBroadcast(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.logger.Debug("Broadcast sent", "stream", msg.Stream, "connections", count)
+	// Log broadcast with message content (application-agnostic)
+	const maxMessageLogSize = 500
+	if len(msg.Data) <= maxMessageLogSize {
+		// Small message - try to parse as JSON for structured logging
+		var parsed interface{}
+		if err := json.Unmarshal(msg.Data, &parsed); err == nil {
+			// Valid JSON - log as nested object
+			h.logger.Info("Broadcast sent",
+				"stream", msg.Stream,
+				"connections", count,
+				"message", parsed)
+		} else {
+			// Not JSON - log as string
+			h.logger.Info("Broadcast sent",
+				"stream", msg.Stream,
+				"connections", count,
+				"message", string(msg.Data))
+		}
+	} else {
+		// Large message - log preview and size
+		preview := string(msg.Data)
+		if len(preview) > 200 {
+			preview = preview[:200] + "..."
+		}
+		h.logger.Info("Broadcast sent",
+			"stream", msg.Stream,
+			"connections", count,
+			"message_bytes", len(msg.Data),
+			"message_preview", preview)
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
