@@ -236,16 +236,11 @@ func (s *StaticFileHandler) setCacheControl(w http.ResponseWriter, path string) 
 	}
 
 	// Set Cache-Control header if configured
-	if maxAge != "" && maxAge != "0" && maxAge != "0s" {
+	if maxAge != "" {
 		// Parse duration and convert to seconds
 		duration := utils.ParseDurationWithDefault(maxAge, 0)
-		if duration > 0 {
-			seconds := int(duration.Seconds())
-			w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", seconds))
-		} else {
-			// If not a duration, assume it's already in seconds
-			w.Header().Set("Cache-Control", "public, max-age="+maxAge)
-		}
+		seconds := int(duration.Seconds())
+		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", seconds))
 	}
 }
 
