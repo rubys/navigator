@@ -126,8 +126,8 @@ type RoutesConfig struct {
 // CacheControlOverride represents cache control configuration for specific paths
 type CacheControlOverride struct {
 	Path      string `yaml:"path"`
-	MaxAge    string `yaml:"max_age"`    // Duration format: "24h", "1h", "1y"
-	Immutable bool   `yaml:"immutable"`  // Add immutable directive for fingerprinted assets
+	MaxAge    string `yaml:"max_age"`   // Duration format: "24h", "1h", "1y"
+	Immutable bool   `yaml:"immutable"` // Add immutable directive for fingerprinted assets
 }
 
 // CacheControl represents cache control configuration

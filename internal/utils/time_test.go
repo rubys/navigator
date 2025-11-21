@@ -48,6 +48,30 @@ func TestParseDurationWithDefault(t *testing.T) {
 			defaultDuration: 10 * time.Minute,
 			expected:        -5 * time.Minute,
 		},
+		{
+			name:            "1 year duration",
+			input:           "1y",
+			defaultDuration: 0,
+			expected:        8760 * time.Hour, // 365 days
+		},
+		{
+			name:            "1 week duration",
+			input:           "1w",
+			defaultDuration: 0,
+			expected:        168 * time.Hour, // 7 days
+		},
+		{
+			name:            "7 days duration",
+			input:           "7d",
+			defaultDuration: 0,
+			expected:        168 * time.Hour,
+		},
+		{
+			name:            "1.5 years duration",
+			input:           "1.5y",
+			defaultDuration: 0,
+			expected:        13140 * time.Hour, // 547.5 days
+		},
 	}
 
 	for _, tt := range tests {

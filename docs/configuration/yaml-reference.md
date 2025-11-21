@@ -1018,7 +1018,7 @@ Navigator validates configuration on startup:
 4. **File paths**: Must be accessible by Navigator process (htpasswd, config files, maintenance page)
 5. **Regex patterns**: Must compile successfully (routes.rewrites, routes.fly.replay)
 6. **Process names**: Must be unique within managed_processes
-7. **Duration format**: Must be valid Go duration (e.g., "30s", "5m", "1h30m")
+7. **Duration format**: Supports standard Go units (h, m, s, ms, us, ns) plus extended formats: y (years), w (weeks), d (days). Examples: "1y", "7d", "24h", "30s", "1h30m"
 8. **Hook timeouts**: Should be reasonable (<10m for most operations)
 
 ## Examples

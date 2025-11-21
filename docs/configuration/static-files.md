@@ -168,10 +168,13 @@ cache_control:
 | **Real-time** | 5 minutes | ❌ No | `5m` | API docs |
 
 **Duration formats:**
-- Years: `1y` = 31536000 seconds
-- Hours: `8760h` = 1 year, `24h` = 1 day
+- Years: `1y` = 31536000 seconds (365 days)
+- Weeks: `1w` = 604800 seconds (7 days)
+- Days: `1d` = 86400 seconds (24 hours)
+- Hours: `24h` = 1 day
 - Minutes: `5m` = 5 minutes
 - Seconds: `30s` = 30 seconds
+- Fractional: `1.5y` = 1.5 years
 - Raw: `0` = always revalidate
 
 ## MIME Types
