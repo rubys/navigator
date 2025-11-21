@@ -2,10 +2,10 @@
 
 A lightweight web server for multi-tenant applications with on-demand process management. Deploy multiple customers or projects from a single configuration file.
 
-!!! success "Latest Release: v1.0.0"
-    **Production-Ready Release** - Navigator 1.0 is here! Battle-tested with 75+ customers, comprehensive features, and 81.2% test coverage.
+!!! success "Latest Release: v1.2.0"
+    **Enhanced Caching & Logging** - Navigator 1.2 adds immutable asset caching, response headers, trust_proxy support, and improved Vector integration.
 
-    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v1.0.0)
+    [View Release Notes](https://github.com/rubys/navigator/releases/tag/v1.2.0) | [Changelog](https://github.com/rubys/navigator/blob/main/CHANGELOG.md)
 
 ## Features
 
