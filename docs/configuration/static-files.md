@@ -108,33 +108,71 @@ Set appropriate cache headers for different paths:
 server:
   static:
     cache_control:
+      default: "0"              # Default: always revalidate HTML
+      default_immutable: false  # Default: not immutable
       overrides:
-        # Long cache for fingerprinted assets
+        # Long cache for fingerprinted assets with immutable directive
         - path: /assets/
-          max_age: 8760h  # 1 year (365 days)
+          max_age: 1y           # 1 year (31536000 seconds)
+          immutable: true       # Never changes (fingerprinted)
 
         # Medium cache for images
         - path: /images/
-          max_age: 24h    # 1 day
+          max_age: 24h          # 1 day
 
         # Short cache for dynamic content
         - path: /docs/
-          max_age: 5m     # 5 minutes
+          max_age: 5m           # 5 minutes
 
         # No cache for development
         - path: /dev/
-          max_age: 0s     # Always revalidate
+          max_age: 0            # Always revalidate
 ```
+
+### Immutable Directive
+
+The `immutable` directive tells browsers that fingerprinted assets will **never change**:
+
+```yaml
+cache_control:
+  overrides:
+    - path: /assets/
+      max_age: 1y         # Cache for 1 year
+      immutable: true     # Content never changes
+```
+
+**Result:** `Cache-Control: public, max-age=31536000, immutable`
+
+**Benefits:**
+- **No revalidation requests** - Browsers never check if file changed
+- **Maximum performance** - Zero server requests during cache lifetime
+- **Safe for fingerprinted assets** - File hash in name ensures uniqueness
+
+**Best for:**
+- Rails asset pipeline files: `application-4a860118.js`
+- Webpacker/Shakapacker: `packs/application-abc123.js`
+- Fingerprinted images: `logo-def456.png`
+
+**Not for:**
+- Non-fingerprinted files (will serve stale content)
+- HTML pages (should always revalidate)
 
 ### Cache Duration Guidelines
 
-| Content Type | Duration | Format | Use Case |
-|--------------|----------|--------|----------|
-| **Immutable assets** | 1 year | `8760h` | Fingerprinted files |
-| **Semi-static** | 1 week | `168h` | Images, fonts |
-| **Dynamic** | 1 hour | `1h` | Generated content |
-| **Real-time** | 5 minutes | `5m` | API docs |
-| **Development** | No cache | `0s` | Local development |
+| Content Type | Duration | Immutable | Format | Use Case |
+|--------------|----------|-----------|--------|----------|
+| **Fingerprinted assets** | 1 year | ✅ Yes | `1y` + `immutable: true` | Rails assets, Webpacker |
+| **HTML pages** | 0 | ❌ No | `0` | Always revalidate |
+| **Semi-static** | 1 week | ❌ No | `168h` | Images, fonts |
+| **Dynamic** | 1 hour | ❌ No | `1h` | Generated content |
+| **Real-time** | 5 minutes | ❌ No | `5m` | API docs |
+
+**Duration formats:**
+- Years: `1y` = 31536000 seconds
+- Hours: `8760h` = 1 year, `24h` = 1 day
+- Minutes: `5m` = 5 minutes
+- Seconds: `30s` = 30 seconds
+- Raw: `0` = always revalidate
 
 ## MIME Types
 
@@ -218,11 +256,14 @@ server:
     allowed_extensions: [css, js, png, jpg, gif, ico, woff, woff2]
     try_files: ["index.html", ".html"]
     cache_control:
+      default: "0"  # HTML: always revalidate
       overrides:
         - path: /assets/
-          max_age: 8760h  # 1 year
+          max_age: 1y         # 1 year
+          immutable: true     # Fingerprinted, never changes
         - path: /packs/
-          max_age: 8760h  # 1 year
+          max_age: 1y         # 1 year
+          immutable: true     # Fingerprinted, never changes
 
 applications:
   global_env:
@@ -237,11 +278,11 @@ server:
     public_dir: "./public/dist"
     try_files: ["index.html", "/index.html"]
     cache_control:
+      default: "0"  # HTML: always revalidate
       overrides:
-        - path: /
-          max_age: 1h
         - path: /assets/
-          max_age: 8760h  # 1 year
+          max_age: 1y         # 1 year
+          immutable: true     # Fingerprinted, never changes
 
 applications:
   tenants:
@@ -293,11 +334,14 @@ server:
         public_dir: "./public"
         allowed_extensions: [css, js, map, png, jpg, gif, ico, svg, woff, woff2, ttf, eot]
         cache_control:
+          default: "0"  # HTML: always revalidate
           overrides:
             - path: /assets/
-              max_age: 8760h  # 1 year
+              max_age: 1y         # 1 year
+              immutable: true     # Fingerprinted, never changes
             - path: /packs/
-              max_age: 8760h  # 1 year
+              max_age: 1y         # 1 year
+              immutable: true     # Fingerprinted, never changes
     ```
 
 ## Security Considerations
@@ -460,7 +504,8 @@ server:
     cache_control:
       overrides:
         - path: /assets/
-          max_age: 8760h  # 1 year
+          max_age: 1y          # 1 year
+          immutable: true      # Equivalent to nginx "immutable"
 ```
 
 ## See Also

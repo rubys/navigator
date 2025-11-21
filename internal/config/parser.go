@@ -89,10 +89,12 @@ func (p *ConfigParser) parseServerConfig() {
 
 	// Parse cache control
 	p.config.Server.Static.CacheControl.Default = p.yamlConfig.Server.Static.CacheControl.Default
+	p.config.Server.Static.CacheControl.DefaultImmutable = p.yamlConfig.Server.Static.CacheControl.DefaultImmutable
 	for _, override := range p.yamlConfig.Server.Static.CacheControl.Overrides {
 		p.config.Server.Static.CacheControl.Overrides = append(p.config.Server.Static.CacheControl.Overrides, CacheControlOverride{
-			Path:   override.Path,
-			MaxAge: override.MaxAge,
+			Path:      override.Path,
+			MaxAge:    override.MaxAge,
+			Immutable: override.Immutable,
 		})
 	}
 

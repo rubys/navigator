@@ -221,18 +221,23 @@ func (s *StaticFileHandler) serveFile(w http.ResponseWriter, r *http.Request, fs
 func (s *StaticFileHandler) setCacheControl(w http.ResponseWriter, path string) {
 	// Find the most specific cache control override
 	var maxAge string
+	var immutable bool
+	var matched bool
 	bestMatchLen := 0
 
 	for _, override := range s.config.Server.Static.CacheControl.Overrides {
 		if strings.HasPrefix(path, override.Path) && len(override.Path) > bestMatchLen {
 			maxAge = override.MaxAge
+			immutable = override.Immutable
 			bestMatchLen = len(override.Path)
+			matched = true
 		}
 	}
 
 	// Use default if no override matched
-	if maxAge == "" {
+	if !matched {
 		maxAge = s.config.Server.Static.CacheControl.Default
+		immutable = s.config.Server.Static.CacheControl.DefaultImmutable
 	}
 
 	// Set Cache-Control header if configured
@@ -240,7 +245,13 @@ func (s *StaticFileHandler) setCacheControl(w http.ResponseWriter, path string) 
 		// Parse duration and convert to seconds
 		duration := utils.ParseDurationWithDefault(maxAge, 0)
 		seconds := int(duration.Seconds())
-		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", seconds))
+
+		// Build Cache-Control header with optional immutable directive
+		cacheControl := fmt.Sprintf("public, max-age=%d", seconds)
+		if immutable {
+			cacheControl += ", immutable"
+		}
+		w.Header().Set("Cache-Control", cacheControl)
 	}
 }
 

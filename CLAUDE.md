@@ -148,12 +148,15 @@ server:
   public_dir: public
 
   # Static file configuration (modern approach)
-  cache_control:
-    overrides:
-      - path: /assets/
-        max_age: 24h
-  allowed_extensions: [html, css, js, png, jpg]  # optional, omit to allow all
-  try_files: [index.html, .html, .htm]           # enables try_files feature
+  static:
+    cache_control:
+      default: "0"  # HTML pages: always revalidate
+      overrides:
+        - path: /assets/
+          max_age: 1y         # 1 year for fingerprinted assets
+          immutable: true     # Fingerprinted assets never change
+    allowed_extensions: [html, css, js, png, jpg]  # optional, omit to allow all
+    try_files: [index.html, .html, .htm]           # enables try_files feature
 
   idle:
     action: suspend    # "suspend" or "stop" for Fly.io machines
@@ -242,7 +245,9 @@ Features:
 - **Try files**: File resolution with multiple extensions (configured via `try_files` array)
 - **Flexible extensions**: Serve specific file types or allow all files
 - **Content-Type detection**: Automatic MIME type setting
-- **Cache control**: Per-path cache header customization
+- **Cache control**: Per-path cache header customization with `immutable` directive support
+  - HTML pages: `max-age=0` (always revalidate with Last-Modified)
+  - Fingerprinted assets: `max-age=31536000, immutable` (1 year, never changes)
 - **Public routes**: Serves studios, regions, docs without authentication
 
 ### 4. Machine Idle Management (Fly.io)

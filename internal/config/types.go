@@ -125,14 +125,16 @@ type RoutesConfig struct {
 
 // CacheControlOverride represents cache control configuration for specific paths
 type CacheControlOverride struct {
-	Path   string `yaml:"path"`
-	MaxAge string `yaml:"max_age"` // Duration format: "24h", "1h"
+	Path      string `yaml:"path"`
+	MaxAge    string `yaml:"max_age"`    // Duration format: "24h", "1h", "1y"
+	Immutable bool   `yaml:"immutable"`  // Add immutable directive for fingerprinted assets
 }
 
 // CacheControl represents cache control configuration
 type CacheControl struct {
-	Default   string                 `yaml:"default"`   // Default cache duration
-	Overrides []CacheControlOverride `yaml:"overrides"` // Path-specific overrides
+	Default          string                 `yaml:"default"`           // Default cache duration
+	DefaultImmutable bool                   `yaml:"default_immutable"` // Default immutable directive
+	Overrides        []CacheControlOverride `yaml:"overrides"`         // Path-specific overrides
 }
 
 // AuthConfig represents authentication configuration
@@ -324,10 +326,12 @@ type YAMLConfig struct {
 			TryFiles                 []string `yaml:"try_files"`
 			NormalizeTrailingSlashes bool     `yaml:"normalize_trailing_slashes"`
 			CacheControl             struct {
-				Default   string `yaml:"default"`
-				Overrides []struct {
-					Path   string `yaml:"path"`
-					MaxAge string `yaml:"max_age"`
+				Default          string `yaml:"default"`
+				DefaultImmutable bool   `yaml:"default_immutable"`
+				Overrides        []struct {
+					Path      string `yaml:"path"`
+					MaxAge    string `yaml:"max_age"`
+					Immutable bool   `yaml:"immutable"`
 				} `yaml:"overrides"`
 			} `yaml:"cache_control"`
 		} `yaml:"static"`

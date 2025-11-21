@@ -101,10 +101,12 @@ server:
       - .htm
     normalize_trailing_slashes: true  # Redirect directories to trailing slash (optional)
     cache_control:
-      default: "1h"               # Default cache duration
+      default: "0"                # Default cache duration (0 = always revalidate)
+      default_immutable: false    # Default immutable directive
       overrides:                  # Path-specific cache durations
         - path: "/assets/"
-          max_age: "24h"
+          max_age: "1y"           # 1 year for fingerprinted assets
+          immutable: true         # Fingerprinted assets never change
 
   # Machine idle configuration (Fly.io)
   idle:
@@ -179,12 +181,13 @@ server:
     try_files: [index.html, .html, .htm]
     normalize_trailing_slashes: true
     cache_control:
-      default: "1h"
+      default: "0"                # HTML: always revalidate
       overrides:
         - path: "/assets/"
-          max_age: "24h"
+          max_age: "1y"           # Fingerprinted: 1 year
+          immutable: true         # Never changes
         - path: "/images/"
-          max_age: "12h"
+          max_age: "24h"          # Non-fingerprinted: 1 day
 ```
 
 | Field | Type | Default | Description |
@@ -194,10 +197,12 @@ server:
 | `try_files` | array | `[]` | Suffixes to try when resolving paths |
 | `normalize_trailing_slashes` | boolean | `false` | Redirect directories to trailing slash URLs |
 | `cache_control` | object | - | Cache header configuration |
-| `cache_control.default` | string | `""` | Default cache duration (e.g., "1h") |
+| `cache_control.default` | string | `""` | Default cache duration (e.g., "1h", "0" = always revalidate) |
+| `cache_control.default_immutable` | boolean | `false` | Default immutable directive for all paths |
 | `cache_control.overrides` | array | `[]` | Path-specific cache configurations |
 | `cache_control.overrides[].path` | string | - | URL path prefix to match |
-| `cache_control.overrides[].max_age` | string | - | Cache duration (e.g., "24h") |
+| `cache_control.overrides[].max_age` | string | - | Cache duration (e.g., "1y", "24h", "0") |
+| `cache_control.overrides[].immutable` | boolean | `false` | Add immutable directive (for fingerprinted assets) |
 
 **Allowed Extensions**: If omitted or empty, all files in `public_dir` can be served. If specified, only files with these extensions can be served.
 
@@ -1040,10 +1045,11 @@ server:
     public_dir: /var/www/public
     allowed_extensions: [html, css, js, png, jpg, gif]
     cache_control:
-      default: "1h"
+      default: "0"            # HTML: always revalidate
       overrides:
         - path: /assets/
-          max_age: 24h
+          max_age: 1y         # Fingerprinted: 1 year
+          immutable: true     # Never changes
 
 auth:
   enabled: true
@@ -1133,10 +1139,11 @@ server:
     allowed_extensions: [html, css, js, png, jpg, svg, ico, woff2]
     try_files: [index.html, .html]
     cache_control:
-      default: "1h"
+      default: "0"            # HTML: always revalidate
       overrides:
         - path: /assets/
-          max_age: 7d
+          max_age: 1y         # Fingerprinted: 1 year
+          immutable: true     # Never changes
   idle:
     action: suspend
     timeout: 20m
