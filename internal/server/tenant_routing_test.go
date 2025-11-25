@@ -111,7 +111,7 @@ func TestTenantRoutingIntegration(t *testing.T) {
 
 	// Create handler with properly initialized managers
 	appManager := process.NewAppManager(cfg)
-	idleManager := idle.NewManager(cfg)
+	idleManager := idle.NewManager(cfg, "", nil)
 	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	for _, tt := range tests {

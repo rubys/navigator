@@ -263,7 +263,7 @@ func TestHandleConfigReload(t *testing.T) {
 	// Create real managers to avoid nil pointer issues
 	appManager := process.NewAppManager(cfg)
 	processManager := process.NewManager(cfg)
-	idleManager := idle.NewManager(cfg)
+	idleManager := idle.NewManager(cfg, "", nil)
 
 	// Create lifecycle with nonexistent config file
 	lifecycle := &ServerLifecycle{
@@ -315,7 +315,7 @@ logging:
 	// Create real managers to avoid nil pointer issues
 	appManager := process.NewAppManager(cfg)
 	processManager := process.NewManager(cfg)
-	idleManager := idle.NewManager(cfg)
+	idleManager := idle.NewManager(cfg, "", nil)
 
 	// Create lifecycle with valid config file
 	lifecycle := &ServerLifecycle{
@@ -393,7 +393,7 @@ logging:
 		t.Error("Expected non-nil app manager")
 	}
 
-	idleManager := idle.NewManager(cfg)
+	idleManager := idle.NewManager(cfg, "", nil)
 	if idleManager == nil {
 		t.Error("Expected non-nil idle manager")
 	}
@@ -495,7 +495,7 @@ logging:
 	// Create real managers to avoid nil pointer issues
 	appManager := process.NewAppManager(cfg)
 	processManager := process.NewManager(cfg)
-	idleManager := idle.NewManager(cfg)
+	idleManager := idle.NewManager(cfg, "", nil)
 
 	// Create lifecycle with valid config file
 	lifecycle := &ServerLifecycle{
@@ -598,7 +598,7 @@ logging:
 	// Create managers
 	appManager := process.NewAppManager(cfg)
 	processManager := process.NewManager(cfg)
-	idleManager := idle.NewManager(cfg)
+	idleManager := idle.NewManager(cfg, "", nil)
 
 	// Create lifecycle
 	lifecycle := &ServerLifecycle{
@@ -690,7 +690,7 @@ logging:
 	// Create real managers to avoid nil pointer issues
 	appManager := process.NewAppManager(cfg)
 	processManager := process.NewManager(cfg)
-	idleManager := idle.NewManager(cfg)
+	idleManager := idle.NewManager(cfg, "", nil)
 
 	// Create lifecycle with valid config file
 	lifecycle := &ServerLifecycle{

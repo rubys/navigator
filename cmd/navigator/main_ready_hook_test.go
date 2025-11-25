@@ -63,7 +63,7 @@ logging:
 	// Create managers
 	appManager := process.NewAppManager(cfg)
 	processManager := process.NewManager(cfg)
-	idleManager := idle.NewManager(cfg)
+	idleManager := idle.NewManager(cfg, "", nil)
 
 	// Create lifecycle
 	lifecycle := &ServerLifecycle{

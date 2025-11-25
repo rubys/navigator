@@ -83,7 +83,16 @@ func main() {
 	// Create managers
 	processManager := process.NewManager(cfg)
 	appManager := process.NewAppManager(cfg)
-	idleManager := idle.NewManager(cfg)
+
+	// Create reload channel for resume hook config reload
+	resumeReloadChan := make(chan string, 1)
+	idleManager := idle.NewManager(cfg, configFile, func(path string) {
+		// Non-blocking send to avoid deadlock if channel is full
+		select {
+		case resumeReloadChan <- path:
+		default:
+		}
+	})
 
 	// Load authentication if configured
 	var basicAuth *auth.BasicAuth
@@ -116,12 +125,13 @@ func main() {
 
 	// Create and run server lifecycle
 	lifecycle := &ServerLifecycle{
-		configFile:     configFile,
-		cfg:            cfg,
-		appManager:     appManager,
-		processManager: processManager,
-		basicAuth:      basicAuth,
-		idleManager:    idleManager,
+		configFile:       configFile,
+		cfg:              cfg,
+		appManager:       appManager,
+		processManager:   processManager,
+		basicAuth:        basicAuth,
+		idleManager:      idleManager,
+		resumeReloadChan: resumeReloadChan,
 	}
 
 	if err := lifecycle.Run(); err != nil {
@@ -220,15 +230,16 @@ func printHelp() {
 
 // ServerLifecycle manages the HTTP server lifecycle and signal handling
 type ServerLifecycle struct {
-	configFile     string
-	cfg            *config.Config
-	appManager     *process.AppManager
-	processManager *process.Manager
-	basicAuth      *auth.BasicAuth
-	idleManager    *idle.Manager
-	cableHandler   *cable.Handler
-	srv            *http.Server
-	reloadChan     chan string // Channel for triggering config reload from CGI scripts
+	configFile       string
+	cfg              *config.Config
+	appManager       *process.AppManager
+	processManager   *process.Manager
+	basicAuth        *auth.BasicAuth
+	idleManager      *idle.Manager
+	cableHandler     *cable.Handler
+	srv              *http.Server
+	reloadChan       chan string // Channel for triggering config reload from CGI scripts
+	resumeReloadChan chan string // Channel for triggering config reload from resume hooks
 }
 
 // Run starts the server and handles signals until shutdown
@@ -311,6 +322,13 @@ func (l *ServerLifecycle) Run() error {
 			}
 			l.handleReload()
 
+		case configPath := <-l.resumeReloadChan:
+			// Resume hook triggered reload
+			if configPath != l.configFile {
+				l.configFile = configPath
+			}
+			l.handleReload()
+
 		case sig := <-sigChan:
 			switch sig {
 			case syscall.SIGHUP:
@@ -342,7 +360,7 @@ func (l *ServerLifecycle) handleReload() {
 	// Update configuration in all managers
 	l.appManager.UpdateConfig(newConfig)
 	l.processManager.UpdateManagedProcesses(newConfig)
-	l.idleManager.UpdateConfig(newConfig)
+	l.idleManager.UpdateConfig(newConfig, l.configFile)
 
 	// Update proxy settings
 	proxy.SetTrustProxy(newConfig.Server.TrustProxy)

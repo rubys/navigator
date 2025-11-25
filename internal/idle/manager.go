@@ -20,17 +20,22 @@ type Manager struct {
 	mutex          sync.RWMutex
 	timer          *time.Timer
 	config         *config.Config
-	idleActioned   bool       // Track if idle action was performed
-	resuming       bool       // Track if resume hooks are currently running
-	resumeCond     *sync.Cond // Condition variable to wait for resume completion
-	testMode       bool       // Prevents actual signal sending during tests
+	configFile     string                  // Current config file path for reload_config support
+	reloadCallback func(configPath string) // Callback to trigger config reload
+	idleActioned   bool                    // Track if idle action was performed
+	resuming       bool                    // Track if resume hooks are currently running
+	resumeCond     *sync.Cond              // Condition variable to wait for resume completion
+	testMode       bool                    // Prevents actual signal sending during tests
 }
 
 // NewManager creates a new idle manager
-func NewManager(cfg *config.Config) *Manager {
+// The reloadCallback is called when a resume hook specifies reload_config and the config file was modified
+func NewManager(cfg *config.Config, configFile string, reloadCallback func(configPath string)) *Manager {
 	m := &Manager{
-		config:       cfg,
-		lastActivity: time.Now(),
+		config:         cfg,
+		configFile:     configFile,
+		reloadCallback: reloadCallback,
+		lastActivity:   time.Now(),
 	}
 
 	// Initialize condition variable
@@ -85,11 +90,22 @@ func (m *Manager) RequestStarted() {
 		m.idleActioned = false
 		m.resuming = true
 
+		// Capture values needed in goroutine
+		configFile := m.configFile
+		reloadCallback := m.reloadCallback
+
 		// Execute resume hooks asynchronously
 		go func() {
 			slog.Info("Executing server resume hooks")
-			if err := process.ExecuteServerHooks(m.config.Hooks.Resume, "resume"); err != nil {
-				slog.Error("Failed to execute resume hooks", "error", err)
+			result := process.ExecuteServerHooksWithReload(m.config.Hooks.Resume, "resume", configFile)
+			if result.Error != nil {
+				slog.Error("Failed to execute resume hooks", "error", result.Error)
+			} else if result.ReloadDecision.ShouldReload && reloadCallback != nil {
+				// Resume hook triggered config reload
+				slog.Info("Resume hook triggered config reload",
+					"reason", result.ReloadDecision.Reason,
+					"configFile", result.ReloadDecision.NewConfigFile)
+				reloadCallback(result.ReloadDecision.NewConfigFile)
 			}
 
 			m.mutex.Lock()
@@ -227,11 +243,12 @@ func (m *Manager) GetStats() (activeRequests int64, lastActivity time.Time) {
 }
 
 // UpdateConfig updates the idle manager configuration after a reload
-func (m *Manager) UpdateConfig(newConfig *config.Config) {
+func (m *Manager) UpdateConfig(newConfig *config.Config, configFile string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	m.config = newConfig
+	m.configFile = configFile
 
 	// Re-configure idle settings from new config
 	if newConfig.Server.Idle.Action != "" && (newConfig.Server.Idle.Action == "suspend" || newConfig.Server.Idle.Action == "stop") {

@@ -1081,7 +1081,7 @@ func TestAssetServingIntegration(t *testing.T) {
 			handler := &Handler{
 				config:        cfg,
 				auth:          &auth.BasicAuth{},
-				idleManager:   idle.NewManager(cfg),
+				idleManager:   idle.NewManager(cfg, "", nil),
 				appManager:    &process.AppManager{},
 				staticHandler: NewStaticFileHandler(cfg),
 			}
@@ -1172,7 +1172,7 @@ func TestAssetServingIntegrationErrorCases(t *testing.T) {
 	handler := &Handler{
 		config:        cfg,
 		auth:          &auth.BasicAuth{},
-		idleManager:   idle.NewManager(cfg),
+		idleManager:   idle.NewManager(cfg, "", nil),
 		appManager:    &process.AppManager{},
 		staticHandler: NewStaticFileHandler(cfg),
 	}
@@ -1259,7 +1259,7 @@ func TestAssetServingRootPathVariations(t *testing.T) {
 			handler := &Handler{
 				config:        cfg,
 				auth:          &auth.BasicAuth{},
-				idleManager:   idle.NewManager(cfg),
+				idleManager:   idle.NewManager(cfg, "", nil),
 				appManager:    &process.AppManager{},
 				staticHandler: NewStaticFileHandler(cfg),
 			}
