@@ -16,15 +16,17 @@ type ReloadDecision struct {
 // ShouldReloadConfig determines if configuration should be reloaded after a command execution
 // Returns true if:
 // 1. reloadConfigPath is different from currentConfigPath, OR
-// 2. The config file was modified during command execution (after startTime)
+// 2. The config file was modified since the last config load (after configLoadTime)
 //
 // Parameters:
 //   - reloadConfigPath: Path specified in reload_config field (empty = no reload requested)
 //   - currentConfigPath: Currently loaded config file path
-//   - startTime: When the command started executing
+//   - configLoadTime: When the current configuration was last loaded
 //
 // This is used by both hooks and CGI scripts to share consistent reload logic.
-func ShouldReloadConfig(reloadConfigPath, currentConfigPath string, startTime time.Time) ReloadDecision {
+// Using configLoadTime (rather than command start time) ensures that changes made
+// while the machine was suspended are detected when it resumes.
+func ShouldReloadConfig(reloadConfigPath, currentConfigPath string, configLoadTime time.Time) ReloadDecision {
 	// No reload requested
 	if reloadConfigPath == "" {
 		return ReloadDecision{ShouldReload: false}
@@ -59,11 +61,11 @@ func ShouldReloadConfig(reloadConfigPath, currentConfigPath string, startTime ti
 		return ReloadDecision{ShouldReload: false}
 	}
 
-	if info.ModTime().After(startTime) {
-		slog.Info("Reload config file was modified during execution",
+	if info.ModTime().After(configLoadTime) {
+		slog.Info("Reload config file was modified since last load",
 			"file", reloadConfigPath,
 			"modTime", info.ModTime(),
-			"startTime", startTime)
+			"configLoadTime", configLoadTime)
 		return ReloadDecision{
 			ShouldReload:  true,
 			Reason:        "config file modified",
@@ -72,9 +74,9 @@ func ShouldReloadConfig(reloadConfigPath, currentConfigPath string, startTime ti
 	}
 
 	// Config file unchanged - no reload needed
-	slog.Debug("Reload config skipped - file unchanged",
+	slog.Debug("Reload config skipped - file unchanged since last load",
 		"file", reloadConfigPath,
 		"modTime", info.ModTime(),
-		"startTime", startTime)
+		"configLoadTime", configLoadTime)
 	return ReloadDecision{ShouldReload: false}
 }

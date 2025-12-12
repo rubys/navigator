@@ -86,10 +86,9 @@ func ExecuteServerHooks(hooks []config.HookConfig, hookType string) error {
 
 // ExecuteServerHooksWithReload executes server lifecycle hooks and checks for reload_config
 // Returns HookResult containing any error and reload decision
-func ExecuteServerHooksWithReload(hooks []config.HookConfig, hookType, currentConfigFile string) HookResult {
-	// Record start time before executing hooks
-	startTime := time.Now()
-
+// configLoadTime is when the current configuration was last loaded - this is used to detect
+// config changes that occurred while the machine was suspended (not just during hook execution)
+func ExecuteServerHooksWithReload(hooks []config.HookConfig, hookType, currentConfigFile string, configLoadTime time.Time) HookResult {
 	// Execute all hooks
 	err := ExecuteHooks(hooks, nil, fmt.Sprintf("server.%s", hookType))
 
@@ -106,7 +105,8 @@ func ExecuteServerHooksWithReload(hooks []config.HookConfig, hookType, currentCo
 		}
 
 		// Determine if config should be reloaded
-		reloadDecision = utils.ShouldReloadConfig(reloadConfigPath, currentConfigFile, startTime)
+		// Uses configLoadTime to detect changes since last load, not just during hook execution
+		reloadDecision = utils.ShouldReloadConfig(reloadConfigPath, currentConfigFile, configLoadTime)
 	} else {
 		slog.Warn("Skipping config reload due to hook failure",
 			"hookType", hookType,

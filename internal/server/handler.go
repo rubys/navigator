@@ -27,7 +27,7 @@ type CableHandler interface {
 }
 
 // CreateHandler creates the main HTTP handler for Navigator
-func CreateHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager, cableHandler CableHandler, currentConfigFn func() string, triggerReloadFn func(string)) http.Handler {
+func CreateHandler(cfg *config.Config, appManager *process.AppManager, basicAuth *auth.BasicAuth, idleManager *idle.Manager, cableHandler CableHandler, currentConfigFn func() string, configLoadTimeFn func() time.Time, triggerReloadFn func(string)) http.Handler {
 	h := &Handler{
 		config:        cfg,
 		appManager:    appManager,
@@ -36,7 +36,7 @@ func CreateHandler(cfg *config.Config, appManager *process.AppManager, basicAuth
 		cableHandler:  cableHandler,
 		staticHandler: NewStaticFileHandler(cfg),
 	}
-	h.setupCGIHandlers(currentConfigFn, triggerReloadFn)
+	h.setupCGIHandlers(currentConfigFn, configLoadTimeFn, triggerReloadFn)
 	return h
 }
 
@@ -50,7 +50,7 @@ func CreateTestHandler(cfg *config.Config, appManager *process.AppManager, basic
 		staticHandler: NewStaticFileHandler(cfg),
 		disableLog:    true,
 	}
-	h.setupCGIHandlers(nil, nil) // No reload support in tests
+	h.setupCGIHandlers(nil, nil, nil) // No reload support in tests
 	return h
 }
 
@@ -563,7 +563,7 @@ func (r *ResponseRecorder) Finish(req *http.Request) {
 }
 
 // setupCGIHandlers initializes CGI handlers from configuration
-func (h *Handler) setupCGIHandlers(currentConfigFn func() string, triggerReloadFn func(string)) {
+func (h *Handler) setupCGIHandlers(currentConfigFn func() string, configLoadTimeFn func() time.Time, triggerReloadFn func(string)) {
 	if len(h.config.Server.CGIScripts) == 0 {
 		return
 	}
@@ -571,7 +571,7 @@ func (h *Handler) setupCGIHandlers(currentConfigFn func() string, triggerReloadF
 	h.cgiHandlers = make(map[string]*cgiRoute)
 
 	for i, scriptCfg := range h.config.Server.CGIScripts {
-		handler, err := cgi.NewHandler(&scriptCfg, currentConfigFn, triggerReloadFn)
+		handler, err := cgi.NewHandler(&scriptCfg, currentConfigFn, configLoadTimeFn, triggerReloadFn)
 		if err != nil {
 			slog.Error("Failed to create CGI handler",
 				"index", i,

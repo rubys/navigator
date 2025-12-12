@@ -21,19 +21,20 @@ import (
 
 // Handler implements CGI script execution with user switching support
 type Handler struct {
-	Script          string
-	User            string
-	Group           string
-	AllowedUsers    []string
-	Env             map[string]string
-	ReloadConfig    string
-	Timeout         time.Duration
-	CurrentConfigFn func() string // Function to get current config file path
-	TriggerReloadFn func(string)  // Function to trigger config reload
+	Script           string
+	User             string
+	Group            string
+	AllowedUsers     []string
+	Env              map[string]string
+	ReloadConfig     string
+	Timeout          time.Duration
+	CurrentConfigFn  func() string    // Function to get current config file path
+	ConfigLoadTimeFn func() time.Time // Function to get when config was last loaded
+	TriggerReloadFn  func(string)     // Function to trigger config reload
 }
 
 // NewHandler creates a new CGI handler from configuration
-func NewHandler(cfg *config.CGIScriptConfig, currentConfigFn func() string, triggerReloadFn func(string)) (*Handler, error) {
+func NewHandler(cfg *config.CGIScriptConfig, currentConfigFn func() string, configLoadTimeFn func() time.Time, triggerReloadFn func(string)) (*Handler, error) {
 	// Validate script path
 	if cfg.Script == "" {
 		return nil, fmt.Errorf("CGI script path is required")
@@ -58,15 +59,16 @@ func NewHandler(cfg *config.CGIScriptConfig, currentConfigFn func() string, trig
 	})
 
 	return &Handler{
-		Script:          cfg.Script,
-		User:            cfg.User,
-		Group:           cfg.Group,
-		AllowedUsers:    cfg.AllowedUsers,
-		Env:             cfg.Env,
-		ReloadConfig:    cfg.ReloadConfig,
-		Timeout:         timeout,
-		CurrentConfigFn: currentConfigFn,
-		TriggerReloadFn: triggerReloadFn,
+		Script:           cfg.Script,
+		User:             cfg.User,
+		Group:            cfg.Group,
+		AllowedUsers:     cfg.AllowedUsers,
+		Env:              cfg.Env,
+		ReloadConfig:     cfg.ReloadConfig,
+		Timeout:          timeout,
+		CurrentConfigFn:  currentConfigFn,
+		ConfigLoadTimeFn: configLoadTimeFn,
+		TriggerReloadFn:  triggerReloadFn,
 	}, nil
 }
 
@@ -241,9 +243,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"duration", time.Since(startTime))
 
 	// Check if config should be reloaded
-	if h.ReloadConfig != "" && h.CurrentConfigFn != nil && h.TriggerReloadFn != nil {
+	if h.ReloadConfig != "" && h.CurrentConfigFn != nil && h.ConfigLoadTimeFn != nil && h.TriggerReloadFn != nil {
 		currentConfig := h.CurrentConfigFn()
-		decision := utils.ShouldReloadConfig(h.ReloadConfig, currentConfig, startTime)
+		configLoadTime := h.ConfigLoadTimeFn()
+		decision := utils.ShouldReloadConfig(h.ReloadConfig, currentConfig, configLoadTime)
 		if decision.ShouldReload {
 			slog.Info("CGI script triggered config reload",
 				"script", h.Script,

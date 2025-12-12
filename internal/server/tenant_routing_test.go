@@ -4,6 +4,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rubys/navigator/internal/config"
 	"github.com/rubys/navigator/internal/idle"
@@ -111,7 +112,7 @@ func TestTenantRoutingIntegration(t *testing.T) {
 
 	// Create handler with properly initialized managers
 	appManager := process.NewAppManager(cfg)
-	idleManager := idle.NewManager(cfg, "", nil)
+	idleManager := idle.NewManager(cfg, "", time.Time{}, nil)
 	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
 	for _, tt := range tests {

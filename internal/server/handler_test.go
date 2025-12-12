@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/rubys/navigator/internal/auth"
 	"github.com/rubys/navigator/internal/config"
@@ -1081,7 +1082,7 @@ func TestAssetServingIntegration(t *testing.T) {
 			handler := &Handler{
 				config:        cfg,
 				auth:          &auth.BasicAuth{},
-				idleManager:   idle.NewManager(cfg, "", nil),
+				idleManager:   idle.NewManager(cfg, "", time.Time{}, nil),
 				appManager:    &process.AppManager{},
 				staticHandler: NewStaticFileHandler(cfg),
 			}
@@ -1172,7 +1173,7 @@ func TestAssetServingIntegrationErrorCases(t *testing.T) {
 	handler := &Handler{
 		config:        cfg,
 		auth:          &auth.BasicAuth{},
-		idleManager:   idle.NewManager(cfg, "", nil),
+		idleManager:   idle.NewManager(cfg, "", time.Time{}, nil),
 		appManager:    &process.AppManager{},
 		staticHandler: NewStaticFileHandler(cfg),
 	}
@@ -1259,7 +1260,7 @@ func TestAssetServingRootPathVariations(t *testing.T) {
 			handler := &Handler{
 				config:        cfg,
 				auth:          &auth.BasicAuth{},
-				idleManager:   idle.NewManager(cfg, "", nil),
+				idleManager:   idle.NewManager(cfg, "", time.Time{}, nil),
 				appManager:    &process.AppManager{},
 				staticHandler: NewStaticFileHandler(cfg),
 			}
@@ -1293,7 +1294,7 @@ func TestJSONAccessLogging(t *testing.T) {
 	cfg.Server.Static.PublicDir = "public"
 
 	// Create handler with logging enabled (not using CreateTestHandler)
-	handler := CreateHandler(cfg, nil, nil, nil, nil, func() string { return "" }, func(string) {})
+	handler := CreateHandler(cfg, nil, nil, nil, nil, func() string { return "" }, func() time.Time { return time.Now() }, func(string) {})
 
 	// Capture stdout to test JSON log output
 	oldStdout := os.Stdout

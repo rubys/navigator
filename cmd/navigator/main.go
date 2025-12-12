@@ -52,6 +52,7 @@ func main() {
 		slog.Error("Failed to load configuration", "error", err)
 		os.Exit(1)
 	}
+	configLoadTime := time.Now() // Track when config was loaded for reload detection
 	slog.Info("Loaded configuration",
 		"tenants", len(cfg.Applications.Tenants),
 		"reverseProxies", len(cfg.Routes.ReverseProxies),
@@ -86,7 +87,7 @@ func main() {
 
 	// Create reload channel for resume hook config reload
 	resumeReloadChan := make(chan string, 1)
-	idleManager := idle.NewManager(cfg, configFile, func(path string) {
+	idleManager := idle.NewManager(cfg, configFile, configLoadTime, func(path string) {
 		// Non-blocking send to avoid deadlock if channel is full
 		select {
 		case resumeReloadChan <- path:
@@ -127,6 +128,7 @@ func main() {
 	lifecycle := &ServerLifecycle{
 		configFile:       configFile,
 		cfg:              cfg,
+		configLoadTime:   configLoadTime,
 		appManager:       appManager,
 		processManager:   processManager,
 		basicAuth:        basicAuth,
@@ -232,6 +234,7 @@ func printHelp() {
 type ServerLifecycle struct {
 	configFile       string
 	cfg              *config.Config
+	configLoadTime   time.Time // When the current config was loaded (used for reload detection)
 	appManager       *process.AppManager
 	processManager   *process.Manager
 	basicAuth        *auth.BasicAuth
@@ -258,8 +261,9 @@ func (l *ServerLifecycle) Run() error {
 		l.basicAuth,
 		l.idleManager,
 		l.cableHandler,
-		func() string { return l.configFile }, // Get current config file
-		func(path string) { l.reloadChan <- path }, // Trigger reload
+		func() string { return l.configFile },       // Get current config file
+		func() time.Time { return l.configLoadTime }, // Get config load time for reload detection
+		func(path string) { l.reloadChan <- path },  // Trigger reload
 	)
 
 	// Create HTTP server
@@ -290,7 +294,8 @@ func (l *ServerLifecycle) Run() error {
 		time.Sleep(100 * time.Millisecond)
 
 		// Execute server ready hooks with reload check
-		result := process.ExecuteServerHooksWithReload(l.cfg.Hooks.Ready, "ready", l.configFile)
+		// Pass configLoadTime to detect changes since config was loaded (including during suspend)
+		result := process.ExecuteServerHooksWithReload(l.cfg.Hooks.Ready, "ready", l.configFile, l.configLoadTime)
 		if result.Error != nil {
 			slog.Error("Failed to execute ready hooks", "error", result.Error)
 		} else if result.ReloadDecision.ShouldReload {
@@ -357,10 +362,14 @@ func (l *ServerLifecycle) handleReload() {
 		"trust_proxy", newConfig.Server.TrustProxy,
 		"config_file", l.configFile)
 
+	// Replace config and update load time
+	l.cfg = newConfig
+	l.configLoadTime = time.Now()
+
 	// Update configuration in all managers
 	l.appManager.UpdateConfig(newConfig)
 	l.processManager.UpdateManagedProcesses(newConfig)
-	l.idleManager.UpdateConfig(newConfig, l.configFile)
+	l.idleManager.UpdateConfig(newConfig, l.configFile, l.configLoadTime)
 
 	// Update proxy settings
 	proxy.SetTrustProxy(newConfig.Server.TrustProxy)
@@ -371,9 +380,6 @@ func (l *ServerLifecycle) handleReload() {
 
 	// Update logging format if changed
 	setupLogging(newConfig)
-
-	// Replace config
-	l.cfg = newConfig
 
 	// Execute server start hooks BEFORE loading auth
 	// This is important because hooks may update the htpasswd file
@@ -410,8 +416,9 @@ func (l *ServerLifecycle) handleReload() {
 			l.basicAuth,
 			l.idleManager,
 			l.cableHandler,
-			func() string { return l.configFile }, // Get current config file
-			func(path string) { l.reloadChan <- path }, // Trigger reload
+			func() string { return l.configFile },       // Get current config file
+			func() time.Time { return l.configLoadTime }, // Get config load time for reload detection
+			func(path string) { l.reloadChan <- path },  // Trigger reload
 		)
 		l.srv.Handler = newHandler
 	}

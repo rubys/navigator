@@ -12,28 +12,31 @@ import (
 
 // Manager tracks active requests and handles machine idle actions
 type Manager struct {
-	enabled        bool
-	action         string // "suspend" or "stop"
-	idleTimeout    time.Duration
-	activeRequests int64
-	lastActivity   time.Time
-	mutex          sync.RWMutex
-	timer          *time.Timer
-	config         *config.Config
-	configFile     string                  // Current config file path for reload_config support
-	reloadCallback func(configPath string) // Callback to trigger config reload
-	idleActioned   bool                    // Track if idle action was performed
-	resuming       bool                    // Track if resume hooks are currently running
-	resumeCond     *sync.Cond              // Condition variable to wait for resume completion
-	testMode       bool                    // Prevents actual signal sending during tests
+	enabled          bool
+	action           string // "suspend" or "stop"
+	idleTimeout      time.Duration
+	activeRequests   int64
+	lastActivity     time.Time
+	mutex            sync.RWMutex
+	timer            *time.Timer
+	config           *config.Config
+	configFile       string                  // Current config file path for reload_config support
+	configLoadTime   time.Time               // When the config was last loaded (for reload detection)
+	reloadCallback   func(configPath string) // Callback to trigger config reload
+	idleActioned     bool                    // Track if idle action was performed
+	resuming         bool                    // Track if resume hooks are currently running
+	resumeCond       *sync.Cond              // Condition variable to wait for resume completion
+	testMode         bool                    // Prevents actual signal sending during tests
 }
 
 // NewManager creates a new idle manager
 // The reloadCallback is called when a resume hook specifies reload_config and the config file was modified
-func NewManager(cfg *config.Config, configFile string, reloadCallback func(configPath string)) *Manager {
+// configLoadTime is when the config was last loaded (for detecting changes since last load)
+func NewManager(cfg *config.Config, configFile string, configLoadTime time.Time, reloadCallback func(configPath string)) *Manager {
 	m := &Manager{
 		config:         cfg,
 		configFile:     configFile,
+		configLoadTime: configLoadTime,
 		reloadCallback: reloadCallback,
 		lastActivity:   time.Now(),
 	}
@@ -94,10 +97,13 @@ func (m *Manager) RequestStarted() {
 		configFile := m.configFile
 		reloadCallback := m.reloadCallback
 
+		// Capture configLoadTime for the goroutine
+		configLoadTime := m.configLoadTime
+
 		// Execute resume hooks asynchronously
 		go func() {
 			slog.Info("Executing server resume hooks")
-			result := process.ExecuteServerHooksWithReload(m.config.Hooks.Resume, "resume", configFile)
+			result := process.ExecuteServerHooksWithReload(m.config.Hooks.Resume, "resume", configFile, configLoadTime)
 			if result.Error != nil {
 				slog.Error("Failed to execute resume hooks", "error", result.Error)
 			} else if result.ReloadDecision.ShouldReload && reloadCallback != nil {
@@ -243,12 +249,13 @@ func (m *Manager) GetStats() (activeRequests int64, lastActivity time.Time) {
 }
 
 // UpdateConfig updates the idle manager configuration after a reload
-func (m *Manager) UpdateConfig(newConfig *config.Config, configFile string) {
+func (m *Manager) UpdateConfig(newConfig *config.Config, configFile string, configLoadTime time.Time) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	m.config = newConfig
 	m.configFile = configFile
+	m.configLoadTime = configLoadTime
 
 	// Re-configure idle settings from new config
 	if newConfig.Server.Idle.Action != "" && (newConfig.Server.Idle.Action == "suspend" || newConfig.Server.Idle.Action == "stop") {

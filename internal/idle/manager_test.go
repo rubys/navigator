@@ -27,7 +27,7 @@ func TestNewManager(t *testing.T) {
 			cfg := &config.Config{}
 			cfg.Server.Idle.Action = tt.action
 			cfg.Server.Idle.Timeout = tt.timeout
-			manager := NewManager(cfg, "", nil)
+			manager := NewManager(cfg, "", time.Time{}, nil)
 
 			if tt.expected {
 				if manager == nil {
@@ -50,7 +50,7 @@ func TestIdleManagerBasicOperations(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "suspend"
 	cfg.Server.Idle.Timeout = "100ms"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		t.Fatal("Failed to create IdleManager")
 	}
@@ -82,7 +82,7 @@ func TestIdleManagerDisabled(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = ""
 	cfg.Server.Idle.Timeout = "20m"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 
 	if manager != nil && manager.IsEnabled() {
 		t.Error("IdleManager with empty action should be disabled")
@@ -101,7 +101,7 @@ func TestIdleManagerTimeout(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "suspend"
 	cfg.Server.Idle.Timeout = "10ms"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		t.Fatal("Failed to create IdleManager")
 	}
@@ -124,7 +124,7 @@ func TestIdleManagerConcurrency(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "suspend"
 	cfg.Server.Idle.Timeout = "1s"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		t.Fatal("Failed to create IdleManager")
 	}
@@ -158,7 +158,7 @@ func TestIdleManagerStop(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "suspend"
 	cfg.Server.Idle.Timeout = "1s"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		t.Fatal("Failed to create IdleManager")
 	}
@@ -182,7 +182,7 @@ func TestIdleManagerActions(t *testing.T) {
 			cfg := &config.Config{}
 			cfg.Server.Idle.Action = action
 			cfg.Server.Idle.Timeout = "1m"
-			manager := NewManager(cfg, "", nil)
+			manager := NewManager(cfg, "", time.Time{}, nil)
 			if manager == nil {
 				t.Errorf("Failed to create IdleManager for action: %s", action)
 			} else {
@@ -206,7 +206,7 @@ func TestIdleManagerTimeoutParsing(t *testing.T) {
 			cfg := &config.Config{}
 			cfg.Server.Idle.Action = "suspend"
 			cfg.Server.Idle.Timeout = timeout
-			manager := NewManager(cfg, "", nil)
+			manager := NewManager(cfg, "", time.Time{}, nil)
 			if manager == nil {
 				t.Errorf("Failed to create IdleManager for timeout: %s", timeout)
 			} else {
@@ -224,7 +224,7 @@ func TestIdleManagerTimeoutParsing(t *testing.T) {
 			cfg := &config.Config{}
 			cfg.Server.Idle.Action = "suspend"
 			cfg.Server.Idle.Timeout = timeout
-			manager := NewManager(cfg, "", nil)
+			manager := NewManager(cfg, "", time.Time{}, nil)
 			// Invalid timeouts fall back to default timeout, so manager should still be enabled
 			if manager == nil || !manager.IsEnabled() {
 				t.Errorf("IdleManager should be enabled even with invalid timeout (falls back to default): %s", timeout)
@@ -239,7 +239,7 @@ func TestIdleManagerTimeoutParsing(t *testing.T) {
 		cfg := &config.Config{}
 		cfg.Server.Idle.Action = "suspend"
 		cfg.Server.Idle.Timeout = "-5m"
-		manager := NewManager(cfg, "", nil)
+		manager := NewManager(cfg, "", time.Time{}, nil)
 		// -5m is a valid duration but negative, so it should still enable
 		if manager == nil || !manager.IsEnabled() {
 			t.Error("IdleManager should be enabled even with negative timeout")
@@ -254,7 +254,7 @@ func TestIdleManagerLongRunning(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "suspend"
 	cfg.Server.Idle.Timeout = "50ms"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		t.Fatal("Failed to create IdleManager")
 	}
@@ -280,7 +280,7 @@ func BenchmarkIdleManagerRequestTracking(b *testing.B) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "suspend"
 	cfg.Server.Idle.Timeout = "1m"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		b.Fatal("Failed to create IdleManager")
 	}
@@ -297,7 +297,7 @@ func BenchmarkIdleManagerConcurrentTracking(b *testing.B) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "suspend"
 	cfg.Server.Idle.Timeout = "1m"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		b.Fatal("Failed to create IdleManager")
 	}
@@ -318,7 +318,7 @@ func TestGetStats(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "suspend"
 	cfg.Server.Idle.Timeout = "1m"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		t.Fatal("Failed to create IdleManager")
 	}
@@ -354,7 +354,7 @@ func TestUpdateConfig(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "suspend"
 	cfg.Server.Idle.Timeout = "1m"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		t.Fatal("Failed to create IdleManager")
 	}
@@ -367,7 +367,7 @@ func TestUpdateConfig(t *testing.T) {
 	newCfg.Server.Idle.Action = "suspend"
 	newCfg.Server.Idle.Timeout = "5m"
 
-	manager.UpdateConfig(newCfg, "")
+	manager.UpdateConfig(newCfg, "", time.Time{})
 
 	// Verify manager is still enabled
 	if !manager.IsEnabled() {
@@ -379,7 +379,7 @@ func TestUpdateConfig(t *testing.T) {
 	disabledCfg.Server.Idle.Action = ""
 	disabledCfg.Server.Idle.Timeout = "1m"
 
-	manager.UpdateConfig(disabledCfg, "")
+	manager.UpdateConfig(disabledCfg, "", time.Time{})
 
 	// Verify manager is now disabled
 	if manager.IsEnabled() {
@@ -390,7 +390,7 @@ func TestUpdateConfig(t *testing.T) {
 func TestUpdateConfigStartsTimer(t *testing.T) {
 	// Start with disabled idle management (simulating boot with empty config)
 	cfg := &config.Config{}
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		t.Fatal("Failed to create IdleManager")
 		return
@@ -409,7 +409,7 @@ func TestUpdateConfigStartsTimer(t *testing.T) {
 	enabledCfg.Server.Idle.Action = "suspend"
 	enabledCfg.Server.Idle.Timeout = "10ms"
 
-	manager.UpdateConfig(enabledCfg, "")
+	manager.UpdateConfig(enabledCfg, "", time.Time{})
 
 	// Verify manager is now enabled
 	if !manager.IsEnabled() {
@@ -433,7 +433,7 @@ func TestStopMachine(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "stop"
 	cfg.Server.Idle.Timeout = "10ms"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		t.Fatal("Failed to create IdleManager")
 	}
@@ -454,7 +454,7 @@ func TestSuspend(t *testing.T) {
 		cfg := &config.Config{}
 		cfg.Server.Idle.Action = "suspend"
 		cfg.Server.Idle.Timeout = "1m"
-		manager := NewManager(cfg, "", nil)
+		manager := NewManager(cfg, "", time.Time{}, nil)
 		if manager == nil {
 			t.Fatal("Failed to create IdleManager")
 		}
@@ -473,7 +473,7 @@ func TestSuspend(t *testing.T) {
 		cfg := &config.Config{}
 		cfg.Server.Idle.Action = "stop"
 		cfg.Server.Idle.Timeout = "1m"
-		manager := NewManager(cfg, "", nil)
+		manager := NewManager(cfg, "", time.Time{}, nil)
 		if manager == nil {
 			t.Fatal("Failed to create IdleManager")
 		}
@@ -492,7 +492,7 @@ func TestSuspend(t *testing.T) {
 		cfg := &config.Config{}
 		cfg.Server.Idle.Action = ""
 		cfg.Server.Idle.Timeout = "1m"
-		manager := NewManager(cfg, "", nil)
+		manager := NewManager(cfg, "", time.Time{}, nil)
 
 		// Manager should be nil or disabled
 		if manager != nil && manager.IsEnabled() {
@@ -508,7 +508,7 @@ func TestRequestStartedWithTimer(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Idle.Action = "suspend"
 	cfg.Server.Idle.Timeout = "100ms"
-	manager := NewManager(cfg, "", nil)
+	manager := NewManager(cfg, "", time.Time{}, nil)
 	if manager == nil {
 		t.Fatal("Failed to create IdleManager")
 	}

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rubys/navigator/internal/config"
 )
@@ -66,7 +67,7 @@ func TestNewHandler(t *testing.T) {
 				}
 			}
 
-			handler, err := NewHandler(tt.cfg, nil, nil)
+			handler, err := NewHandler(tt.cfg, nil, nil, nil)
 
 			if tt.wantError && err == nil {
 				t.Error("Expected error but got none")
@@ -106,7 +107,7 @@ echo "Query: $QUERY_STRING"
 		},
 	}
 
-	handler, err := NewHandler(cfg, nil, nil)
+	handler, err := NewHandler(cfg, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create handler: %v", err)
 	}
@@ -195,9 +196,11 @@ echo "Config updated"
 		ReloadConfig: configPath,
 	}
 
+	configLoadTime := time.Now().Add(-1 * time.Hour) // Simulate config was loaded an hour ago
 	handler, err := NewHandler(
 		cfg,
 		func() string { return configPath },
+		func() time.Time { return configLoadTime },
 		func(path string) {
 			reloadTriggered = true
 			reloadConfigPath = path
@@ -330,7 +333,7 @@ echo "Access granted"
 				AllowedUsers: tt.allowedUsers,
 			}
 
-			handler, err := NewHandler(cfg, nil, nil)
+			handler, err := NewHandler(cfg, nil, nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to create handler: %v", err)
 			}

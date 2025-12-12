@@ -649,7 +649,8 @@ func TestExecuteServerHooksWithReload(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ExecuteServerHooksWithReload(tt.hooks, "test", tt.currentConfigFile)
+			configLoadTime := time.Now().Add(-1 * time.Hour) // Simulate config was loaded an hour ago
+			result := ExecuteServerHooksWithReload(tt.hooks, "test", tt.currentConfigFile, configLoadTime)
 
 			if (result.Error != nil) != tt.wantError {
 				t.Errorf("Error = %v, wantError = %v", result.Error, tt.wantError)
