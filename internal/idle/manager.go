@@ -12,21 +12,21 @@ import (
 
 // Manager tracks active requests and handles machine idle actions
 type Manager struct {
-	enabled          bool
-	action           string // "suspend" or "stop"
-	idleTimeout      time.Duration
-	activeRequests   int64
-	lastActivity     time.Time
-	mutex            sync.RWMutex
-	timer            *time.Timer
-	config           *config.Config
-	configFile       string                  // Current config file path for reload_config support
-	configLoadTime   time.Time               // When the config was last loaded (for reload detection)
-	reloadCallback   func(configPath string) // Callback to trigger config reload
-	idleActioned     bool                    // Track if idle action was performed
-	resuming         bool                    // Track if resume hooks are currently running
-	resumeCond       *sync.Cond              // Condition variable to wait for resume completion
-	testMode         bool                    // Prevents actual signal sending during tests
+	enabled        bool
+	action         string // "suspend" or "stop"
+	idleTimeout    time.Duration
+	activeRequests int64
+	lastActivity   time.Time
+	mutex          sync.RWMutex
+	timer          *time.Timer
+	config         *config.Config
+	configFile     string                  // Current config file path for reload_config support
+	configLoadTime time.Time               // When the config was last loaded (for reload detection)
+	reloadCallback func(configPath string) // Callback to trigger config reload
+	idleActioned   bool                    // Track if idle action was performed
+	resuming       bool                    // Track if resume hooks are currently running
+	resumeCond     *sync.Cond              // Condition variable to wait for resume completion
+	testMode       bool                    // Prevents actual signal sending during tests
 }
 
 // NewManager creates a new idle manager

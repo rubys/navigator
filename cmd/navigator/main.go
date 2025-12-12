@@ -261,9 +261,9 @@ func (l *ServerLifecycle) Run() error {
 		l.basicAuth,
 		l.idleManager,
 		l.cableHandler,
-		func() string { return l.configFile },       // Get current config file
+		func() string { return l.configFile }, // Get current config file
 		func() time.Time { return l.configLoadTime }, // Get config load time for reload detection
-		func(path string) { l.reloadChan <- path },  // Trigger reload
+		func(path string) { l.reloadChan <- path },   // Trigger reload
 	)
 
 	// Create HTTP server
@@ -416,9 +416,9 @@ func (l *ServerLifecycle) handleReload() {
 			l.basicAuth,
 			l.idleManager,
 			l.cableHandler,
-			func() string { return l.configFile },       // Get current config file
+			func() string { return l.configFile }, // Get current config file
 			func() time.Time { return l.configLoadTime }, // Get config load time for reload detection
-			func(path string) { l.reloadChan <- path },  // Trigger reload
+			func(path string) { l.reloadChan <- path },   // Trigger reload
 		)
 		l.srv.Handler = newHandler
 	}
