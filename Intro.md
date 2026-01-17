@@ -56,17 +56,13 @@ This could be accomplished via a reverse proxy like [Nginx](https://nginx.org/) 
 
 Navigator can be configured to do both tasks, without needing to modify the configuration of your Rails application. See [websockets-example.yml](examples/websockets-example.yml) for a complete configuration example.
 
-## Use Case 4: Sticky Sessions
-
-Navigator provides built-in sticky session support using HTTP cookies, ensuring requests from the same client are routed to the same machine. This is particularly useful for maintaining WebSocket connections or accessing locally stored data on specific machines. See [sticky-sessions-example.yml](examples/sticky-sessions-example.yml) for a complete configuration example.
-
-## Use Case 5: Routing
+## Use Case 4: Routing
 
 Fly.io supports [Dynamic Routing](https://fly.io/docs/networking/dynamic-request-routing/), which has two modes: _prefer_ or _force_. With _prefer_ requests that can't be routed to the intended destination are routed to an available server. With _force_, such requests fail.
 
 Having requests routed somewhere means that your application has an ability to detect, log, recover, or take other actions. For now, Navigator shows a maintenance page, which is more user friendly and something that can be searched for in logs. See [routing-example.yml](examples/routing-example.yml) for a complete configuration example.
 
-## Use Case 6: Log Aggregation with Vector
+## Use Case 5: Log Aggregation with Vector
 
 Modern applications generate logs from multiple sources: web servers, background workers, databases, and the application itself. When running across multiple machines or regions, centralizing these logs becomes essential for debugging and monitoring. [Vector](https://vector.dev/) is a high-performance observability data pipeline that can collect, transform, and route logs to various destinations.
 
