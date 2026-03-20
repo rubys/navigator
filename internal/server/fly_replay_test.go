@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -129,8 +128,7 @@ func TestHandleFlyReplay(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variable for current app
 			if tt.currentApp != "" {
-				os.Setenv("FLY_APP_NAME", tt.currentApp)
-				defer os.Unsetenv("FLY_APP_NAME")
+				t.Setenv("FLY_APP_NAME", tt.currentApp)
 			}
 
 			cfg := &config.Config{}
@@ -224,8 +222,7 @@ func TestHandleFlyReplay(t *testing.T) {
 }
 
 func TestHandleFlyReplay_WithAuthorization(t *testing.T) {
-	os.Setenv("FLY_APP_NAME", "myapp")
-	defer os.Unsetenv("FLY_APP_NAME")
+	t.Setenv("FLY_APP_NAME", "myapp")
 
 	cfg := &config.Config{}
 	req := httptest.NewRequest("GET", "/test", nil)

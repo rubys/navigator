@@ -215,12 +215,12 @@ applications:
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			if _, err := tmpFile.WriteString(tt.config); err != nil {
 				t.Fatalf("Failed to write test config: %v", err)
 			}
-			tmpFile.Close()
+			_ = tmpFile.Close()
 
 			config, err := LoadConfig(tmpFile.Name())
 
@@ -390,12 +390,12 @@ managed_processes: []
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			if _, err := tmpFile.WriteString(tt.config); err != nil {
 				t.Fatalf("Failed to write test config: %v", err)
 			}
-			tmpFile.Close()
+			_ = tmpFile.Close()
 
 			config, err := LoadConfig(tmpFile.Name())
 			if err != nil {
@@ -640,12 +640,12 @@ applications:
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			if _, err := tmpFile.WriteString(tt.config); err != nil {
 				t.Fatalf("Failed to write test config: %v", err)
 			}
-			tmpFile.Close()
+			_ = tmpFile.Close()
 
 			// Configuration should load without errors even with problematic variable substitution
 			config, err := LoadConfig(tmpFile.Name())
@@ -717,12 +717,12 @@ hooks:
 	if err != nil {
 		b.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		b.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
