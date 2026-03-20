@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"net/http/httptest"
-	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -37,8 +36,7 @@ func TestFlyReplayIntegration_EndToEnd(t *testing.T) {
 	}
 
 	// Set up test environment
-	os.Setenv("FLY_APP_NAME", "smooth-nav")
-	defer os.Unsetenv("FLY_APP_NAME")
+	t.Setenv("FLY_APP_NAME", "smooth-nav")
 
 	// Create handler
 	appManager := &process.AppManager{}
@@ -167,8 +165,7 @@ func TestFlyReplayIntegration_LargeRequestNotHandled(t *testing.T) {
 		},
 	}
 
-	os.Setenv("FLY_APP_NAME", "testapp")
-	defer os.Unsetenv("FLY_APP_NAME")
+	t.Setenv("FLY_APP_NAME", "testapp")
 
 	appManager := &process.AppManager{}
 	idleManager := &idle.Manager{}

@@ -290,7 +290,7 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
 	}
-	defer backendConn.Close()
+	defer func() { _ = backendConn.Close() }()
 
 	// Upgrade client connection with matching subprotocol
 	responseHeader := http.Header{}
@@ -303,7 +303,7 @@ func (h *Handler) handleWebSocketProxy(w http.ResponseWriter, r *http.Request, r
 		logging.LogWebSocketUpgradeError(err)
 		return
 	}
-	defer clientConn.Close()
+	defer func() { _ = clientConn.Close() }()
 
 	logging.LogWebSocketProxyEstablished(r.RemoteAddr, targetURL.String(), r.URL.Path)
 

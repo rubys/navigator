@@ -16,7 +16,7 @@ func TestHandler_ProxyIntegration(t *testing.T) {
 	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"method": "%s", "path": "%s", "headers": %v}`, r.Method, r.URL.Path, r.Header.Get("X-Test-Header"))
+		_, _ = fmt.Fprintf(w, `{"method": "%s", "path": "%s", "headers": %v}`, r.Method, r.URL.Path, r.Header.Get("X-Test-Header"))
 	}))
 	defer backendServer.Close()
 

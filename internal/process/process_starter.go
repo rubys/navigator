@@ -203,7 +203,7 @@ func (ps *ProcessStarter) waitForReady(app *WebApp, tenantName, runtime string) 
 			}
 			resp, err := client.Get(fmt.Sprintf("http://localhost:%d%s", app.Port, healthCheck))
 			if err == nil {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 				// Any HTTP response (even 404/500) means the app is serving requests
 				slog.Debug("Health check succeeded",
 					"tenant", tenantName,

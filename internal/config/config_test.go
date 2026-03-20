@@ -36,12 +36,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// Test loading the config
 	config, err := LoadConfig(tmpFile.Name())
@@ -107,12 +107,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -149,12 +149,12 @@ server:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(invalidConfig); err != nil {
 		t.Fatalf("Failed to write invalid config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	_, err = LoadConfig(tmpFile.Name())
 	if err == nil {
@@ -193,12 +193,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -242,12 +242,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -284,12 +284,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -326,12 +326,12 @@ server:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(minimalConfig); err != nil {
 		t.Fatalf("Failed to write minimal config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -396,12 +396,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -487,12 +487,12 @@ pools:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(maintenanceConfig); err != nil {
 		t.Fatalf("Failed to write maintenance config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -593,12 +593,12 @@ hooks:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -674,12 +674,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -723,9 +723,10 @@ applications:
 	rewriteCount := 0
 
 	for _, rule := range config.Server.RewriteRules {
-		if rule.Flag == "redirect" {
+		switch rule.Flag {
+		case "redirect":
 			redirectCount++
-		} else if rule.Flag == "last" {
+		case "last":
 			rewriteCount++
 		}
 	}
@@ -822,12 +823,12 @@ applications:
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			if _, err := tmpFile.WriteString(tt.config); err != nil {
 				t.Fatalf("Failed to write test config: %v", err)
 			}
-			tmpFile.Close()
+			_ = tmpFile.Close()
 
 			config, err := LoadConfig(tmpFile.Name())
 			if err != nil {
@@ -867,12 +868,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -930,12 +931,12 @@ applications:
 	if err != nil {
 		b.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		b.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -972,12 +973,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -1026,12 +1027,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -1075,12 +1076,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -1122,12 +1123,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(testConfig); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config, err := LoadConfig(tmpFile.Name())
 	if err != nil {
@@ -1190,12 +1191,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile1.Name())
+	defer func() { _ = os.Remove(tmpFile1.Name()) }()
 
 	if _, err := tmpFile1.WriteString(initialConfig); err != nil {
 		t.Fatalf("Failed to write initial config: %v", err)
 	}
-	tmpFile1.Close()
+	_ = tmpFile1.Close()
 
 	currentConfig, err := LoadConfig(tmpFile1.Name())
 	if err != nil {
@@ -1207,12 +1208,12 @@ applications:
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile2.Name())
+	defer func() { _ = os.Remove(tmpFile2.Name()) }()
 
 	if _, err := tmpFile2.WriteString(newConfigYAML); err != nil {
 		t.Fatalf("Failed to write new config: %v", err)
 	}
-	tmpFile2.Close()
+	_ = tmpFile2.Close()
 
 	newConfig, err := LoadConfig(tmpFile2.Name())
 	if err != nil {

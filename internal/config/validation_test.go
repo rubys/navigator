@@ -495,7 +495,7 @@ func TestFileSystemValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
-	defer os.RemoveAll(testDir)
+	defer func() { _ = os.RemoveAll(testDir) }()
 
 	// Create various test files and directories
 	readableFile := filepath.Join(testDir, "readable.yml")

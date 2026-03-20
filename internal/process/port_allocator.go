@@ -38,7 +38,7 @@ func (pa *PortAllocator) AllocatePort() (int, error) {
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 		if err == nil {
 			// Port is available - close the test listener and mark as allocated
-			listener.Close()
+			_ = listener.Close()
 			pa.allocatedPorts[port] = true
 			return port, nil
 		}

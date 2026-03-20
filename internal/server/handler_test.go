@@ -190,8 +190,8 @@ func TestServeStaticFileWithRootPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.Remove(tempDir.Name())
-	tempDir.Close()
+	defer func() { _ = os.Remove(tempDir.Name()) }()
+	_ = tempDir.Close()
 
 	publicDir := filepath.Dir(tempDir.Name())
 	testPublicDir := filepath.Join(publicDir, "test-public")
@@ -200,7 +200,7 @@ func TestServeStaticFileWithRootPath(t *testing.T) {
 	if err := os.MkdirAll(assetsDir, 0755); err != nil {
 		t.Fatalf("Failed to create test directories: %v", err)
 	}
-	defer os.RemoveAll(testPublicDir)
+	defer func() { _ = os.RemoveAll(testPublicDir) }()
 
 	// Create test file
 	testFile := filepath.Join(assetsDir, "live_scores_controller-3e78916c.js")
@@ -356,7 +356,7 @@ func TestCreateHandler(t *testing.T) {
 			}
 
 			// Verify it implements http.Handler
-			var _ http.Handler = handler
+			var _ = handler
 
 			// Verify handler type
 			h, ok := handler.(*Handler)
@@ -724,7 +724,7 @@ func TestMaintenanceModeHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create a maintenance page
 	maintenanceHTML := `<!DOCTYPE html>
@@ -1121,11 +1121,12 @@ func TestAssetServingIntegration(t *testing.T) {
 
 					// Verify content type is set correctly
 					contentType := rr.Header().Get("Content-Type")
-					if assetTest.expectedExt == ".js" {
+					switch assetTest.expectedExt {
+					case ".js":
 						if !strings.Contains(contentType, "javascript") && !strings.Contains(contentType, "text/plain") {
 							t.Errorf("Expected JS content type for %s, got: %s", assetTest.path, contentType)
 						}
-					} else if assetTest.expectedExt == ".css" {
+					case ".css":
 						if !strings.Contains(contentType, "css") && !strings.Contains(contentType, "text/plain") {
 							t.Errorf("Expected CSS content type for %s, got: %s", assetTest.path, contentType)
 						}
@@ -1320,7 +1321,7 @@ func TestJSONAccessLogging(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	// Close writer and restore stdout
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	// Restore access log writer

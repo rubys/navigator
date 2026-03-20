@@ -179,7 +179,7 @@ func TestPathTraversalPrevention(t *testing.T) {
 		// Echo the received path for analysis
 		w.Header().Set("Received-Path", r.URL.Path)
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(fmt.Sprintf("Path: %s", r.URL.Path)))
+		_, _ = fmt.Fprintf(w, "Path: %s", r.URL.Path)
 	}))
 	defer backend.Close()
 

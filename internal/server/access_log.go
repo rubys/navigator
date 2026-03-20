@@ -126,5 +126,5 @@ func LogRequest(req *http.Request, statusCode, bodySize int, startTime time.Time
 
 	// Output JSON log entry (matching nginx/rails format)
 	data, _ := json.Marshal(entry)
-	fmt.Fprintln(accessLogWriter, string(data))
+	_, _ = fmt.Fprintln(accessLogWriter, string(data))
 }

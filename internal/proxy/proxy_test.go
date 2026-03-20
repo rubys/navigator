@@ -212,7 +212,7 @@ func TestWebSocketTracker(t *testing.T) {
 	}
 
 	// Clean up the mock connection
-	conn.Close()
+	_ = conn.Close()
 }
 
 // Mock hijackable recorder for testing

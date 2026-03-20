@@ -78,7 +78,7 @@ func (m *Manager) performFlyAction(action string) error {
 	if err != nil {
 		return fmt.Errorf("failed to execute %s request: %w", action, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)

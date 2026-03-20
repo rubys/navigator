@@ -481,7 +481,7 @@ func TestReverseProxyErrorHandling(t *testing.T) {
 
 			// Allow some flexibility in error status codes
 			if recorder.Code != tt.expectedStatus &&
-				!(tt.expectedStatus == http.StatusInternalServerError && recorder.Code == http.StatusBadGateway) {
+				(tt.expectedStatus != http.StatusInternalServerError || recorder.Code != http.StatusBadGateway) {
 				t.Errorf("%s: expected status %d, got %d", tt.description, tt.expectedStatus, recorder.Code)
 			}
 

@@ -311,7 +311,7 @@ func TestWebSocketProxy_SuccessfulUpgrade(t *testing.T) {
 			t.Errorf("Backend upgrade failed: %v", err)
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		// Echo messages back
 		for {

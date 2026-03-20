@@ -135,7 +135,7 @@ func (v *VectorWriter) Write(p []byte) (n int, err error) {
 	n, err = v.conn.Write(p)
 	if err != nil {
 		// Connection failed, close and reset
-		v.conn.Close()
+		_ = v.conn.Close()
 		v.conn = nil
 		// Return success to avoid breaking the log pipeline
 		return len(p), nil

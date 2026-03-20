@@ -197,7 +197,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Copy request body to script's stdin
 	go func() {
-		defer stdin.Close()
+		defer func() { _ = stdin.Close() }()
 		if r.Body != nil {
 			_, _ = io.Copy(stdin, r.Body)
 		}
