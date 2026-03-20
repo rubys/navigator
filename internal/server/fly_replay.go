@@ -2,22 +2,24 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/rubys/navigator/internal/config"
 	"github.com/rubys/navigator/internal/logging"
-	"github.com/rubys/navigator/internal/proxy"
 )
 
 const (
 	// MaxFlyReplaySize is the maximum request size for Fly-Replay (1MB)
 	MaxFlyReplaySize = 1024 * 1024
+
+	// DefaultFlyReplayTimeout is the default timeout for Fly-Replay attempts
+	DefaultFlyReplayTimeout = "5s"
+
+	// DefaultFlyReplayFallback is the default fallback strategy for Fly-Replay
+	DefaultFlyReplayFallback = "force_self"
 )
 
 // ShouldUseFlyReplay determines if a request should use fly-replay based on content length
@@ -48,168 +50,117 @@ func ShouldUseFlyReplay(r *http.Request) bool {
 
 // HandleFlyReplay handles Fly-Replay rewrite rules
 func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, status string, config *config.Config) bool {
-	if ShouldUseFlyReplay(r) {
-		// Check if this is a retry
-		if r.Header.Get("X-Navigator-Retry") == "true" {
-			// Retry detected, serve maintenance page
-			logging.LogFlyReplayRetryDetected(r.Header.Get("Fly-Replay-Src"), target)
-			ServeMaintenancePage(w, r, config)
-			return true
-		}
-
-		w.Header().Set("Content-Type", "application/vnd.fly.replay+json")
-		statusCode := http.StatusTemporaryRedirect
-		if code, err := strconv.Atoi(status); err == nil {
-			statusCode = code
-		}
-
-		// Get current app name to determine if we're replaying to a different app
-		currentAppName := os.Getenv("FLY_APP_NAME")
-
-		// Build transform headers that preserve Authorization
-		// The Authorization header must be explicitly preserved during fly-replay
-		// to prevent authentication failures on the target machine
-		buildTransformHeaders := func() []map[string]string {
-			headers := []map[string]string{
-				{"name": "X-Navigator-Retry", "value": "true"},
-			}
-
-			// Explicitly preserve Authorization header if present
-			if authHeader := r.Header.Get("Authorization"); authHeader != "" {
-				headers = append(headers, map[string]string{
-					"name":  "Authorization",
-					"value": authHeader,
-				})
-			}
-
-			return headers
-		}
-
-		// Parse target to determine if it's machine, app, or region
-		var responseMap map[string]interface{}
-		if strings.HasPrefix(target, "machine=") {
-			// Machine-based fly-replay: machine=machine_id:app_name
-			machineAndApp := strings.TrimPrefix(target, "machine=")
-			parts := strings.Split(machineAndApp, ":")
-			if len(parts) == 2 {
-				machineID := parts[0]
-				appName := parts[1]
-
-				responseMap = map[string]interface{}{
-					"app":             appName,
-					"prefer_instance": machineID,
-				}
-
-				// Only add transform if staying within the same app
-				if currentAppName == appName {
-					responseMap["transform"] = map[string]interface{}{
-						"set_headers": buildTransformHeaders(),
-					}
-				}
-			}
-		} else if strings.HasPrefix(target, "app=") {
-			// App-based fly-replay
-			appName := strings.TrimPrefix(target, "app=")
-
-			responseMap = map[string]interface{}{
-				"app": appName,
-			}
-
-			// Only add transform if staying within the same app
-			if currentAppName == appName {
-				responseMap["transform"] = map[string]interface{}{
-					"set_headers": buildTransformHeaders(),
-				}
-			}
-		} else {
-			// Region-based fly-replay (same app, different region)
-			responseMap = map[string]interface{}{
-				"region": target + ",any",
-				"transform": map[string]interface{}{
-					"set_headers": buildTransformHeaders(),
-				},
-			}
-		}
-
-		w.WriteHeader(statusCode)
-
-		responseBodyBytes, err := json.Marshal(responseMap)
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return true
-		}
-		logging.LogFlyReplayResponseBody(responseBodyBytes)
-		_, _ = w.Write(responseBodyBytes)
-
-		// Set metadata for fly-replay response
-		if recorder, ok := w.(*ResponseRecorder); ok {
-			recorder.SetMetadata("response_type", "fly-replay")
-			recorder.SetMetadata("destination", target)
-		}
-
-		return true
-	} else {
-		// Automatically reverse proxy instead of fly-replay
-		return HandleFlyReplayFallback(w, r, target, config)
-	}
-}
-
-// HandleFlyReplayFallback automatically reverse proxies the request when fly-replay isn't suitable
-// Constructs the target URL based on target type:
-// - Machine: http://<machine_id>.vm.<appname>.internal:<port><path>
-// - App: http://<appname>.internal:<port><path>
-// - Region: http://<region>.<FLY_APP_NAME>.internal:<port><path>
-func HandleFlyReplayFallback(w http.ResponseWriter, r *http.Request, target string, config *config.Config) bool {
-	flyAppName := os.Getenv("FLY_APP_NAME")
-	if flyAppName == "" {
-		logging.LogFlyReplayNoAppName()
+	if !ShouldUseFlyReplay(r) {
 		return false
 	}
 
-	// Construct the target URL based on target type
-	listenPort := 3000 // Default port
-	if config.Server.Listen != "" {
-		// Parse port from config.Server.Listen (could be ":3000" or "3000")
-		portStr := strings.TrimPrefix(config.Server.Listen, ":")
-		if port, err := strconv.Atoi(portStr); err == nil {
-			listenPort = port
-		}
+	// Check if this is a failed replay (Fly couldn't reach the target and fell back to us)
+	if failedHeader := r.Header.Get("fly-replay-failed"); failedHeader != "" {
+		logging.LogFlyReplayFailed(failedHeader, target)
+		ServeMaintenancePage(w, r, config)
+		return true
 	}
 
-	var targetURL string
+	w.Header().Set("Content-Type", "application/vnd.fly.replay+json")
+	statusCode := http.StatusTemporaryRedirect
+	if code, err := strconv.Atoi(status); err == nil {
+		statusCode = code
+	}
+
+	// Get current app name to determine if we're replaying to a different app
+	currentAppName := os.Getenv("FLY_APP_NAME")
+
+	// Build transform headers that preserve Authorization
+	// The Authorization header must be explicitly preserved during fly-replay
+	// to prevent authentication failures on the target machine
+	buildTransformHeaders := func() []map[string]string {
+		var headers []map[string]string
+
+		// Explicitly preserve Authorization header if present
+		if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+			headers = append(headers, map[string]string{
+				"name":  "Authorization",
+				"value": authHeader,
+			})
+		}
+
+		return headers
+	}
+
+	// Parse target to determine if it's machine, app, or region
+	var responseMap map[string]interface{}
 	if strings.HasPrefix(target, "machine=") {
-		// Machine-based: http://<machine_id>.vm.<appname>.internal:<port><path>
+		// Machine-based fly-replay: machine=machine_id:app_name
 		machineAndApp := strings.TrimPrefix(target, "machine=")
 		parts := strings.Split(machineAndApp, ":")
 		if len(parts) == 2 {
 			machineID := parts[0]
 			appName := parts[1]
-			targetURL = fmt.Sprintf("http://%s.vm.%s.internal:%d%s", machineID, appName, listenPort, r.URL.Path)
-		} else {
-			logging.LogFlyReplayInvalidMachineTarget(target)
-			return false
+
+			responseMap = map[string]interface{}{
+				"app":             appName,
+				"prefer_instance": machineID,
+				"timeout":         DefaultFlyReplayTimeout,
+				"fallback":        DefaultFlyReplayFallback,
+			}
+
+			// Only add transform if staying within the same app and we have headers to set
+			if currentAppName == appName {
+				if headers := buildTransformHeaders(); len(headers) > 0 {
+					responseMap["transform"] = map[string]interface{}{
+						"set_headers": headers,
+					}
+				}
+			}
 		}
 	} else if strings.HasPrefix(target, "app=") {
-		// App-based: http://<appname>.internal:<port><path>
+		// App-based fly-replay
 		appName := strings.TrimPrefix(target, "app=")
-		targetURL = fmt.Sprintf("http://%s.internal:%d%s", appName, listenPort, r.URL.Path)
+
+		responseMap = map[string]interface{}{
+			"app":      appName,
+			"timeout":  DefaultFlyReplayTimeout,
+			"fallback": DefaultFlyReplayFallback,
+		}
+
+		// Only add transform if staying within the same app and we have headers to set
+		if currentAppName == appName {
+			if headers := buildTransformHeaders(); len(headers) > 0 {
+				responseMap["transform"] = map[string]interface{}{
+					"set_headers": headers,
+				}
+			}
+		}
 	} else {
-		// Region-based: http://<region>.<FLY_APP_NAME>.internal:<port><path>
-		targetURL = fmt.Sprintf("http://%s.%s.internal:%d%s", target, flyAppName, listenPort, r.URL.Path)
+		// Region-based fly-replay (same app, different region)
+		responseMap = map[string]interface{}{
+			"region":   target + ",any",
+			"timeout":  DefaultFlyReplayTimeout,
+			"fallback": DefaultFlyReplayFallback,
+		}
+
+		if headers := buildTransformHeaders(); len(headers) > 0 {
+			responseMap["transform"] = map[string]interface{}{
+				"set_headers": headers,
+			}
+		}
 	}
 
-	_, err := url.Parse(targetURL)
+	w.WriteHeader(statusCode)
+
+	responseBodyBytes, err := json.Marshal(responseMap)
 	if err != nil {
-		logging.LogFlyReplayFallbackURLError(targetURL, err)
-		return false
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return true
+	}
+	logging.LogFlyReplayResponseBody(responseBodyBytes)
+	_, _ = w.Write(responseBodyBytes)
+
+	// Set metadata for fly-replay response
+	if recorder, ok := w.(*ResponseRecorder); ok {
+		recorder.SetMetadata("response_type", "fly-replay")
+		recorder.SetMetadata("destination", target)
 	}
 
-	// Set forwarding headers
-	r.Header.Set("X-Forwarded-Host", r.Host)
-
-	logging.LogFlyReplayFallbackProxy(target, targetURL)
-
-	// Use the existing retry proxy logic
-	proxy.HandleProxyWithRetry(w, r, targetURL, 3*time.Second)
 	return true
 }

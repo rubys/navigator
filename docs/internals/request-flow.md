@@ -283,9 +283,9 @@ targetURL := fmt.Sprintf("http://%s.vm.%s.internal:%d%s",
     machineID, appName, listenPort, r.URL.Path)
 ```
 
-**Retry Detection:**
+**Failure Detection:**
 
-Navigator adds `X-Navigator-Retry: true` header when using Fly-Replay within the same app. If the request comes back (machine unavailable), it serves a maintenance page instead of infinite loops.
+Navigator uses Fly.io's native replay fallback mechanism with `timeout` and `fallback=force_self` fields in the replay response. If the target is unavailable, Fly's proxy returns the request to the originating machine with a `fly-replay-failed` header. Navigator detects this header and serves a maintenance page instead of retrying.
 
 #### `last` - Internal Rewrite
 Modifies path and continues processing:

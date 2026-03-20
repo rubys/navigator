@@ -352,15 +352,21 @@ When Navigator sends a Fly-Replay response:
 ```json
 {
   "region": "fra",
-  "app": "pdf-service", 
+  "app": "pdf-service",
   "prefer_instance": "machine123",
+  "timeout": "5s",
+  "fallback": "force_self",
   "transform": {
     "set_headers": [
-      {"name": "X-Navigator-Retry", "value": "true"}
+      {"name": "Authorization", "value": "Basic ..."}
     ]
   }
 }
 ```
+
+The `timeout` and `fallback` fields leverage Fly.io's native replay fallback mechanism.
+When the target is unavailable, Fly's proxy returns the request to the originating machine
+with a `fly-replay-failed` header, and Navigator serves a maintenance page.
 
 ## Common Use Cases
 
@@ -507,21 +513,12 @@ Navigator validates Fly-Replay requests:
 - Validates target exists
 - Ensures method is allowed
 
-### Internal Network Security
+### Native Replay Fallback
 
-Fallback proxy uses Fly.io internal networking:
-- Traffic stays within Fly.io network
-- Automatic TLS encryption
-- No external network exposure
-
-### Retry Headers
-
-Navigator adds retry tracking headers:
-```
-X-Navigator-Retry: true
-```
-
-This prevents infinite retry loops when requests bounce between regions.
+Navigator uses Fly.io's native replay fallback mechanism to prevent infinite retry loops:
+- Replay responses include `timeout=5s` and `fallback=force_self`
+- If the target is unavailable, Fly's proxy returns the request with a `fly-replay-failed` header
+- Navigator detects this header and serves a maintenance page
 
 ## See Also
 

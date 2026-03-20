@@ -28,12 +28,12 @@ func TestShouldUseFlyReplay(t *testing.T) {
 		{"PUT with small content", "PUT", 1024, true},
 		{"PATCH with small content", "PATCH", 1024, true},
 
-		// Methods with large content (should use proxy)
+		// Methods with large content (should not use replay)
 		{"POST with large content", "POST", MaxFlyReplaySize, false},
 		{"PUT with large content", "PUT", MaxFlyReplaySize + 1, false},
 		{"PATCH with large content", "PATCH", MaxFlyReplaySize * 2, false},
 
-		// Methods with missing content length (should use proxy for body methods)
+		// Methods with missing content length (should not use replay for body methods)
 		{"POST with missing content length", "POST", -1, false},
 		{"PUT with missing content length", "PUT", -1, false},
 		{"PATCH with missing content length", "PATCH", -1, false},
@@ -63,7 +63,7 @@ func TestHandleFlyReplay(t *testing.T) {
 		target                string
 		status                string
 		currentApp            string
-		retryHeader           string
+		failedHeader          string
 		expectHandled         bool
 		expectStatus          int
 		expectContentType     string
@@ -106,11 +106,11 @@ func TestHandleFlyReplay(t *testing.T) {
 			expectContentType: "application/vnd.fly.replay+json",
 		},
 		{
-			name:                  "Retry detected - maintenance page",
+			name:                  "Failed replay - maintenance page",
 			target:                "us-west",
 			status:                "307",
 			currentApp:            "myapp",
-			retryHeader:           "true",
+			failedHeader:          "connection_timeout",
 			expectHandled:         true,
 			expectMaintenancePage: true,
 		},
@@ -135,8 +135,8 @@ func TestHandleFlyReplay(t *testing.T) {
 
 			cfg := &config.Config{}
 			req := httptest.NewRequest("GET", "/test", nil) // GET to ensure ShouldUseFlyReplay returns true
-			if tt.retryHeader != "" {
-				req.Header.Set("X-Navigator-Retry", tt.retryHeader)
+			if tt.failedHeader != "" {
+				req.Header.Set("fly-replay-failed", tt.failedHeader)
 			}
 
 			recorder := httptest.NewRecorder()
@@ -188,51 +188,105 @@ func TestHandleFlyReplay(t *testing.T) {
 				}
 			}
 
-			// Check for retry header transform (only for same app or region replays)
-			shouldHaveRetryTransform := false
-			if strings.HasPrefix(tt.target, "machine=") {
-				parts := strings.Split(strings.TrimPrefix(tt.target, "machine="), ":")
-				shouldHaveRetryTransform = len(parts) == 2 && parts[1] == tt.currentApp
-			} else if strings.HasPrefix(tt.target, "app=") {
-				appName := strings.TrimPrefix(tt.target, "app=")
-				shouldHaveRetryTransform = appName == tt.currentApp
-			} else {
-				// Region-based always has retry transform
-				shouldHaveRetryTransform = true
+			// Verify timeout and fallback fields are present
+			if _, ok := response["timeout"]; !ok {
+				t.Error("Response should contain 'timeout' field")
+			}
+			if _, ok := response["fallback"]; !ok {
+				t.Error("Response should contain 'fallback' field")
+			}
+			if response["timeout"] != DefaultFlyReplayTimeout {
+				t.Errorf("timeout = %v, expected %v", response["timeout"], DefaultFlyReplayTimeout)
+			}
+			if response["fallback"] != DefaultFlyReplayFallback {
+				t.Errorf("fallback = %v, expected %v", response["fallback"], DefaultFlyReplayFallback)
 			}
 
-			if shouldHaveRetryTransform {
-				if _, ok := response["transform"]; !ok {
-					t.Error("Should contain retry transform for same-app/region replay")
+			// Check for transform headers (only for same app or region replays with Authorization)
+			// Without Authorization header, no transform should be present
+			if strings.HasPrefix(tt.target, "machine=") {
+				parts := strings.Split(strings.TrimPrefix(tt.target, "machine="), ":")
+				if len(parts) == 2 && parts[1] != tt.currentApp {
+					if _, ok := response["transform"]; ok {
+						t.Error("Different-app replay should not contain transform")
+					}
+				}
+			} else if strings.HasPrefix(tt.target, "app=") {
+				appName := strings.TrimPrefix(tt.target, "app=")
+				if appName != tt.currentApp {
+					if _, ok := response["transform"]; ok {
+						t.Error("Different-app replay should not contain transform")
+					}
 				}
 			}
 		})
 	}
 }
 
-func TestHandleFlyReplay_LargeRequest(t *testing.T) {
-	// Set FLY_APP_NAME for fallback to work
-	os.Setenv("FLY_APP_NAME", "testapp")
+func TestHandleFlyReplay_WithAuthorization(t *testing.T) {
+	os.Setenv("FLY_APP_NAME", "myapp")
 	defer os.Unsetenv("FLY_APP_NAME")
 
 	cfg := &config.Config{}
-	cfg.Server.Listen = "3000"
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Authorization", "Bearer test-token")
 
-	// Create a request that should trigger fallback (large content)
+	recorder := httptest.NewRecorder()
+	HandleFlyReplay(recorder, req, "us-west", "307", cfg)
+
+	var response map[string]interface{}
+	err := json.Unmarshal(recorder.Body.Bytes(), &response)
+	if err != nil {
+		t.Fatalf("Failed to parse JSON response: %v", err)
+	}
+
+	// Region-based replay with Authorization should have transform headers
+	transform, ok := response["transform"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Region-based replay with Authorization should contain transform")
+	}
+
+	headers, ok := transform["set_headers"].([]interface{})
+	if !ok {
+		t.Fatal("Transform should contain set_headers")
+	}
+
+	// Should have Authorization header but NOT X-Navigator-Retry
+	foundAuth := false
+	for _, h := range headers {
+		header := h.(map[string]interface{})
+		if header["name"] == "X-Navigator-Retry" {
+			t.Error("Should not contain X-Navigator-Retry header")
+		}
+		if header["name"] == "Authorization" {
+			foundAuth = true
+			if header["value"] != "Bearer test-token" {
+				t.Errorf("Authorization value = %v, expected 'Bearer test-token'", header["value"])
+			}
+		}
+	}
+	if !foundAuth {
+		t.Error("Transform should contain Authorization header")
+	}
+}
+
+func TestHandleFlyReplay_LargeRequest(t *testing.T) {
+	cfg := &config.Config{}
+
+	// Create a request that exceeds the size limit
 	req := httptest.NewRequest("POST", "/test", strings.NewReader("large body"))
 	req.ContentLength = MaxFlyReplaySize + 1
 
 	recorder := httptest.NewRecorder()
 
-	// This should call HandleFlyReplayFallback instead
+	// Large requests should return false (not handled) so the caller can route normally
 	handled := HandleFlyReplay(recorder, req, "us-west", "307", cfg)
 
-	if !handled {
-		t.Error("HandleFlyReplay should have been handled (via fallback)")
+	if handled {
+		t.Error("HandleFlyReplay should return false for large requests")
 	}
 
-	// The exact behavior depends on HandleFlyReplayFallback implementation
-	// but it should not be a fly-replay response
+	// Should not be a fly-replay response
 	contentType := recorder.Header().Get("Content-Type")
 	if contentType == "application/vnd.fly.replay+json" {
 		t.Error("Large request should not use fly-replay JSON response")

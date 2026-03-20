@@ -1561,21 +1561,22 @@ func TestHandler_HandleRewritesFlyReplayLargeRequest(t *testing.T) {
 		staticHandler: NewStaticFileHandler(cfg),
 	}
 
-	// Create a POST request with large content that should trigger fallback
+	// Create a POST request with large content that exceeds fly-replay size limit
 	req := httptest.NewRequest("POST", "/upload/large-file", strings.NewReader("large content"))
 	req.ContentLength = MaxFlyReplaySize + 1 // Exceeds limit
 	recorder := httptest.NewRecorder()
 
 	handled := handler.handleRewrites(recorder, req)
 
-	if !handled {
-		t.Error("handleRewrites() should have handled large request via fallback")
+	// Large requests are not handled by fly-replay; they fall through to normal routing
+	if handled {
+		t.Error("handleRewrites() should not handle large request via fly-replay")
 	}
 
 	// Should not be a fly-replay JSON response
 	contentType := recorder.Header().Get("Content-Type")
 	if contentType == "application/vnd.fly.replay+json" {
-		t.Error("Large request should not use fly-replay JSON response, should use fallback")
+		t.Error("Large request should not use fly-replay JSON response")
 	}
 }
 

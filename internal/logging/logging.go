@@ -440,42 +440,17 @@ func LogFlyReplayMissingContentLength(method string) {
 		"method", method)
 }
 
-// LogFlyReplayRetryDetected logs fly-replay retry detection
-func LogFlyReplayRetryDetected(retryCount string, targetMachine string) {
-	slog.Info("Retry detected, serving maintenance page",
-		"retryCount", retryCount,
-		"targetMachine", targetMachine)
+// LogFlyReplayFailed logs when a fly-replay failed and fell back to the originating machine
+func LogFlyReplayFailed(failedHeader string, target string) {
+	slog.Info("Fly-replay failed, serving maintenance page",
+		"failedReason", failedHeader,
+		"target", target)
 }
 
 // LogFlyReplayResponseBody logs fly-replay response body
 func LogFlyReplayResponseBody(body []byte) {
 	slog.Debug("Fly replay response body",
 		"body", string(body))
-}
-
-// LogFlyReplayNoAppName logs missing FLY_APP_NAME
-func LogFlyReplayNoAppName() {
-	slog.Debug("FLY_APP_NAME not set, cannot construct fallback proxy URL")
-}
-
-// LogFlyReplayInvalidMachineTarget logs invalid machine target format
-func LogFlyReplayInvalidMachineTarget(target string) {
-	slog.Debug("Invalid machine target format",
-		"target", target)
-}
-
-// LogFlyReplayFallbackURLError logs fallback URL parse error
-func LogFlyReplayFallbackURLError(url string, err error) {
-	slog.Error("Failed to parse fly-replay fallback URL",
-		"url", url,
-		"error", err)
-}
-
-// LogFlyReplayFallbackProxy logs automatic fallback to reverse proxy
-func LogFlyReplayFallbackProxy(target, fallbackURL string) {
-	slog.Info("Using automatic reverse proxy fallback for fly-replay",
-		"originalTarget", target,
-		"fallbackURL", fallbackURL)
 }
 
 // Response write logging helpers

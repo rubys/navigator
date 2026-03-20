@@ -137,6 +137,14 @@ func TestFlyReplayIntegration_EndToEnd(t *testing.T) {
 					}
 				}
 
+				// Verify timeout and fallback are present
+				if _, ok := response["timeout"]; !ok {
+					t.Error("Response should contain 'timeout' field")
+				}
+				if _, ok := response["fallback"]; !ok {
+					t.Error("Response should contain 'fallback' field")
+				}
+
 			} else {
 				// Should NOT be a fly-replay response
 				if recorder.Header().Get("Content-Type") == "application/vnd.fly.replay+json" {
@@ -148,7 +156,7 @@ func TestFlyReplayIntegration_EndToEnd(t *testing.T) {
 	}
 }
 
-func TestFlyReplayIntegration_LargeRequestFallback(t *testing.T) {
+func TestFlyReplayIntegration_LargeRequestNotHandled(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.Listen = "3000"
 	cfg.Server.RewriteRules = []config.RewriteRule{
@@ -166,7 +174,7 @@ func TestFlyReplayIntegration_LargeRequestFallback(t *testing.T) {
 	idleManager := &idle.Manager{}
 	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
-	// Create a large POST request that should trigger fallback
+	// Create a large POST request that should not trigger fly-replay
 	req := httptest.NewRequest("POST", "/upload/large-file", strings.NewReader("large body content"))
 	req.ContentLength = MaxFlyReplaySize + 1
 	recorder := httptest.NewRecorder()
@@ -177,14 +185,9 @@ func TestFlyReplayIntegration_LargeRequestFallback(t *testing.T) {
 	if recorder.Header().Get("Content-Type") == "application/vnd.fly.replay+json" {
 		t.Error("Large request should not use fly-replay JSON response")
 	}
-
-	// Should have been handled by fallback (exact behavior depends on proxy implementation)
-	if recorder.Code == 0 {
-		t.Error("Request should have been handled")
-	}
 }
 
-func TestFlyReplayIntegration_RetryHandling(t *testing.T) {
+func TestFlyReplayIntegration_FailedReplayHandling(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.RewriteRules = []config.RewriteRule{
 		{
@@ -198,21 +201,21 @@ func TestFlyReplayIntegration_RetryHandling(t *testing.T) {
 	idleManager := &idle.Manager{}
 	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
 
-	// Test request with retry header
+	// Test request with fly-replay-failed header (Fly couldn't reach the target)
 	req := httptest.NewRequest("GET", "/retry-test/endpoint", nil)
-	req.Header.Set("X-Navigator-Retry", "true")
+	req.Header.Set("fly-replay-failed", "connection_timeout")
 	recorder := httptest.NewRecorder()
 
 	handler.ServeHTTP(recorder, req)
 
 	// Should serve maintenance page, not fly-replay
 	if recorder.Header().Get("Content-Type") == "application/vnd.fly.replay+json" {
-		t.Error("Retry request should not use fly-replay, should serve maintenance page")
+		t.Error("Failed replay request should not use fly-replay, should serve maintenance page")
 	}
 
 	// Should have some content (maintenance page)
 	if recorder.Body.Len() == 0 {
-		t.Error("Retry request should serve maintenance page content")
+		t.Error("Failed replay request should serve maintenance page content")
 	}
 }
 
