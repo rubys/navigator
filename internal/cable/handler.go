@@ -243,7 +243,7 @@ func (h *Handler) Shutdown(ctx context.Context) error {
 	h.connectionsMu.RUnlock()
 
 	for _, conn := range connections {
-		conn.ws.Close()
+		_ = conn.ws.Close()
 	}
 
 	h.logger.Info("WebSocket handler shutdown complete")
@@ -252,7 +252,7 @@ func (h *Handler) Shutdown(ctx context.Context) error {
 
 // readPump handles incoming messages from the WebSocket
 func (conn *Connection) readPump() {
-	defer conn.ws.Close()
+	defer func() { _ = conn.ws.Close() }()
 
 	// Set max message size to prevent DoS attacks
 	conn.ws.SetReadLimit(maxMessageSize)
@@ -303,7 +303,7 @@ func (conn *Connection) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		conn.ws.Close()
+		_ = conn.ws.Close()
 	}()
 
 	for {

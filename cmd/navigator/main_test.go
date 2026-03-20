@@ -122,8 +122,7 @@ func TestLogLevelFromEnvironment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variable
-			os.Setenv("LOG_LEVEL", tt.envValue)
-			defer os.Unsetenv("LOG_LEVEL")
+			t.Setenv("LOG_LEVEL", tt.envValue)
 
 			// Test that initLogger correctly parses the environment variable
 			// We'll verify by testing the log level detection logic directly
@@ -226,7 +225,7 @@ func TestPrintHelp(t *testing.T) {
 	printHelp()
 
 	// Restore stdout
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	// Read captured output

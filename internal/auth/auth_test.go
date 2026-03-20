@@ -513,7 +513,7 @@ func TestHtpasswdAutoReload(t *testing.T) {
 	if _, err := tmpfile.WriteString(initialContent); err != nil {
 		t.Fatalf("Failed to write initial content: %v", err)
 	}
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	// Load the auth file
 	auth, err := LoadAuthFile(tmpfile.Name(), "Test", []string{})

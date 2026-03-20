@@ -124,7 +124,7 @@ func TestWebSocketUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Verify we can send a message
 	subscribe := Message{
@@ -163,7 +163,7 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Subscribe
 	subscribe := Message{Type: "subscribe", Stream: "test-stream"}
@@ -223,13 +223,13 @@ func TestBroadcastToSubscribers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect client 1: %v", err)
 	}
-	defer ws1.Close()
+	defer func() { _ = ws1.Close() }()
 
 	ws2, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to connect client 2: %v", err)
 	}
-	defer ws2.Close()
+	defer func() { _ = ws2.Close() }()
 
 	// Both subscribe to same stream
 	subscribe := Message{Type: "subscribe", Stream: "broadcast-test"}
@@ -295,7 +295,7 @@ func TestPingPong(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Send pong message
 	pong := Message{Type: "pong"}
@@ -336,7 +336,7 @@ func TestShutdown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Subscribe to verify connection is working
 	subscribe := Message{Type: "subscribe", Stream: "test"}
@@ -376,7 +376,7 @@ func TestMultipleStreams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Subscribe to multiple streams
 	streams := []string{"stream1", "stream2", "stream3"}
@@ -454,7 +454,7 @@ func TestMaxMessageSize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
 	}
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// First verify normal message works
 	subscribe := Message{Type: "subscribe", Stream: "test"}
