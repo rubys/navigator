@@ -440,6 +440,12 @@ func LogFlyReplayMissingContentLength(method string) {
 		"method", method)
 }
 
+// LogFlyReplayRetryDetected logs when a request has already been through fly-replay
+func LogFlyReplayRetryDetected(target string) {
+	slog.Info("Retry detected via X-Navigator-Retry, serving maintenance page",
+		"target", target)
+}
+
 // LogFlyReplayFailed logs when a fly-replay failed and fell back to the originating machine
 func LogFlyReplayFailed(failedHeader string, target string) {
 	slog.Info("Fly-replay failed, serving maintenance page",

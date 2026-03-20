@@ -216,6 +216,38 @@ func TestFlyReplayIntegration_FailedReplayHandling(t *testing.T) {
 	}
 }
 
+func TestFlyReplayIntegration_RetryHeaderHandling(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Server.RewriteRules = []config.RewriteRule{
+		{
+			Pattern:     regexp.MustCompile(`^/retry-test/`),
+			Replacement: "/retry-test/",
+			Flag:        "fly-replay:us-east:307",
+		},
+	}
+
+	appManager := &process.AppManager{}
+	idleManager := &idle.Manager{}
+	handler := CreateTestHandler(cfg, appManager, nil, idleManager)
+
+	// Test request with X-Navigator-Retry header (request already went through fly-replay)
+	req := httptest.NewRequest("GET", "/retry-test/endpoint", nil)
+	req.Header.Set("X-Navigator-Retry", "true")
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	// Should serve maintenance page, not fly-replay
+	if recorder.Header().Get("Content-Type") == "application/vnd.fly.replay+json" {
+		t.Error("Retry request should not use fly-replay, should serve maintenance page")
+	}
+
+	// Should have some content (maintenance page)
+	if recorder.Body.Len() == 0 {
+		t.Error("Retry request should serve maintenance page content")
+	}
+}
+
 func TestFlyReplayIntegration_MethodFiltering(t *testing.T) {
 	cfg := &config.Config{}
 

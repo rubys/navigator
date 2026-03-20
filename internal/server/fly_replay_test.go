@@ -63,6 +63,7 @@ func TestHandleFlyReplay(t *testing.T) {
 		status                string
 		currentApp            string
 		failedHeader          string
+		retryHeader           string
 		expectHandled         bool
 		expectStatus          int
 		expectContentType     string
@@ -114,6 +115,15 @@ func TestHandleFlyReplay(t *testing.T) {
 			expectMaintenancePage: true,
 		},
 		{
+			name:                  "Retry detected - maintenance page",
+			target:                "us-west",
+			status:                "307",
+			currentApp:            "myapp",
+			retryHeader:           "true",
+			expectHandled:         true,
+			expectMaintenancePage: true,
+		},
+		{
 			name:              "Default status code",
 			target:            "us-east",
 			status:            "invalid",
@@ -135,6 +145,9 @@ func TestHandleFlyReplay(t *testing.T) {
 			req := httptest.NewRequest("GET", "/test", nil) // GET to ensure ShouldUseFlyReplay returns true
 			if tt.failedHeader != "" {
 				req.Header.Set("fly-replay-failed", tt.failedHeader)
+			}
+			if tt.retryHeader != "" {
+				req.Header.Set("X-Navigator-Retry", tt.retryHeader)
 			}
 
 			recorder := httptest.NewRecorder()
@@ -200,21 +213,37 @@ func TestHandleFlyReplay(t *testing.T) {
 				t.Errorf("fallback = %v, expected %v", response["fallback"], DefaultFlyReplayFallback)
 			}
 
-			// Check for transform headers (only for same app or region replays with Authorization)
-			// Without Authorization header, no transform should be present
+			// Check for transform headers
+			// Same-app and region replays should have transform with X-Navigator-Retry
+			// Different-app replays should not have transform
 			if strings.HasPrefix(tt.target, "machine=") {
 				parts := strings.Split(strings.TrimPrefix(tt.target, "machine="), ":")
-				if len(parts) == 2 && parts[1] != tt.currentApp {
-					if _, ok := response["transform"]; ok {
-						t.Error("Different-app replay should not contain transform")
+				if len(parts) == 2 {
+					if parts[1] == tt.currentApp {
+						if _, ok := response["transform"]; !ok {
+							t.Error("Same-app replay should contain transform with retry header")
+						}
+					} else {
+						if _, ok := response["transform"]; ok {
+							t.Error("Different-app replay should not contain transform")
+						}
 					}
 				}
 			} else if strings.HasPrefix(tt.target, "app=") {
 				appName := strings.TrimPrefix(tt.target, "app=")
-				if appName != tt.currentApp {
+				if appName == tt.currentApp {
+					if _, ok := response["transform"]; !ok {
+						t.Error("Same-app replay should contain transform with retry header")
+					}
+				} else {
 					if _, ok := response["transform"]; ok {
 						t.Error("Different-app replay should not contain transform")
 					}
+				}
+			} else {
+				// Region-based always has transform
+				if _, ok := response["transform"]; !ok {
+					t.Error("Region-based replay should contain transform with retry header")
 				}
 			}
 		})
@@ -248,12 +277,16 @@ func TestHandleFlyReplay_WithAuthorization(t *testing.T) {
 		t.Fatal("Transform should contain set_headers")
 	}
 
-	// Should have Authorization header but NOT X-Navigator-Retry
+	// Should have both X-Navigator-Retry and Authorization headers
+	foundRetry := false
 	foundAuth := false
 	for _, h := range headers {
 		header := h.(map[string]interface{})
 		if header["name"] == "X-Navigator-Retry" {
-			t.Error("Should not contain X-Navigator-Retry header")
+			foundRetry = true
+			if header["value"] != "true" {
+				t.Errorf("X-Navigator-Retry value = %v, expected 'true'", header["value"])
+			}
 		}
 		if header["name"] == "Authorization" {
 			foundAuth = true
@@ -261,6 +294,9 @@ func TestHandleFlyReplay_WithAuthorization(t *testing.T) {
 				t.Errorf("Authorization value = %v, expected 'Bearer test-token'", header["value"])
 			}
 		}
+	}
+	if !foundRetry {
+		t.Error("Transform should contain X-Navigator-Retry header")
 	}
 	if !foundAuth {
 		t.Error("Transform should contain Authorization header")

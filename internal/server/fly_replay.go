@@ -61,6 +61,13 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 		return true
 	}
 
+	// Check if this is a retry (request already went through fly-replay once)
+	if r.Header.Get("X-Navigator-Retry") == "true" {
+		logging.LogFlyReplayRetryDetected(target)
+		ServeMaintenancePage(w, r, config)
+		return true
+	}
+
 	w.Header().Set("Content-Type", "application/vnd.fly.replay+json")
 	statusCode := http.StatusTemporaryRedirect
 	if code, err := strconv.Atoi(status); err == nil {
@@ -74,7 +81,9 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 	// The Authorization header must be explicitly preserved during fly-replay
 	// to prevent authentication failures on the target machine
 	buildTransformHeaders := func() []map[string]string {
-		var headers []map[string]string
+		headers := []map[string]string{
+			{"name": "X-Navigator-Retry", "value": "true"},
+		}
 
 		// Explicitly preserve Authorization header if present
 		if authHeader := r.Header.Get("Authorization"); authHeader != "" {
@@ -104,12 +113,10 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 				"fallback":        DefaultFlyReplayFallback,
 			}
 
-			// Only add transform if staying within the same app and we have headers to set
+			// Only add transform if staying within the same app
 			if currentAppName == appName {
-				if headers := buildTransformHeaders(); len(headers) > 0 {
-					responseMap["transform"] = map[string]interface{}{
-						"set_headers": headers,
-					}
+				responseMap["transform"] = map[string]interface{}{
+					"set_headers": buildTransformHeaders(),
 				}
 			}
 		}
@@ -123,12 +130,10 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 			"fallback": DefaultFlyReplayFallback,
 		}
 
-		// Only add transform if staying within the same app and we have headers to set
+		// Only add transform if staying within the same app
 		if currentAppName == appName {
-			if headers := buildTransformHeaders(); len(headers) > 0 {
-				responseMap["transform"] = map[string]interface{}{
-					"set_headers": headers,
-				}
+			responseMap["transform"] = map[string]interface{}{
+				"set_headers": buildTransformHeaders(),
 			}
 		}
 	} else {
@@ -137,12 +142,9 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 			"region":   target + ",any",
 			"timeout":  DefaultFlyReplayTimeout,
 			"fallback": DefaultFlyReplayFallback,
-		}
-
-		if headers := buildTransformHeaders(); len(headers) > 0 {
-			responseMap["transform"] = map[string]interface{}{
-				"set_headers": headers,
-			}
+			"transform": map[string]interface{}{
+				"set_headers": buildTransformHeaders(),
+			},
 		}
 	}
 
