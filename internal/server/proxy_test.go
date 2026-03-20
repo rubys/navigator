@@ -353,7 +353,7 @@ func TestWebSocketProxy_SuccessfulUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WebSocket connection failed: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Test echo
 	testMessage := "hello websocket"
@@ -384,7 +384,7 @@ func TestWebSocketProxy_StripPath(t *testing.T) {
 			t.Errorf("Backend upgrade failed: %v", err)
 			return
 		}
-		conn.Close()
+		_ = conn.Close()
 	}))
 	defer backend.Close()
 
@@ -418,7 +418,7 @@ func TestWebSocketProxy_StripPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WebSocket connection failed: %v", err)
 	}
-	conn.Close()
+	_ = conn.Close()
 
 	// Verify the backend received the stripped path
 	if receivedPath != "/cable" {
@@ -493,7 +493,7 @@ func TestWebSocketProxy_ProtocolNegotiation(t *testing.T) {
 			t.Errorf("Backend upgrade failed: %v", err)
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		// Send welcome message (like Action Cable does)
 		_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"welcome"}`))
@@ -538,7 +538,7 @@ func TestWebSocketProxy_ProtocolNegotiation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WebSocket connection failed: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Verify the selected protocol is returned to client
 	if resp.Header.Get("Sec-WebSocket-Protocol") != selectedProtocol {

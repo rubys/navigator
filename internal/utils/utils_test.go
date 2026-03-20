@@ -57,7 +57,7 @@ func TestExtractTenantName(t *testing.T) {
 func TestWritePIDFile(t *testing.T) {
 	// Test with temporary file
 	tmpFile := "/tmp/test-navigator.pid"
-	defer os.Remove(tmpFile)
+	defer func() { _ = os.Remove(tmpFile) }()
 
 	err := WritePIDFile(tmpFile)
 	if err != nil {

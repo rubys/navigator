@@ -63,7 +63,7 @@ func TestHandleProxyNoRetry(t *testing.T) {
 		if ok {
 			conn, _, _ := hj.Hijack()
 			if conn != nil {
-				conn.Close()
+				_ = conn.Close()
 			}
 		}
 	}))

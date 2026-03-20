@@ -433,7 +433,7 @@ func cleanupPidFile(pidfilePath string) error {
 	if err != nil {
 		slog.Warn("Invalid PID in file", "file", pidfilePath, "pid", pidStr)
 		// Remove invalid PID file
-		os.Remove(pidfilePath)
+		_ = os.Remove(pidfilePath)
 		return nil
 	}
 

@@ -906,7 +906,7 @@ func TestCleanupPidFile(t *testing.T) {
 	if _, err := os.Stat(pidFile); !os.IsNotExist(err) {
 		t.Error("PID file should be removed after cleanup")
 		// Clean up if test failed
-		os.Remove(pidFile)
+		_ = os.Remove(pidFile)
 	}
 
 	// Test cleanup of non-existent file (should not error)
@@ -1063,7 +1063,7 @@ func TestLoggingComponents(t *testing.T) {
 				if strings.Contains(filename, "{{app}}") {
 					filename = strings.ReplaceAll(filename, "{{app}}", tt.source)
 				}
-				os.Remove(filename)
+				_ = os.Remove(filename)
 			}
 		})
 	}

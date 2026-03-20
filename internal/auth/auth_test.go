@@ -505,7 +505,7 @@ func TestHtpasswdAutoReload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	// Write initial htpasswd content with user1:password1
 	// Using bcrypt hash (generated with: htpasswd -nbB user1 password1)

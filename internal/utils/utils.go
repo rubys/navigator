@@ -72,7 +72,7 @@ func WritePIDFile(pidFile string) error {
 
 // RemovePIDFile removes the PID file
 func RemovePIDFile(pidFile string) {
-	os.Remove(pidFile)
+	_ = os.Remove(pidFile)
 }
 
 // SendReloadSignal sends a HUP signal to the running navigator process

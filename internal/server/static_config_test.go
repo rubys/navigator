@@ -19,7 +19,7 @@ func TestServerTryFilesWithFileResolution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create test files
 	studiosDir := filepath.Join(tempDir, "studios")
@@ -120,7 +120,7 @@ func TestServerAllowedExtensions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create test files with different extensions
 	testFiles := map[string]string{
@@ -216,7 +216,7 @@ func TestServerCacheControl(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create directory structure
 	assetsDir := filepath.Join(tempDir, "assets")
@@ -319,7 +319,7 @@ func TestServerTryFilesWithAllowedExtensions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create test files with different extensions
 	contentDir := filepath.Join(tempDir, "content")
@@ -394,7 +394,7 @@ func TestServerTryFilesDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create test file
 	htmlFile := filepath.Join(tempDir, "page.html")
@@ -440,7 +440,7 @@ func TestServerTryFilesWithTenantPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create studios/millbrae.html
 	studiosDir := filepath.Join(tempDir, "studios")
@@ -493,7 +493,7 @@ func TestDirectoryRedirect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create studios/laval/index.html
 	lavalDir := filepath.Join(tempDir, "studios", "laval")

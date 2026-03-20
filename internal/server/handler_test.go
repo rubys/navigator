@@ -894,7 +894,7 @@ func TestMaintenanceModeWithStaticFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create a static HTML file
 	staticHTML := `<!DOCTYPE html>
@@ -1028,7 +1028,7 @@ func TestAssetServingIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create assets directory and test files
 	assetsDir := filepath.Join(tempDir, "assets")
@@ -1139,11 +1139,12 @@ func TestAssetServingIntegration(t *testing.T) {
 					}
 
 					// Verify actual content matches expected
-					if assetTest.expectedExt == ".js" {
+					switch assetTest.expectedExt {
+					case ".js":
 						if !strings.Contains(body, "Live scores controller loaded") {
 							t.Errorf("JS file content not found in response for %s", assetTest.path)
 						}
-					} else if assetTest.expectedExt == ".css" {
+					case ".css":
 						if !strings.Contains(body, ".live-scores") {
 							t.Errorf("CSS content not found in response for %s", assetTest.path)
 						}
@@ -1161,7 +1162,7 @@ func TestAssetServingIntegrationErrorCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	cfg := &config.Config{
 		LocationConfigMutex: sync.RWMutex{},
@@ -1197,7 +1198,7 @@ func TestAssetServingRootPathVariations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create test asset
 	assetsDir := filepath.Join(tempDir, "assets")
@@ -1452,8 +1453,7 @@ func TestHandler_HandleRewritesFlyReplay(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up environment
 			if tt.flyAppName != "" {
-				os.Setenv("FLY_APP_NAME", tt.flyAppName)
-				defer os.Unsetenv("FLY_APP_NAME")
+				t.Setenv("FLY_APP_NAME", tt.flyAppName)
 			}
 
 			// Create handler with test configuration
@@ -1544,8 +1544,7 @@ func TestHandler_HandleRewritesFlyReplayWithMethods(t *testing.T) {
 }
 
 func TestHandler_HandleRewritesFlyReplayLargeRequest(t *testing.T) {
-	os.Setenv("FLY_APP_NAME", "testapp")
-	defer os.Unsetenv("FLY_APP_NAME")
+	t.Setenv("FLY_APP_NAME", "testapp")
 
 	cfg := &config.Config{}
 	cfg.Server.Listen = "3000"
