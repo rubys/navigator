@@ -185,8 +185,8 @@ func TestHandleFlyReplay(t *testing.T) {
 				if _, ok := response["app"]; !ok {
 					t.Error("Machine-based replay should contain 'app' field")
 				}
-				if _, ok := response["prefer_instance"]; !ok {
-					t.Error("Machine-based replay should contain 'prefer_instance' field")
+				if _, ok := response["instance"]; !ok {
+					t.Error("Machine-based replay should contain 'instance' field")
 				}
 			} else if strings.HasPrefix(tt.target, "app=") {
 				if _, ok := response["app"]; !ok {

@@ -119,9 +119,9 @@ func TestFlyReplayIntegration_EndToEnd(t *testing.T) {
 					if !ok {
 						t.Error("Response should contain 'region' field")
 					} else {
-						// Region field format is "region,any"
-						if !strings.HasPrefix(regionField, tt.expectedRegion+",") {
-							t.Errorf("Region field = %q, expected to start with %q", regionField, tt.expectedRegion)
+						// Region field is the exact region (hard target for failure notification)
+						if regionField != tt.expectedRegion {
+							t.Errorf("Region field = %q, expected %q", regionField, tt.expectedRegion)
 						}
 					}
 				}

@@ -108,7 +108,7 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 
 			responseMap = map[string]interface{}{
 				"app":             appName,
-				"prefer_instance": machineID,
+				"instance": machineID,
 				"timeout":         DefaultFlyReplayTimeout,
 				"fallback":        DefaultFlyReplayFallback,
 			}
@@ -139,7 +139,7 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 	} else {
 		// Region-based fly-replay (same app, different region)
 		responseMap = map[string]interface{}{
-			"region":   target + ",any",
+			"region":   target,
 			"timeout":  DefaultFlyReplayTimeout,
 			"fallback": DefaultFlyReplayFallback,
 			"transform": map[string]interface{}{
