@@ -16,7 +16,7 @@ const (
 	MaxFlyReplaySize = 1024 * 1024
 
 	// DefaultFlyReplayTimeout is the default timeout for Fly-Replay attempts
-	DefaultFlyReplayTimeout = "5s"
+	DefaultFlyReplayTimeout = "30s"
 
 	// DefaultFlyReplayFallback is the default fallback strategy for Fly-Replay
 	DefaultFlyReplayFallback = "force_self"
