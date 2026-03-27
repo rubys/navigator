@@ -107,10 +107,10 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 			appName := parts[1]
 
 			responseMap = map[string]interface{}{
-				"app":             appName,
+				"app":      appName,
 				"instance": machineID,
-				"timeout":         DefaultFlyReplayTimeout,
-				"fallback":        DefaultFlyReplayFallback,
+				"timeout":  DefaultFlyReplayTimeout,
+				"fallback": DefaultFlyReplayFallback,
 			}
 
 			// Only add transform if staying within the same app
