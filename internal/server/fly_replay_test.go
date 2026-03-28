@@ -199,51 +199,39 @@ func TestHandleFlyReplay(t *testing.T) {
 				}
 			}
 
-			// Verify timeout and fallback fields are present
-			if _, ok := response["timeout"]; !ok {
-				t.Error("Response should contain 'timeout' field")
-			}
-			if _, ok := response["fallback"]; !ok {
-				t.Error("Response should contain 'fallback' field")
-			}
-			if response["timeout"] != DefaultFlyReplayTimeout {
-				t.Errorf("timeout = %v, expected %v", response["timeout"], DefaultFlyReplayTimeout)
-			}
-			if response["fallback"] != DefaultFlyReplayFallback {
-				t.Errorf("fallback = %v, expected %v", response["fallback"], DefaultFlyReplayFallback)
-			}
-
-			// Check for transform headers
-			// Same-app and region replays should have transform with X-Navigator-Retry
-			// Different-app replays should not have transform
-			if strings.HasPrefix(tt.target, "machine=") {
+			// Cross-app replays should NOT have timeout/fallback (let Fly handle natively)
+			// Same-app (machine/region) replays SHOULD have timeout/fallback
+			// Determine if this is a cross-app replay
+			isCrossApp := false
+			if strings.HasPrefix(tt.target, "app=") {
+				isCrossApp = strings.TrimPrefix(tt.target, "app=") != tt.currentApp
+			} else if strings.HasPrefix(tt.target, "machine=") {
 				parts := strings.Split(strings.TrimPrefix(tt.target, "machine="), ":")
 				if len(parts) == 2 {
-					if parts[1] == tt.currentApp {
-						if _, ok := response["transform"]; !ok {
-							t.Error("Same-app replay should contain transform with retry header")
-						}
-					} else {
-						if _, ok := response["transform"]; ok {
-							t.Error("Different-app replay should not contain transform")
-						}
-					}
+					isCrossApp = parts[1] != tt.currentApp
 				}
-			} else if strings.HasPrefix(tt.target, "app=") {
-				appName := strings.TrimPrefix(tt.target, "app=")
-				if appName == tt.currentApp {
-					if _, ok := response["transform"]; !ok {
-						t.Error("Same-app replay should contain transform with retry header")
-					}
-				} else {
-					if _, ok := response["transform"]; ok {
-						t.Error("Different-app replay should not contain transform")
-					}
+			}
+			if isCrossApp {
+				if _, ok := response["timeout"]; ok {
+					t.Error("Cross-app replay should not contain 'timeout' field")
+				}
+				if _, ok := response["fallback"]; ok {
+					t.Error("Cross-app replay should not contain 'fallback' field")
+				}
+				if _, ok := response["transform"]; ok {
+					t.Error("Cross-app replay should not contain transform")
 				}
 			} else {
-				// Region-based always has transform
+				if response["timeout"] != DefaultFlyReplayTimeout {
+					t.Errorf("timeout = %v, expected %v", response["timeout"], DefaultFlyReplayTimeout)
+				}
+				if response["fallback"] != DefaultFlyReplayFallback {
+					t.Errorf("fallback = %v, expected %v", response["fallback"], DefaultFlyReplayFallback)
+				}
+
+				// Same-app and region replays should have transform with X-Navigator-Retry
 				if _, ok := response["transform"]; !ok {
-					t.Error("Region-based replay should contain transform with retry header")
+					t.Error("Same-app/region replay should contain transform with retry header")
 				}
 			}
 		})

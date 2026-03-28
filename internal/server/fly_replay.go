@@ -109,32 +109,25 @@ func HandleFlyReplay(w http.ResponseWriter, r *http.Request, target string, stat
 			responseMap = map[string]interface{}{
 				"app":      appName,
 				"instance": machineID,
-				"timeout":  DefaultFlyReplayTimeout,
-				"fallback": DefaultFlyReplayFallback,
 			}
 
-			// Only add transform if staying within the same app
+			// Only add timeout/fallback/transform for same-app replays
 			if currentAppName == appName {
+				responseMap["timeout"] = DefaultFlyReplayTimeout
+				responseMap["fallback"] = DefaultFlyReplayFallback
 				responseMap["transform"] = map[string]interface{}{
 					"set_headers": buildTransformHeaders(),
 				}
 			}
 		}
 	} else if strings.HasPrefix(target, "app=") {
-		// App-based fly-replay
+		// App-based fly-replay to a different app (e.g., smooth-pdf)
+		// No timeout/fallback - let Fly handle the connection natively,
+		// allowing cold starts to complete without artificial cutoff
 		appName := strings.TrimPrefix(target, "app=")
 
 		responseMap = map[string]interface{}{
-			"app":      appName,
-			"timeout":  DefaultFlyReplayTimeout,
-			"fallback": DefaultFlyReplayFallback,
-		}
-
-		// Only add transform if staying within the same app
-		if currentAppName == appName {
-			responseMap["transform"] = map[string]interface{}{
-				"set_headers": buildTransformHeaders(),
-			}
+			"app": appName,
 		}
 	} else {
 		// Region-based fly-replay (same app, different region)

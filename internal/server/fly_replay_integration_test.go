@@ -135,12 +135,22 @@ func TestFlyReplayIntegration_EndToEnd(t *testing.T) {
 					}
 				}
 
-				// Verify timeout and fallback are present
-				if _, ok := response["timeout"]; !ok {
-					t.Error("Response should contain 'timeout' field")
-				}
-				if _, ok := response["fallback"]; !ok {
-					t.Error("Response should contain 'fallback' field")
+				// Cross-app replays should NOT have timeout/fallback
+				// Same-app (region) replays SHOULD have timeout/fallback
+				if tt.expectedApp != "" {
+					if _, ok := response["timeout"]; ok {
+						t.Error("Cross-app replay should not contain 'timeout' field")
+					}
+					if _, ok := response["fallback"]; ok {
+						t.Error("Cross-app replay should not contain 'fallback' field")
+					}
+				} else {
+					if _, ok := response["timeout"]; !ok {
+						t.Error("Response should contain 'timeout' field")
+					}
+					if _, ok := response["fallback"]; !ok {
+						t.Error("Response should contain 'fallback' field")
+					}
 				}
 
 			} else {
