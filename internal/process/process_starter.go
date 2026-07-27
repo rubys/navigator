@@ -79,6 +79,39 @@ func (ps *ProcessStarter) StartWebApp(app *WebApp, tenant *config.Tenant) error 
 		}
 	}
 
+	// Reap the child. exec.Cmd.Start() obliges its caller to Wait(), and
+	// nothing here did, so an exited web app stayed a zombie for the whole
+	// life of the navigator process. Idle shutdown reaches the app through
+	// app.cancel(), and cancelling a CommandContext KILLS but does not reap
+	// -- so every start/stop cycle leaked a PID. Observed in production:
+	// 1613 zombies against a single navigator after 41 days. Mirrors the
+	// managed-process path in manager.go, which has always done this
+	// correctly.
+	//
+	// The PID is the whole of the leak: the stdout/stderr copying goroutines
+	// os/exec spawns for non-*os.File writers close their own pipe ends on
+	// EOF, so descriptors were never at risk (that same production navigator
+	// held 58 of them).
+	//
+	// Deliberately started AFTER the cgroup write above: Wait() releases the
+	// PID for reuse, and AddProcessToCgroup writes that PID to cgroup.procs.
+	go func() {
+		err := cmd.Wait()
+
+		// A cancelled context is the ordinary path -- idle timeout or
+		// shutdown asked for this exit, and the kill it sends surfaces here
+		// as an error. Anything else means the app died on its own.
+		if ctx.Err() != nil {
+			slog.Debug("Web app stopped", "tenant", tenantName, "reason", ctx.Err())
+			return
+		}
+		if err != nil {
+			slog.Error("Web app exited unexpectedly", "tenant", tenantName, "error", err)
+		} else {
+			slog.Info("Web app exited", "tenant", tenantName)
+		}
+	}()
+
 	// Execute tenant start hooks
 	if err := ExecuteTenantHooks(ps.config.Applications.Hooks.Start, tenant.Hooks.Start,
 		tenant.Env, tenantName, "start"); err != nil {
